@@ -7,6 +7,7 @@ import {
   Menu,
   nativeTheme,
   safeStorage,
+  screen,
   session,
   shell,
   type BrowserWindowConstructorOptions,
@@ -85,8 +86,8 @@ import {
 } from '../domain/types';
 import type { NoteRef } from '../domain/note-operations';
 import { isDamaged } from '../domain/conversation';
-import { WindowTabs } from '../domain/workspace-tabs';
-import { titleBarHeight, windowChrome } from '../domain/window-frame';
+import { WindowTabs, type MovedTab } from '../domain/workspace-tabs';
+import { droppedWindowBounds, titleBarHeight, windowChrome } from '../domain/window-frame';
 import { startDictation } from './dictation';
 import { SerialQueue } from './serial-queue';
 /** irori's windows (ADR 051): each keeps its own workspace tabs over the one host. */
@@ -204,6 +205,9 @@ app
         if (!window.isDestroyed()) window.webContents.send('irori:event', event);
     };
     const tabs = new WindowTabs();
+    // Tabs dragged out of a window (ADR 062), by the window opened for each: it takes its
+    // tab once it has loaded, and `done` tells the window it came from whether it shows it.
+    const arriving = new Map<number, { tab: MovedTab; done: (shown: boolean) => void }>();
     // A terminal is its window's: its output goes there alone once the window is known.
     const terminalOwners = new Map<string, BrowserWindow>();
     const updates = new UpdateService({
@@ -1326,6 +1330,8 @@ app
       | 'closeTerminal'
       | 'windowTabs'
       | 'otherWindows'
+      | 'moveTab'
+      | 'movedTab'
       | 'showMenu';
     /**
      * For a vault on an SSH host (ADR 061), what this device answers itself. Its
@@ -1421,9 +1427,20 @@ app
         closeTerminal: (id) => terminals.close(ownTerminal(id)),
         windowTabs: (open) => {
           tabs.set(id, open);
+          const coming = arriving.get(id);
+          if (coming && open.some((tab) => tab.id === coming.tab.id)) coming.done(true);
           for (const other of windows) if (other !== window) emit({ type: 'windows' }, other);
         },
         otherWindows: () => tabs.elsewhere(id),
+        moveTab: (tab, at) => moveTab(tab, at),
+        movedTab: async () => {
+          const coming = arriving.get(id);
+          if (!coming) return undefined;
+          const profile = (await workspaces.list()).find((item) => item.id === coming.tab.id);
+          // A workspace removed on the way is not shown; its tab stays where it was.
+          if (!profile) coming.done(false);
+          return profile && { profile, place: coming.tab.place };
+        },
         showMenu: (x, y) => {
           Menu.getApplicationMenu()?.popup({ window, x, y });
         },
@@ -1670,14 +1687,19 @@ app
           height: titleBarHeight,
         });
     }
-    function createWindow() {
+    /** Opens a window at the start screen; `at` is where a tab dragged out to it was let go. */
+    function createWindow(at?: { x: number; y: number }) {
       const from = BrowserWindow.getFocusedWindow() ?? [...windows].at(-1);
       const bounds = from && !from.isMaximized() && !from.isFullScreen() && from.getBounds();
+      const size = bounds
+        ? { width: bounds.width, height: bounds.height }
+        : { width: 1440, height: 940 };
       const window = new BrowserWindow({
-        width: bounds ? bounds.width : 1440,
-        height: bounds ? bounds.height : 940,
-        // A new window steps down from the one it came from rather than covering it.
-        ...(bounds && { x: bounds.x + 28, y: bounds.y + 28 }),
+        // A new window steps down from the one it came from rather than covering it; one a
+        // tab was dragged out to has that tab under the pointer (ADR 062).
+        ...(at
+          ? droppedWindowBounds(at, size, screen.getDisplayNearestPoint(at).workArea)
+          : { ...size, ...(bounds && { x: bounds.x + 28, y: bounds.y + 28 }) }),
         minWidth: 980,
         minHeight: 680,
         ...frameOptions(),
@@ -1734,7 +1756,28 @@ app
           if (owner === window) terminalOwners.delete(terminal);
         emit({ type: 'windows' });
       });
-      return window.loadFile(entry);
+      return { window, loaded: window.loadFile(entry) };
+    }
+    /**
+     * Opens a tab dragged out of a window in a window of its own (ADR 062), true once that
+     * window shows it. The tab stays in the window it left until then, so what it runs is
+     * never in no window's tabs, and stays there when the new window cannot show it.
+     */
+    async function moveTab(tab: MovedTab, at?: { x: number; y: number }) {
+      if (!(await workspaces.list()).some((profile) => profile.id === tab.id)) return false;
+      const { window, loaded } = createWindow(at);
+      const id = window.webContents.id;
+      return new Promise<boolean>((resolve) => {
+        const done = (shown: boolean) => {
+          clearTimeout(late);
+          if (arriving.get(id)?.tab === tab) arriving.delete(id);
+          resolve(shown);
+        };
+        const late = setTimeout(() => done(false), 30_000);
+        arriving.set(id, { tab, done });
+        window.once('closed', () => done(false));
+        loaded.catch(() => done(false));
+      });
     }
     /**
      * The menu, in the reader's language: File carries New Window (ADR 051). macOS shows it in
@@ -1745,7 +1788,7 @@ app
         id: 'new-window',
         label: t('新しいウィンドウ', 'New Window'),
         accelerator: 'CmdOrCtrl+Shift+N',
-        click: () => void createWindow().catch((error) => console.error(error)),
+        click: () => void createWindow().loaded.catch((error) => console.error(error)),
       };
       const mac = process.platform === 'darwin';
       Menu.setApplicationMenu(
@@ -1768,7 +1811,7 @@ app
     };
     setMenu();
     languageChanged = setMenu;
-    await createWindow();
+    await createWindow().loaded;
     // An installed irori looks for a newer published version by itself; a development run and
     // the package smoke (IRORI_AUTOMATIC_UPDATE_CHECKS=0) only check when asked.
     if (app.isPackaged && process.env.IRORI_AUTOMATIC_UPDATE_CHECKS !== '0') updates.watch();

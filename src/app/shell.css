@@ -169,6 +169,45 @@
   background: var(--raised-2);
   color: var(--tx);
 }
+/* A tab being dragged, or on its way to a window of its own (ADR 062), fades in its
+   place; the drag itself follows the pointer and, out of the strip, says where it goes. */
+.workspace-tab[data-moving] {
+  opacity: 0.45;
+}
+.workspace-tab-drag {
+  position: fixed;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 26px;
+  max-width: 320px;
+  padding: 0 12px;
+  border-radius: 7px;
+  background: var(--raised);
+  box-shadow: var(--pop);
+  color: var(--tx);
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+.workspace-tab-drag > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.workspace-tab-drag[data-out] {
+  box-shadow:
+    inset 0 0 0 1px var(--act-line),
+    var(--pop);
+}
+.workspace-tab-drag > small {
+  flex: none;
+  color: var(--act);
+  font-size: 11.5px;
+}
 /* The start screen under the tabs takes the window's rest. */
 .app.app-start > .start {
   flex: 1;

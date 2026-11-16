@@ -8,7 +8,8 @@ import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 import { showEveryWindowItem } from '../tests/fixtures/window-items';
 
 // Several windows over one irori (ADR 051): each has its own tabs, what one has
-// open the others leave alone, and closing one leaves the rest running.
+// open the others leave alone, and closing one leaves the rest running. A tab
+// dragged out of its window opens in a window of its own (ADR 062).
 const base = await mkdtemp(path.join(tmpdir(), 'irori windows UI 日本語 '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
@@ -92,9 +93,45 @@ try {
   await page.getByRole('button', { name: 'ワークスペースを選択', exact: true }).click();
   await expect(page.getByRole('button', { name: '次の作業 の登録を削除' })).toBeEnabled();
   await expect(page.getByRole('button', { name: '最初の作業 の登録を削除' })).toBeDisabled();
+
+  // A tab dragged below the strip opens in a window of its own (ADR 062), on the vault it
+  // showed, and leaves this window once that one shows it. Nothing of it stops.
+  await page.locator('.workspace-card').filter({ hasText: '次の作業' }).click();
+  const strip = page.getByRole('navigation', { name: 'ワークスペース' });
+  const tabOf = (where: typeof strip, name: string) =>
+    where.getByRole('button', { name, exact: true });
+  await expect(tabOf(strip, '次の作業')).toHaveAttribute('aria-current', 'page');
+  const held = (await tabOf(strip, '次の作業').boundingBox())!;
+  await page.mouse.move(held.x + held.width / 2, held.y + held.height / 2);
+  await page.mouse.down();
+  // Along the strip it is not out yet; below it, it says where it goes.
+  await page.mouse.move(held.x + held.width / 2 + 30, held.y + held.height / 2 + 4, { steps: 4 });
+  await expect(page.locator('.workspace-tab-drag')).toBeVisible();
+  await expect(page.locator('.workspace-tab-drag')).not.toContainText('新しいウィンドウで開く');
+  await page.mouse.move(held.x + held.width / 2 + 60, held.y + 240, { steps: 8 });
+  await expect(page.locator('.workspace-tab-drag')).toContainText('新しいウィンドウで開く');
+  const [moved] = await Promise.all([app.waitForEvent('window'), page.mouse.up()]);
+  moved.on('pageerror', (error) => errors.push(String(error)));
+  const movedStrip = moved.getByRole('navigation', { name: 'ワークスペース' });
+  await expect(tabOf(movedStrip, '次の作業')).toHaveAttribute('aria-current', 'page');
+  await expect(moved.getByRole('heading', { name: '二つ目のKB' }).first()).toBeVisible();
+  await expect(strip).not.toContainText('次の作業');
+  await expect(tabOf(strip, '最初の作業')).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('.workspace-tab-drag')).toHaveCount(0);
+  expect(await windowCount()).toBe(2);
+  await moved.screenshot({ path: 'test-results/irori-windows-moved.png' });
+  // A window's only tab stays: dragging it out opens nothing.
+  const only = (await tabOf(movedStrip, '次の作業').boundingBox())!;
+  await moved.mouse.move(only.x + only.width / 2, only.y + only.height / 2);
+  await moved.mouse.down();
+  await moved.mouse.move(only.x + only.width / 2, only.y + 240, { steps: 8 });
+  await expect(moved.locator('.workspace-tab-drag')).toHaveCount(0);
+  await moved.mouse.up();
+  await expect(tabOf(movedStrip, '次の作業')).toBeVisible();
+  expect(await windowCount()).toBe(2);
   expect(errors).toEqual([]);
   console.log(
-    'Windows UI passed: new window from the menu, separate tabs, protection of what another window has open, terminal kept when another window closes. No model inference.',
+    'Windows UI passed: new window from the menu, separate tabs, protection of what another window has open, terminal kept when another window closes, a tab dragged out to a window of its own. No model inference.',
   );
 } finally {
   await app.close();
