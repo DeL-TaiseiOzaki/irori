@@ -21,6 +21,7 @@ import { webAddress } from '../domain/links';
 import { FileService, watcherIgnored, watchRegistrationChanges } from './files';
 import { vaultReads } from './vault-reads';
 import { RemoteHosts } from './remote-hosts';
+import { readSshConfigHosts } from './ssh-config';
 import { shippedPayload, sshLauncher } from './remote-payload';
 import { isForwardedRead } from '../remote/protocol';
 import { SettingsService } from './settings';
@@ -1097,6 +1098,7 @@ app
       switchCloudToLocal: (...args) => changeCloud(args[0], () => cloud.switchToLocal(...args)),
       spaces: () => [...files.list(), ...remote.list()],
       remoteHosts: () => remote.hosts(),
+      sshConfigHosts: () => readSshConfigHosts(),
       saveRemoteHost: (input) => remote.saveHost(input),
       removeRemoteHost: (id) => remote.removeHost(id),
       connectRemoteHost: (id) => remote.connect(id),

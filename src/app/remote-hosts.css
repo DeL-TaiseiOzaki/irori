@@ -158,6 +158,52 @@
   color: var(--ink-3);
   overflow-wrap: anywhere;
 }
+/* The hosts of the person's ssh configuration, offered where a host is chosen or added. */
+.remote-config {
+  margin: 0 0 12px;
+}
+.remote-config h5 {
+  margin: 0 0 6px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.remote-config h5 small {
+  font-weight: 400;
+  color: var(--ink-3);
+}
+.remote-config input[type='search'] {
+  width: 100%;
+  margin: 0 0 6px;
+  font: inherit;
+  font-size: 13px;
+}
+/* A long configuration scrolls inside its own part, so that what follows it stays in reach. */
+.remote-config ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 264px;
+  overflow-y: auto;
+}
+.remote-config .hint {
+  margin: 6px 0 0;
+}
+/* What a click goes on to do, at the row's end: it keeps its width, the names take the rest. */
+.remote-choice-host > span.remote-config-action {
+  flex: none;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.remote-config .remote-choice-host:hover:not(:disabled) .remote-config-action {
+  color: var(--ink);
+}
 .remote-lead,
 .remote-note {
   font-size: 12px;

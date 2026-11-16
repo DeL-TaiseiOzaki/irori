@@ -1,5 +1,39 @@
 # Implementation status — notes, native agents and connection onboarding
 
+SSH hosts from the person's ssh configuration, 2026-11-16 (**0.2.73**;
+[ADR 061](decisions/061-vaults-on-ssh-hosts.md) decision 3 amended, [SSH-HOSTS](SSH-HOSTS.md)):
+the owner expects what VS Code's Remote-SSH gives, a host written in
+`~/.ssh/config` chosen and not typed again.
+- `src/host/ssh-config.ts` reads `~/.ssh/config`, what it includes and the
+  system's file. `HostAPI.sshConfigHosts` gives the window each name on a `Host`
+  line with the address, user and port `ssh` would obtain for it. Nothing is
+  written there. A host added from it has the name as its destination, so `ssh`
+  applies the configuration at each connection.
+- The reading follows `ssh`, checked with `ssh -G` on OpenSSH 9.6: the first
+  value wins, a pattern's block gives its values to the hosts it matches, and a
+  file included inside a block is read for that block's hosts alone. A `Match`
+  other than `Match all` is left to `ssh`: the hosts it names are not listed,
+  and what it sets is shown for no host.
+- Remote-SSH was read first, from its Marketplace package (pre-release 0.129)
+  and its documents. It reads the same two files, lists the non-pattern words
+  of `Host` lines and the `host` values of `Match` lines, follows includes at
+  the top level and under a block with `*`, writes a `Host` block when a host
+  is added, and answers ssh's prompts in its window through `SSH_ASKPASS`.
+- The window (`ConfigHosts` in `src/app/RemoteHosts.tsx`): **ssh の設定にあるホスト**
+  in **設定 › SSH ホスト** (**追加**) and where a vault is added (**フォルダを選ぶ**
+  adds the host, connects and opens the folder dialog). More than eight hosts
+  get a filter, and fifty rows show at a time. The form for any other host is
+  **接続先を入力して追加**.
+- Verified on Linux: `tests/ssh-config.test.ts` (13 tests; one compares eight
+  hosts of a configuration with includes and patterns against `ssh -G` and is
+  skipped where no `ssh` answers it, one reads 6,000 hosts) and
+  `scripts/remote-hosts-ui-smoke.ts` with a 61-host configuration in a real
+  Electron under Xvfb.
+- Not verified: a Windows client (`%ProgramData%\ssh\ssh_config`, an `Include`
+  with backslashes), macOS, and a real host chosen from a real configuration.
+  A file with a UTF-8 byte-order mark is listed here, but OpenSSH 9.6 on Linux
+  refuses it, so its hosts would fail to connect with ssh's own message.
+
 irori-templete out of shipped code, 2026-11-16 (**0.2.72**,
 [#329](https://github.com/DeL-TaiseiOzaki/irori/pull/329), published as
 `v0.2.72-preview.1`): irori-templete

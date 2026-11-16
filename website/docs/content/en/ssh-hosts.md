@@ -19,15 +19,24 @@ The first connection puts irori's own files under `~/.irori-host` on the host. T
 
 ## Add an SSH host
 
-1. Open **Settings → Where vaults live → SSH hosts**.
-2. Choose **Add an SSH host**.
-3. Enter a **Name** and the **Destination**: what you would type after `ssh`, a Host of your ssh configuration or `user@host`. Add a **Port (optional)** if needed, and choose **Add**.
+Open **Settings → Where vaults live → SSH hosts**.
+
+**A host written in your ssh configuration.** As VS Code's Remote-SSH does, irori lists the hosts your own ssh configuration names, under **Hosts in your ssh configuration**. Choose **Add** on one, and it is added under that name. With more than a few hosts, type in the field above the list to filter them by name, address or user.
+
+irori reads `~/.ssh/config`, the files it includes and the system's file, and writes nothing there. `ssh` applies the configuration each time it connects, so what you change in the file later needs no change in irori. What is listed:
+
+- Each name on a `Host` line, with the address, user and port `ssh` would use for it. Settings from a pattern such as `Host *` are counted in.
+- Not a pattern such as `*.example.com` or `!name`: it says how to connect, not where. To use a host that only a pattern covers, add it by its destination.
+- Not a host that only a `Match` line names.
+- A file named by `Include` is read as `ssh` reads it. An `Include` written below a `Host` line belongs to that block: `ssh` reads the file only for the hosts the block matches, and uses no other host in it. Write `Include` at the top of the file.
+
+**Any other host.** Choose **Add one by its destination**, enter a **Name** and the **Destination** (what you would type after `ssh`: `user@host`, or a Host of your ssh configuration), a **Port (optional)** if needed, and choose **Add**.
 
 **Connect** connects a host in the list, **Edit** changes its name or destination, and **Remove** takes it off. Hosts are this computer's own record and are not part of the [environment saved on GitHub](settings.md#section-6).
 
 ## Add a vault
 
-The host's **Add vault** opens a dialog that walks the host's folders. **From an SSH host** on the start screen, and **SSH host** where a vault is added, start the same way.
+The host's **Add vault** opens a dialog that walks the host's folders. **From an SSH host** on the start screen, and **SSH host** where a vault is added, start the same way. There, a host of your ssh configuration can be chosen directly: irori adds it, connects and shows its folders in one step.
 
 Choose a folder, or type a path starting with `/` in **Folder path on the host**, and choose **Make it a vault**. Like a folder on this computer, one that is not a vault yet gets `.irori/scope.json` and a `/contents/` line in `.gitignore`. A vault already registered here or on another host is refused: one vault, one place.
 

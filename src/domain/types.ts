@@ -718,6 +718,12 @@ export interface HostAPI {
   register(root: string, name: string, category: Category): Promise<Space>;
   /** The SSH hosts this device knows, with whether each is connected (ADR 061). */
   remoteHosts(): Promise<import('./remote-hosts').RemoteHost[]>;
+  /**
+   * The hosts the person's ssh configuration names, as VS Code's Remote-SSH lists
+   * them: one is added as an SSH host by its name alone. Read each time; nothing
+   * is written to that configuration.
+   */
+  sshConfigHosts(): Promise<import('./remote-hosts').SshConfigHost[]>;
   /** Adds an SSH host, or changes one's name, destination or port. */
   saveRemoteHost(
     input: import('./remote-hosts').RemoteHostInput,

@@ -69,7 +69,28 @@ const env = {
   IRORI_VAULT_HOST_IDLE_MS: '2000',
 } as Record<string, string>;
 delete env.ELECTRON_RUN_AS_NODE;
-await mkdir(env.HOME, { recursive: true });
+// The person's own ssh configuration: a host by name, sixty more in an included file, and
+// patterns, which are no hosts but say where the hosts they match are.
+await mkdir(path.join(env.HOME, '.ssh'), { recursive: true });
+await writeFile(
+  path.join(env.HOME, '.ssh', 'config'),
+  [
+    'Include cluster',
+    'Host lab-gpu',
+    '  HostName gpu.lab.example.com',
+    '  User taro',
+    '  Port 2222',
+    'Host node*',
+    '  HostName %h.cluster.example.com',
+    'Host *.internal !bastion.internal',
+    '  User ops',
+    '',
+  ].join('\n'),
+);
+await writeFile(
+  path.join(env.HOME, '.ssh', 'cluster'),
+  Array.from({ length: 60 }, (_, at) => `Host node${String(at + 1).padStart(2, '0')}\n`).join(''),
+);
 await mkdir('test-results', { recursive: true });
 const errors: string[] = [];
 const launch = () =>
@@ -99,7 +120,30 @@ try {
   const settings = page.getByRole('dialog', { name: '設定' });
   await settings.getByRole('button', { name: 'SSH ホスト' }).click();
   await expect(settings.getByText('~/.irori-host').first()).toBeVisible();
-  await settings.getByRole('button', { name: 'SSH ホストを追加' }).click();
+  // The hosts of ~/.ssh/config and of the file it includes are offered by name, with what
+  // ssh would obtain for each; a pattern is not a host. A long list shows its first rows
+  // and is filtered by typing.
+  const offered = settings.getByRole('region', { name: 'ssh の設定にあるホスト' });
+  const filter = offered.getByRole('searchbox', { name: 'ssh の設定のホストを絞り込む' });
+  await expect(offered.getByRole('button')).toHaveCount(50);
+  await expect(offered).toContainText('ほかに 11 件あります');
+  await filter.fill('GPU');
+  await expect(offered.getByRole('button')).toHaveCount(1);
+  await expect(offered.getByRole('button', { name: /^lab-gpu/ })).toContainText(
+    'taro@gpu.lab.example.com:2222',
+  );
+  await filter.fill('node6');
+  await expect(offered.getByRole('button')).toHaveCount(1);
+  await expect(offered.getByRole('button', { name: /^node60/ })).toContainText(
+    'node60.cluster.example.com',
+  );
+  await filter.fill('no such host');
+  await expect(offered.getByRole('button')).toHaveCount(0);
+  await expect(offered).toContainText('一致するホストがありません');
+  await filter.fill('');
+  await offered.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'test-results/remote-hosts-config.png' });
+  await settings.getByRole('button', { name: '接続先を入力して追加' }).click();
   // The destination is checked before anything is saved.
   await settings.getByRole('textbox', { name: 'SSH ホストの名前' }).fill('Lab server');
   await settings.getByRole('textbox', { name: 'SSH の接続先' }).fill('-oProxyCommand=x');
@@ -115,7 +159,7 @@ try {
   await expect(server).toContainText('linux');
 
   // A host that cannot be reached says why.
-  await settings.getByRole('button', { name: 'SSH ホストを追加' }).click();
+  await settings.getByRole('button', { name: '接続先を入力して追加' }).click();
   await settings.getByRole('textbox', { name: 'SSH ホストの名前' }).fill('Broken');
   await settings.getByRole('textbox', { name: 'SSH の接続先' }).fill('broken');
   await settings.getByRole('button', { name: '追加', exact: true }).click();
@@ -216,6 +260,25 @@ try {
   const again = page.getByRole('dialog', { name: 'Lab server のフォルダを vault にする' });
   await expect(again.getByRole('listitem').filter({ hasText: 'notes' })).toContainText('vault');
   await again.getByRole('button', { name: 'キャンセル' }).click();
+  // A host of the ssh configuration is chosen by its name alone: it is added, connected
+  // and its folders are on show, as with Remote-SSH. It is then a host like the others.
+  const configured = register.getByRole('region', { name: 'ssh の設定にあるホスト' });
+  await configured.getByRole('searchbox', { name: 'ssh の設定のホストを絞り込む' }).fill('lab');
+  await page.screenshot({ path: 'test-results/remote-hosts-choice.png' });
+  await configured.getByRole('button', { name: /^lab-gpu/ }).click();
+  const chosen = page.getByRole('dialog', { name: 'lab-gpu のフォルダを vault にする' });
+  await expect(chosen.getByRole('textbox', { name: 'ホストのフォルダのパス' })).toHaveValue(
+    remoteHome,
+    { timeout: 60_000 },
+  );
+  await chosen.getByRole('button', { name: 'キャンセル' }).click();
+  // Added, it is no longer offered; the other hosts of the configuration still are.
+  await expect(configured.getByRole('button', { name: /^lab-gpu/ })).toHaveCount(0);
+  await configured.getByRole('searchbox', { name: 'ssh の設定のホストを絞り込む' }).fill('');
+  await expect(configured.getByRole('button')).toHaveCount(50);
+  await expect(
+    register.getByRole('list', { name: 'SSH ホスト' }).getByRole('button', { name: /^lab-gpu/ }),
+  ).toContainText('接続済み');
   await page
     .getByRole('dialog', { name: 'スペース登録' })
     .getByRole('button', { name: 'キャンセル' })

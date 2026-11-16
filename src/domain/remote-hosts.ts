@@ -53,6 +53,18 @@ export interface RemoteHost {
   vaults: number;
 }
 
+/**
+ * A host the person's own ssh configuration names (`~/.ssh/config` and what it
+ * includes): `alias` is what `ssh` is given. The rest is what the entry says of
+ * it, for showing which machine it is; `ssh` works it out again when it connects.
+ */
+export interface SshConfigHost {
+  alias: string;
+  hostName?: string;
+  user?: string;
+  port?: number;
+}
+
 /** The folders in one folder of an SSH host, for choosing a vault's. */
 export interface RemoteFolders {
   path: string;
