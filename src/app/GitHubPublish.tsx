@@ -6,6 +6,7 @@ import { ErrorMessage } from './ErrorMessage';
 import { useAction } from './useAction';
 import { ArrowFillButton } from './obsidian/ArrowFillButton';
 import { useResource } from './useResource';
+import { GitHubSignIn, useGitHubUnavailable } from './GitHubSignIn';
 const host = window.irori;
 
 /** A publication is ready once an account is chosen and the name is one GitHub accepts. */
@@ -30,7 +31,10 @@ export function PublishFields({
   onChange: (value: PublishRepository) => void;
   disabled: boolean;
 }) {
-  const account = useResource(() => host.githubAccount(), []);
+  // Signing in from the sheet reads the account again.
+  const [read, setRead] = useState(0);
+  const account = useResource(() => host.githubAccount(), [read]);
+  const unavailable = useGitHubUnavailable(account.error);
   const owners = account.data ? [account.data.login, ...account.data.organizations] : [];
   // The signed-in account is the default place for a new repository.
   useEffect(() => {
@@ -39,7 +43,16 @@ export function PublishFields({
   const nameIssue = value.name && !validRepositoryName(value.name);
   return (
     <fieldset className="github-publish" disabled={disabled}>
-      {account.error ? (
+      {/* Set only while the account could not be read. */}
+      {unavailable === 'checking' ? (
+        <p role="status">{t('確認しています…', 'Checking…')}</p>
+      ) : unavailable ? (
+        <GitHubSignIn
+          state={unavailable}
+          onCheck={() => setRead((n) => n + 1)}
+          onSignedIn={() => setRead((n) => n + 1)}
+        />
+      ) : account.error ? (
         <ErrorMessage text={account.error} />
       ) : (
         <label>

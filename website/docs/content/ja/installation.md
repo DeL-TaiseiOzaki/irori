@@ -30,7 +30,7 @@ Windows ARM と Intel Mac の配布版はありません。Linux では[ソー�
 
 ## Git と AI を準備する
 
-[Git](https://git-scm.com/downloads)をインストールします。vault を GitHub に公開したり、環境を GitHub に保存したりする場合は、[GitHub CLI](https://cli.github.com/) `gh` も入れて `gh auth login` でログインします。AI は Claude Code・Codex・OpenCode・Pi・Hermes Agent・Antigravity CLI に対応しています。使う CLI を先にインストールし、その CLI で認証を済ませます。irori 専用のアカウントや API キーは必要ありません。
+[Git](https://git-scm.com/downloads)をインストールします。vault を GitHub に公開したり、環境を GitHub に保存したりする場合は、[GitHub CLI](https://cli.github.com/) `gh` も入れます。ログインは irori の **設定 → アカウント** の **GitHub にログイン** でも、ターミナルの `gh auth login` でもできます。AI は Claude Code・Codex・OpenCode・Pi・Hermes Agent・Antigravity CLI に対応しています。使う CLI を先にインストールし、その CLI で認証を済ませます。irori 専用のアカウントや API キーは必要ありません。
 
 新しい版が出るとアプリが知らせます。**更新して再起動** で更新できます。
 

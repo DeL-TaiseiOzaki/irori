@@ -51,8 +51,10 @@ import { AgentPaths } from './agent-paths';
 import { WorkspaceService, inspectRepository } from './workspaces';
 import { GitService } from '../git/service';
 import { GitHubCli } from '../git/github';
+import { GitAuthorStore } from '../git/author';
 import { approveGitConfig, GitConfigApprovals } from '../git/config-approval';
 import { EnvironmentService } from './environment';
+import { GitHubSignInService } from './github-sign-in';
 import { gitScope } from '../domain/git';
 import { isAppDocument } from './trust';
 import { BundleService } from './bundle';
@@ -585,6 +587,14 @@ app
       const address = webAddress(url);
       if (address) await shell.openExternal(address.href);
     };
+    // Signing gh in from the window, and the device's Git author (ADR 062).
+    const author = new GitAuthorStore(files.dataDir);
+    const githubSignIn = new GitHubSignInService({
+      github,
+      author,
+      open: (url) => shell.openExternal(url),
+      copy: (text) => clipboard.writeText(text),
+    });
     // The environment kept on the GitHub account (ADR 026).
     const environment = new EnvironmentService({
       files,
@@ -974,6 +984,13 @@ app
       gitClone: (input) => git.clone(input),
       gitInit: (id) => changed(id, () => git.init(id)),
       githubAccount: () => git.githubAccount(),
+      githubStatus: () => githubSignIn.status(),
+      startGitHubSignIn: () => githubSignIn.start(),
+      openGitHubSignIn: () => githubSignIn.open(),
+      finishGitHubSignIn: () => githubSignIn.finish(),
+      cancelGitHubSignIn: () => githubSignIn.cancel(),
+      gitAuthor: () => githubSignIn.author(),
+      saveGitAuthor: (identity) => githubSignIn.saveAuthor(identity),
       environment: () => environment.state(),
       saveEnvironment: (passphrase) => environment.save(passphrase),
       restoreEnvironment: async (input) => {
@@ -1513,6 +1530,8 @@ app
       await terminals.closeAll();
       // A vault host goes on by itself while an agent works there; only the connections end.
       remote.close();
+      await githubSignIn.cancel();
+      await author.close();
       await git.close();
       try {
         await cloud.close();
