@@ -78,6 +78,7 @@
   padding-left: 10px;
 }
 .workspace-tab-list {
+  position: relative;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -198,6 +199,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Along the strip it hangs under the pointer, so the mark of where it goes stays seen. */
+.workspace-tab-drag:not([data-out]) {
+  transform: translate(-50%, 12px);
+}
 .workspace-tab-drag[data-out] {
   box-shadow:
     inset 0 0 0 1px var(--act-line),
@@ -207,6 +212,17 @@
   flex: none;
   color: var(--act);
   font-size: 11.5px;
+}
+/* Where a tab dragged along the strip would go (ADR 065): a mark in the gap. */
+.workspace-tab-slot {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--act);
+  pointer-events: none;
 }
 /* Where a tab dragged out of another window would join these tabs (ADR 064). */
 .workspace-tab[data-incoming] {

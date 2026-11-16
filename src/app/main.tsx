@@ -8,6 +8,7 @@ import {
   closeTab as closeWorkspaceTab,
   insertTab,
   onlyIn,
+  reorderTab,
   type OpenTab,
   openTab,
   replaceTab,
@@ -2366,6 +2367,9 @@ function App() {
     // A drag that ended sends no argument: the host checks how many it is given.
     dragTab: (drag?: { name: string; at: { x: number; y: number } }) =>
       void (drag ? host.dragTab(drag) : host.dragTab()).catch(report),
+    // A tab dragged along the strip takes its new place; nothing else changes (ADR 065).
+    reorderTab: (profile: WorkspaceProfile, index: number) =>
+      setWorkspaceTabs((all) => reorderTab(all, profile.id, index)),
     showOverview,
     showRoutines: () => goToLevel('routines'),
     enterBrain: (space: Space) => void enterBrain(space),
@@ -3071,6 +3075,7 @@ function App() {
       onClose={act.closeWorkspace}
       onMoveOut={act.moveOut}
       onDragOver={act.dragTab}
+      onReorder={act.reorderTab}
       onAdd={act.leaveWorkspace}
     />
   );

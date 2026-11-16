@@ -10,7 +10,8 @@ import { showEveryWindowItem } from '../tests/fixtures/window-items';
 // Several windows over one irori (ADR 051): each has its own tabs, what one has
 // open the others leave alone, and closing one leaves the rest running. A tab
 // dragged out of its window opens in a window of its own (ADR 063), or joins the
-// tabs of another window it is let go on (ADR 064).
+// tabs of another window it is let go on (ADR 064); along its strip it is reordered
+// (ADR 065).
 const base = await mkdtemp(path.join(tmpdir(), 'irori windows UI 日本語 '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
@@ -164,6 +165,29 @@ try {
   await expect(tabOf(strip, '次の作業')).toHaveAttribute('aria-current', 'page');
   expect(await strip.locator('.workspace-tab').allInnerTexts()).toEqual(['最初の作業', '次の作業']);
 
+  // A tab dragged along the strip takes the place it is let go at (ADR 065): a mark shows
+  // the gap while it moves, and the tab on show and the windows stay as they were.
+  const first = (await tabOf(strip, '最初の作業').boundingBox())!;
+  const along = (await tabOf(strip, '次の作業').boundingBox())!;
+  await page.mouse.move(along.x + along.width / 2, along.y + along.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(first.x + 4, along.y + along.height / 2 + 6, { steps: 8 });
+  await expect(strip.locator('.workspace-tab-slot')).toBeVisible();
+  await expect(page.locator('.workspace-tab-drag')).not.toContainText('新しいウィンドウで開く');
+  await page.mouse.up();
+  await expect(strip.locator('.workspace-tab-slot')).toHaveCount(0);
+  expect(await strip.locator('.workspace-tab').allInnerTexts()).toEqual(['次の作業', '最初の作業']);
+  await expect(tabOf(strip, '次の作業')).toHaveAttribute('aria-current', 'page');
+  expect(await windowCount()).toBe(1);
+  // Let go where it already stands, nothing moves.
+  const stays = (await tabOf(strip, '次の作業').boundingBox())!;
+  await page.mouse.move(stays.x + stays.width / 2, stays.y + stays.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(stays.x + stays.width / 2 + 12, stays.y + stays.height / 2, { steps: 4 });
+  await expect(strip.locator('.workspace-tab-slot')).toHaveCount(0);
+  await page.mouse.up();
+  expect(await strip.locator('.workspace-tab').allInnerTexts()).toEqual(['次の作業', '最初の作業']);
+
   // A window at its start screen takes a tab let go on its title bar, and the window it
   // came from keeps its other tab.
   const [empty] = await Promise.all([
@@ -187,7 +211,7 @@ try {
   expect(await windowCount()).toBe(2);
   expect(errors).toEqual([]);
   console.log(
-    'Windows UI passed: new window from the menu, separate tabs, protection of what another window has open, terminal kept when another window closes, a tab dragged out to a window of its own, and dropped on the tabs of another window to join them. No model inference.',
+    'Windows UI passed: new window from the menu, separate tabs, protection of what another window has open, terminal kept when another window closes, a tab dragged out to a window of its own, dropped on the tabs of another window to join them, and reordered along its strip. No model inference.',
   );
 } finally {
   await app.close();
