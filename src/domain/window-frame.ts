@@ -7,6 +7,33 @@ import type { Theme } from './types';
  */
 export const titleBarHeight = 36;
 
+type Point = { x: number; y: number };
+type Rectangle = Point & { width: number; height: number };
+/** Where in a window a tab dragged out of another is held: on its first tab, in the title bar. */
+const heldAt: Point = { x: 110, y: titleBarHeight / 2 };
+
+/**
+ * Where a window opened by dragging a tab out of another stands (ADR 063): its first tab
+ * under the pointer that let go of it at `at`, and the whole window inside the work area
+ * of that screen, shrunk to fit when it is larger.
+ */
+export function droppedWindowBounds(
+  at: Point,
+  size: { width: number; height: number },
+  area: Rectangle,
+): Rectangle {
+  const width = Math.min(size.width, area.width);
+  const height = Math.min(size.height, area.height);
+  const within = (value: number, start: number, room: number) =>
+    Math.round(Math.max(start, Math.min(value, start + room)));
+  return {
+    x: within(at.x - heldAt.x, area.x, area.width - width),
+    y: within(at.y - heldAt.y, area.y, area.height - height),
+    width,
+    height,
+  };
+}
+
 /**
  * What the host paints around the renderer for a theme: the window's first paint and
  * the system's window controls, which sit on the title bar. Hearth, dark and a system

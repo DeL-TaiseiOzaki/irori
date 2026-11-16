@@ -6,6 +6,7 @@ import {
   useDefaultLayout,
   usePanelRef,
 } from 'react-resizable-panels';
+import type { overviewViews } from '../domain/workspace-tabs';
 import { knowledgeFolder } from '../domain/layers';
 import type { AgentAccess, AgentId, Entry, Space, WorkspaceProfile } from '../domain/types';
 import { agentNames } from '../domain/types';
@@ -41,7 +42,7 @@ import type { RunRoutine } from '../domain/routines';
 import './overview.css';
 
 const host = window.irori;
-export type OverviewView = 'map' | 'columns';
+export type OverviewView = (typeof overviewViews)[number];
 const idle: BrainAi = {
   events: [],
   queued: [],

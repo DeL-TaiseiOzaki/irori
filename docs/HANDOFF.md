@@ -1,5 +1,14 @@
 # irori continuation handoff
 
+**A workspace tab dragged out opens in a new window, 0.2.74**
+([ADR 063](decisions/063-tab-out-to-a-new-window.md)). Run on Linux under Xvfb
+only. Next:
+1. Try it by hand on Windows and macOS, with the pointer let go outside the
+   window and on a second screen; Chromium keeps the drag's pointer events
+   there, but irori has not been seen doing it on those systems.
+2. Not covered: dropping a tab onto another window's strip, reordering tabs,
+   and a menu or keyboard way to move a tab out.
+
 **Signing in to GitHub from irori, 0.2.73** ([ADR 062](decisions/062-signing-in-to-github-from-irori.md)).
 irori runs `gh auth login --web` from the account section, the restore sheet
 and the publish sheet, and sets an unset Git author from the account. Still
@@ -51,7 +60,7 @@ when the connection is cut. Next, in this order:
 4. The terminal as `ssh -t`, connected folders, path links in replies for files
    on a host, and SSH's prompts answered in the window.
 
-0.2.74 lists the hosts of the person's ssh configuration where a host is added
+0.2.75 lists the hosts of the person's ssh configuration where a host is added
 (`src/host/ssh-config.ts`; ADR 061 decision 3, amended), because the owner
 expects what VS Code's Remote-SSH gives. What still differs from Remote-SSH most
 is the prompts of item 4: irori connects in `BatchMode`, so a key with a

@@ -1,6 +1,6 @@
 # Implementation status — notes, native agents and connection onboarding
 
-SSH hosts from the person's ssh configuration, 2026-11-16 (**0.2.74**,
+SSH hosts from the person's ssh configuration, 2026-11-16 (**0.2.75**,
 [#333](https://github.com/DeL-TaiseiOzaki/irori/pull/333);
 [ADR 061](decisions/061-vaults-on-ssh-hosts.md) decision 3 amended, [SSH-HOSTS](SSH-HOSTS.md)):
 the owner expects what VS Code's Remote-SSH gives, a host written in
@@ -30,7 +30,7 @@ the owner expects what VS Code's Remote-SSH gives, a host written in
   skipped where no `ssh` answers it, one reads 6,000 hosts) and
   `scripts/remote-hosts-ui-smoke.ts` with a 61-host configuration in a real
   Electron under Xvfb.
-- Also in 0.2.74, found through this pull request's CI: `AgentService.codex`
+- Also in 0.2.75, found through this pull request's CI: `AgentService.codex`
   let a stopped Codex end the turn of the Codex started in its place. `killTree`
   waits for the process's `exit`, the `close` handler came later and called
   whatever `run.finish` then was, so the new turn's. It showed as
@@ -42,6 +42,22 @@ the owner expects what VS Code's Remote-SSH gives, a host written in
   with backslashes), macOS, and a real host chosen from a real configuration.
   A file with a UTF-8 byte-order mark is listed here, but OpenSSH 9.6 on Linux
   refuses it, so its hosts would fail to connect with ssh's own message.
+
+A workspace tab dragged out opens in a new window, 2026-11-16 (**0.2.74**,
+[ADR 063](decisions/063-tab-out-to-a-new-window.md)): the owner asked that, with
+several workspaces open, dragging one tab out makes it a window of its own.
+- `WorkspaceTabs` follows a held tab with the pointer; let go more than 24 px
+  below the strip or off the window, it calls `moveOut`. Only with two tabs or
+  more; nothing happens within the strip.
+- The host's `moveTab` opens a window at the drop point (`droppedWindowBounds`)
+  and resolves once that window's `windowTabs` includes the workspace; the new
+  window takes it with `movedTab`, with its level, Overview view and vaults
+  (`TabPlace`). The window it left shows its next tab at once and drops the
+  moving tab only then, so nothing stops; a terminal of the tab on show closes
+  after the person agrees.
+- `scripts/windows-ui-smoke.ts` drags a tab out with the mouse;
+  `tests/window-frame.test.ts` and `tests/workspace-tabs.test.ts` check the
+  placement and the validated arguments. Linux under Xvfb only.
 
 Signing in to GitHub from irori, 2026-11-16 (**0.2.73**,
 [#332](https://github.com/DeL-TaiseiOzaki/irori/pull/332), published as

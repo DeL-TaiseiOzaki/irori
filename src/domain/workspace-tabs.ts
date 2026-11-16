@@ -48,6 +48,20 @@ export function onlyIn(tabs: WorkspaceProfile[], id: string): string[] {
 /** What the host keeps of a window's tab: the workspace and the vaults it shows. */
 export type OpenTab = Pick<WorkspaceProfile, 'id' | 'scopeIds'>;
 
+export const tabLevels = ['overview', 'routines', 'brain', 'you'] as const;
+export const overviewViews = ['map', 'columns'] as const;
+/** Where a tab was left, to come back to (ADR 037 D6). */
+export type TabPlace = {
+  level: (typeof tabLevels)[number];
+  overviewView: (typeof overviewViews)[number];
+  /** The vault on show. */
+  scopeId?: string;
+  /** The vault beside, when one was open (ADR 038). */
+  side?: string;
+};
+/** A tab dragged out of its window, on its way to a window of its own (ADR 063). */
+export type MovedTab = { id: string; place?: TabPlace };
+
 /**
  * The tabs each of irori's windows has open (ADR 051). A window closes as its tabs
  * would: what another window still has open is left running and connected.
