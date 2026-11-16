@@ -109,5 +109,16 @@ export interface AttachReply {
 
 /** The line a vault host prints before the frames begin, after whatever a login shell printed. */
 export const attachedLine = 'IRORI-HOST 1';
-/** The line the starter prints instead when the vault host is not installed yet. */
+/**
+ * The line the starter prints instead when the vault host is not installed yet.
+ * The same login then takes what is missing: one login is one sign-in, and a
+ * person who types a verification code types it once.
+ */
 export const needsLine = 'IRORI-NEEDS';
+/** What the starter prints once a part it was sent is in place, or could not be put there. */
+export const doneLine = 'IRORI-DONE';
+export const failedLine = 'IRORI-FAILED';
+/** A vault host of another version is running an agent: it is not replaced now. */
+export const busyLine = 'IRORI-BUSY';
+/** A vault host of another version, with nothing running, is giving way to this one. */
+export const replacingLine = 'IRORI-REPLACING';

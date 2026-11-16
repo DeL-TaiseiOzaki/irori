@@ -34,9 +34,38 @@ data/host.pid, data/host.log  the running vault host, and why one did not start
 `ssh <destination> 'sh -c "…"'` first checks for Node and the vault host. When
 both are there it runs `attach`, which prints `IRORI-HOST 1` and from then on
 relays lines between the login and the socket. Otherwise it prints
-`IRORI-NEEDS <system> <machine> [node] [bundle]`, and this device sends what is
-missing with one login each, then tries again. Whatever a login shell prints
-before either line is passed over.
+`IRORI-NEEDS <system> <machine> [node] [bundle]` and takes what is missing from
+the same login: a line `archive|binary|bundle <bytes> [member]`, that many
+bytes, answered by `IRORI-DONE` or `IRORI-FAILED`, then `go`, and `attach` runs.
+Whatever a login shell prints before these lines is passed over.
+
+A connection is one login whatever it has to do. `attach` finds a vault host of
+another version, asks it to end when nothing runs on it (`IRORI-REPLACING`) and
+starts its own, or prints `IRORI-BUSY` and leaves it while an agent works.
+One login is one sign-in: a person who types a verification code types it once.
+
+## What ssh asks
+
+A password, a key's passphrase, a verification code and whether to trust a
+host's key are asked in a window (`RemoteHost.asking`, the dialog `SshQuestions`).
+
+- `ssh` has no terminal, so it runs the program `SSH_ASKPASS` names with the
+  question as its argument and reads the answer from that program's output.
+  `SshAskpass` (`src/host/ssh-askpass.ts`) gives each connection attempt a
+  session: its environment for `ssh`, and what `RemoteHosts` shows the person.
+- The program reaches irori through a socket in a folder of its own under the
+  system's temporary folder (a named pipe on Windows), with the session's
+  random id. Nothing listens on a network port.
+- On macOS and Linux the program is a shell launcher that runs
+  `<data>/ssh/askpass.cjs` on irori's own runtime. On Windows it is
+  `irori-askpass.exe`, built from `native/askpass/Askpass.cs` by
+  `scripts/build-host.mjs` with the C# compiler of .NET Framework 4 and shipped
+  outside the archive. Win32-OpenSSH writes the question after the program
+  unquoted, so a script would be run by cmd.exe with a host's words as commands.
+- No answer ends the login (`LoginCancelled`): `ssh` would only ask again. After
+  a login that asked and failed, nothing asks by itself until the person
+  connects (`hold`). A retry irori makes on a timer asks nothing (`BatchMode`).
+- An answer goes to `ssh` and is kept nowhere.
 
 ## Adding an operation
 
@@ -64,7 +93,14 @@ IRORI_TEST_SSH=<destination> npm test
 ```
 
 `<destination>` must be a disposable Linux machine that `ssh <destination>`
-reaches without a prompt. The first run downloads Node from nodejs.org (about
+reaches without a prompt.
+
+What `ssh` asks is tried without a host: `tests/fixtures/ssh-server.ts` is an
+SSH server on a loopback port that wants a password and a code, and the
+system's own `ssh` signs in to it. `tests/remote-hosts.test.ts` runs a login's
+commands on this machine behind it, and `scripts/package-smoke.ts` uses it
+against the packaged app on each system CI packages for, which is where the
+Windows program is run. The first run downloads Node from nodejs.org (about
 55 MB) and sends it. The test leaves `~/.irori-host` there and removes the one
 folder it makes.
 

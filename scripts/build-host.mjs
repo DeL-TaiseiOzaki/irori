@@ -34,3 +34,31 @@ await build({
   define: { 'import.meta.url': '__vaultHostUrl' },
   banner: { js: "const __vaultHostUrl = require('node:url').pathToFileURL(__filename).href;" },
 });
+
+// What `ssh` runs on Windows to ask the person something while it signs in
+// (src/host/ssh-askpass.ts): a program of its own and not a script, because Windows
+// would hand a script to cmd.exe together with the host's words. It is built with the
+// C# compiler that is part of every Windows (.NET Framework 4), so no other toolchain
+// is needed; native/askpass/Askpass.cs keeps to what that compiler knows.
+if (process.platform === 'win32') {
+  const { execFileSync } = await import('node:child_process');
+  const { existsSync } = await import('node:fs');
+  const path = await import('node:path');
+  const windows = process.env.SystemRoot ?? process.env.WINDIR ?? 'C:\\Windows';
+  const compiler = ['Framework64', 'Framework']
+    .map((folder) => path.join(windows, 'Microsoft.NET', folder, 'v4.0.30319', 'csc.exe'))
+    .find((file) => existsSync(file));
+  if (!compiler)
+    throw Error('The C# compiler of .NET Framework 4 (csc.exe) was not found under ' + windows);
+  execFileSync(
+    compiler,
+    [
+      '/nologo',
+      '/target:winexe',
+      '/optimize+',
+      '/out:' + path.join('dist-host', 'irori-askpass.exe'),
+      path.join('native', 'askpass', 'Askpass.cs'),
+    ],
+    { stdio: 'inherit' },
+  );
+}

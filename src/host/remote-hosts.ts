@@ -20,6 +20,7 @@ import {
   type RemoteHost,
   type RemoteHostAbout,
   type RemoteHostInput,
+  type RemoteHostQuestion,
   type RemoteHostState,
 } from '../domain/remote-hosts';
 import type {
@@ -35,10 +36,12 @@ import { readLocalJson, writeLocalJson } from './local-json';
 import { SerialQueue } from './serial-queue';
 import {
   ConnectionEnded,
+  LoginCancelled,
   RemoteLink,
   type RemoteLauncher,
   type RemotePayload,
 } from './remote-link';
+import type { AskLogin, LoginQuestion, LoginSession } from './ssh-askpass';
 
 /** A vault on a host as this device last saw it, so that it shows while the host is away. */
 const vaultRecord = z
@@ -76,7 +79,26 @@ type Live = {
   handOffs: Map<string, Follow>;
   retry?: NodeJS.Timeout;
   retries: number;
+  /** What `ssh` asks the person for this host's login, the first of them shown. */
+  questions: (RemoteHostQuestion & { answer(value: string | undefined): void })[];
+  /** The words of what the login under way has asked so far. */
+  asked?: Set<string>;
+  /**
+   * Set once a login that asked the person failed or was given no answer: no
+   * login asks again by itself, only when they connect.
+   */
+  hold?: Error;
 };
+
+/** How a question of `ssh` is answered: yes or no, nothing at all, or words to type. */
+const questionKind = ({ text, hint }: LoginQuestion): RemoteHostQuestion['kind'] =>
+  hint === 'none'
+    ? 'notice'
+    : hint === 'confirm' ||
+        /\(yes\/no(\/\[fingerprint\])?\)\?\s*$/.test(text) ||
+        /^Please type 'yes', 'no' or the fingerprint/.test(text)
+      ? 'confirm'
+      : 'secret';
 
 /**
  * How long a host that could not be reached is left alone by what the window
@@ -91,7 +113,10 @@ const notYet = () =>
 
 export interface RemoteHostsOptions {
   dataDir: string;
-  launcher(host: { destination: string; port?: number }): RemoteLauncher;
+  /** `ssh` for a host. With a `session`, what it asks while signing in is asked through it. */
+  launcher(host: { destination: string; port?: number }, session?: LoginSession): RemoteLauncher;
+  /** Where the person can be asked what `ssh` asks; without it no login asks anything. */
+  logins?: { session(ask: AskLogin): LoginSession | undefined };
   payload: RemotePayload;
   language(): Language;
   /** The ids of the vaults on this device: a vault is registered in one place only. */
@@ -133,18 +158,33 @@ export class RemoteHosts implements RemoteVaults {
   }
   private state(id: string) {
     let live = this.live.get(id);
-    if (!live) this.live.set(id, (live = { state: 'offline', handOffs: new Map(), retries: 0 }));
+    if (!live)
+      this.live.set(
+        id,
+        (live = { state: 'offline', handOffs: new Map(), retries: 0, questions: [] }),
+      );
     return live;
   }
   private shown(record: HostRecord): RemoteHost {
-    const { state, detail, about } = this.state(record.id);
+    const { state, detail, about, questions } = this.state(record.id);
+    const [asking] = questions;
     return {
       id: record.id,
       name: record.name,
       destination: record.destination,
       ...(record.port && { port: record.port }),
       state,
-      ...(detail && { detail }),
+      ...(asking
+        ? { detail: t('入力を待っています', 'Waiting for your answer') }
+        : detail && { detail }),
+      ...(asking && {
+        asking: {
+          id: asking.id,
+          text: asking.text,
+          kind: asking.kind,
+          ...(asking.again && { again: true }),
+        },
+      }),
       ...(about && { about }),
       vaults: record.vaults.length,
     };
@@ -236,19 +276,66 @@ export class RemoteHosts implements RemoteVaults {
     live.link?.close();
     live.link = undefined;
     live.failed = undefined;
+    live.hold = undefined;
+    for (const question of [...live.questions]) question.answer(undefined);
     this.set(id, 'offline');
   }
 
-  /** The open connection to a host, opened first when there is none. */
-  private link(id: string): Promise<RemoteLink> {
+  /** Shows the person what `ssh` asks for a host's login, and resolves with their answer. */
+  private question(id: string, asked: LoginQuestion, gone: AbortSignal) {
+    const live = this.state(id);
+    return new Promise<string | undefined>((resolve) => {
+      const question = {
+        id: randomUUID(),
+        text: asked.text,
+        kind: questionKind(asked),
+        // `ssh` says only on its error output that an answer was wrong; it asks again in the same words.
+        again: live.asked?.has(asked.text) ?? false,
+        answer: (value: string | undefined) => {
+          const at = live.questions.indexOf(question);
+          if (at < 0) return;
+          live.questions.splice(at, 1);
+          this.options.emit({ type: 'hosts' });
+          resolve(value);
+        },
+      };
+      (live.asked ??= new Set()).add(asked.text);
+      live.questions.push(question);
+      // The login that ended, or the program that asked going away, takes the question back.
+      gone.addEventListener('abort', () => question.answer(undefined), { once: true });
+      this.options.emit({ type: 'hosts' });
+    });
+  }
+  /** The person's answer to a question of `ssh`; `null` gives none, which ends that login. */
+  answer(hostId: string, questionId: string, value: string | null) {
+    const question = this.state(hostId).questions.find((item) => item.id === questionId);
+    if (!question)
+      throw Error(t('この質問はもう終わっています。', 'This question has already ended.'));
+    question.answer(value ?? undefined);
+  }
+
+  /**
+   * The open connection to a host, opened first when there is none. `quiet` is a
+   * login nobody asked for at this moment (a retry on a timer): it asks the person nothing.
+   */
+  private link(id: string, quiet = false): Promise<RemoteLink> {
     const record = this.record(id);
     const live = this.state(id);
     if (live.link?.connected) return Promise.resolve(live.link);
     if (live.opening) return live.opening;
+    if (live.hold && !quiet) return Promise.reject(live.hold);
     if (live.failed && Date.now() - live.failed.at < cooldown)
       return Promise.reject(live.failed.error);
+    let asked = false;
+    live.asked = undefined;
+    const session = quiet
+      ? undefined
+      : this.options.logins?.session((question, gone) => {
+          asked = true;
+          return this.question(id, question, gone);
+        });
     const link = new RemoteLink({
-      launcher: this.options.launcher(record),
+      launcher: this.options.launcher(record, session),
       payload: this.options.payload,
       language: this.options.language,
       onEvent: (event) => this.event(id, event),
@@ -266,6 +353,7 @@ export class RemoteHosts implements RemoteVaults {
           live.link = link;
           live.about = reply.about;
           live.failed = undefined;
+          live.hold = undefined;
           live.retries = 0;
           this.set(id, 'connected');
           await this.refresh(id, link).catch(() => {});
@@ -273,6 +361,9 @@ export class RemoteHosts implements RemoteVaults {
         },
         (error: Error) => {
           live.failed = { at: Date.now(), error };
+          // The person was asked and it did not work, or they gave no answer: what the
+          // window reads by itself does not ask them again.
+          if (asked || error instanceof LoginCancelled) live.hold = error;
           this.set(id, 'error', error.message);
           throw error;
         },
@@ -282,9 +373,14 @@ export class RemoteHosts implements RemoteVaults {
       });
     return live.opening;
   }
-  /** Connects to a host now, as the person asks to; a failure a moment ago is tried again. */
+  /**
+   * Connects to a host now, as the person asks to: a failure a moment ago is tried
+   * again, and what `ssh` asks is asked again.
+   */
   async connect(id: string) {
-    this.state(id).failed = undefined;
+    const live = this.state(id);
+    live.failed = undefined;
+    live.hold = undefined;
     await this.link(id);
     return this.shown(this.record(id));
   }
@@ -304,7 +400,8 @@ export class RemoteHosts implements RemoteVaults {
     live.retry = setTimeout(() => {
       live.retry = undefined;
       live.failed = undefined;
-      this.link(id).then(
+      // Nobody is asked for a retry of irori's own: a host that needs an answer waits for the person.
+      this.link(id, true).then(
         (link) => this.resume(id, link),
         () => this.retry(id),
       );
@@ -523,6 +620,7 @@ export class RemoteHosts implements RemoteVaults {
     this.closing = true;
     for (const live of this.live.values()) {
       clearTimeout(live.retry);
+      for (const question of [...live.questions]) question.answer(undefined);
       live.link?.close();
     }
   }

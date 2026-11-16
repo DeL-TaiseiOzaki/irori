@@ -1,7 +1,7 @@
 import { _electron as electron, expect } from '@playwright/test';
 import { extractFile, listPackage } from '@electron/asar';
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { cp, glob, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
@@ -12,6 +12,7 @@ import { promisify } from 'node:util';
 import { vocabulary } from '../tests/fixtures/ontology';
 import { SettingsService } from '../src/host/settings';
 import { everyWindowItem } from '../src/domain/window-items';
+import { sshServer } from '../tests/fixtures/ssh-server';
 
 const project = process.cwd();
 const built = path.join(project, 'out', `irori-${process.platform}-${process.arch}`);
@@ -199,6 +200,12 @@ try {
     if (info.isFile()) unpacked += info.size;
   }
   const weight = { asar: (await stat(archive)).size, unpacked };
+  // On Windows the program ssh runs to ask the person something ships beside the archive.
+  if (process.platform === 'win32')
+    assert.ok(
+      (await stat(path.join(`${archive}.unpacked`, 'dist-host', 'irori-askpass.exe'))).size > 0,
+      'irori-askpass.exe is not packaged outside the archive',
+    );
   const env = { ...process.env, IRORI_DATA_DIR: path.join(temporary, 'device') } as Record<
     string,
     string
@@ -475,6 +482,71 @@ try {
     });
     return space.scopeId;
   });
+  // What ssh asks while it signs in is asked in the window (ADR 061, amended): this
+  // system's own ssh, the packaged program it runs to ask, and a server of this run that
+  // wants a password and a verification code. The server answers the login's command as a
+  // host irori does not run on, so the refusal that names it shows the sign-in went through.
+  let asked = 'not run: no ssh on this computer';
+  if (spawnSync('ssh', ['-V']).status === 0) {
+    const far = await sshServer({
+      asks: [
+        { prompt: 'Password: ', answer: 'correct horse' },
+        { prompt: 'Verification code: ', answer: '424242' },
+      ],
+      run: () => ({ output: 'IRORI-NEEDS Smoke x1\n', code: 0 }),
+    });
+    try {
+      const hostId = await page.evaluate(async (port) => {
+        const host = await window.irori.saveRemoteHost({
+          name: 'Smoke box',
+          destination: 'smoke@127.0.0.1',
+          port,
+        });
+        void window.irori.connectRemoteHost(host.id).catch(() => {});
+        return host.id;
+      }, far.port);
+      const question = page.getByRole('dialog', { name: 'Smoke box に接続' });
+      const words = question.locator('.ssh-question-text');
+      await expect(words).toContainText('fingerprint is SHA256:', { timeout: 60_000 });
+      await question.getByRole('button', { name: '続ける' }).click();
+      await expect(words).toContainText('Password:', { timeout: 60_000 });
+      await question.getByRole('textbox', { name: 'ssh への答え' }).fill('correct horse');
+      await question.getByRole('button', { name: '送信' }).click();
+      await expect(words).toContainText('Verification code:', { timeout: 60_000 });
+      await question.getByRole('textbox', { name: 'ssh への答え' }).fill('424242');
+      await question.getByRole('button', { name: '送信' }).click();
+      await expect(question).toHaveCount(0, { timeout: 60_000 });
+      await expect
+        .poll(
+          () =>
+            page.evaluate(
+              async (id) =>
+                (await window.irori.remoteHosts()).find((item) => item.id === id)?.detail ?? '',
+              hostId,
+            ),
+          { timeout: 60_000 },
+        )
+        .toContain('Smoke x1');
+      assert.equal(far.state.logins, 1);
+      await page.evaluate((id) => window.irori.removeRemoteHost(id), hostId);
+      asked = 'host key, password and verification code answered in the window';
+    } catch (error) {
+      // What ssh said, for a run that cannot be watched.
+      console.error(
+        'ssh questions failed:',
+        JSON.stringify({
+          hosts: await page.evaluate(() => window.irori.remoteHosts()).catch(() => undefined),
+          server: far.state,
+          ssh: spawnSync('ssh', ['-V'], { encoding: 'utf8' }).stderr.trim(),
+        }),
+      );
+      throw error;
+    } finally {
+      await far.close();
+      // The key of this run's server is taken off the person's known hosts again.
+      spawnSync('ssh-keygen', ['-R', `[127.0.0.1]:${far.port}`]);
+    }
+  }
   await application.close();
   application = await launchPackaged();
   const restored = await application.firstWindow();
@@ -569,6 +641,7 @@ try {
   );
   console.log(
     `Packaged app passed: ${process.platform}/${process.arch}, isolated launch, both SDK imports, Japanese note save, ontology view and normal shutdown. ` +
+      `What ssh asks: ${asked}. ` +
       `The application weighs ${weight.asar} bytes archived and ${weight.unpacked} unpacked.`,
   );
 } catch (error) {

@@ -5,21 +5,38 @@ import { createReadStream, promises as fs } from 'node:fs';
 import { agentEnv, launch } from '../agents/process';
 import { t } from '../domain/i18n';
 import type { RemoteLauncher, RemotePayload } from './remote-link';
+import type { LoginSession } from './ssh-askpass';
 
 /**
  * `ssh` as irori runs it for an SSH host (ADR 061): the system's client, with the
- * person's own configuration, keys and agent. No prompt can be answered here, so
- * none is asked (`BatchMode`), and a connection that went quiet is noticed.
- * The destination is one argument after `--`, never an option.
+ * person's own configuration, keys and agent, and a connection that went quiet
+ * is noticed. The destination is one argument after `--`, never an option.
+ *
+ * With a `session`, what `ssh` asks while it signs in is asked in irori's window
+ * (`ssh-askpass.ts`). Without one nobody is there to answer, so nothing is asked
+ * (`BatchMode`) and a login that needs an answer fails at once. `first` are
+ * options put before irori's own, which a test names its own configuration with.
  */
-export const sshLauncher = (host: { destination: string; port?: number }): RemoteLauncher => ({
-  run: (command) =>
-    launch(
+export const sshLauncher = (
+  host: { destination: string; port?: number },
+  session?: LoginSession,
+  first: string[] = [],
+): RemoteLauncher => ({
+  run: (command) => {
+    const env = { ...agentEnv(), ...session?.env };
+    if (!session) {
+      // `BatchMode` on the command line does not reach the `ssh` a jump host is reached
+      // with, which reads the environment: no program of the desktop's asks for it either.
+      for (const name of Object.keys(env))
+        if (name.toUpperCase() === 'SSH_ASKPASS') delete env[name];
+      env.SSH_ASKPASS_REQUIRE = 'never';
+    }
+    const child = launch(
       'ssh',
       [
+        ...first,
         '-T',
-        '-o',
-        'BatchMode=yes',
+        ...(session ? [] : ['-o', 'BatchMode=yes']),
         '-o',
         'ConnectTimeout=20',
         '-o',
@@ -32,8 +49,15 @@ export const sshLauncher = (host: { destination: string; port?: number }): Remot
         command,
       ],
       os.homedir(),
-      agentEnv(),
-    ),
+      env,
+    );
+    // Given no answer, `ssh` asks again or goes on to another way in: it is stopped instead.
+    session?.onCancel(() => child.kill());
+    return child;
+  },
+  asking: () => session?.asking() ?? false,
+  cancelled: () => session?.cancelled() ?? false,
+  settle: () => session?.settle(),
 });
 
 /**

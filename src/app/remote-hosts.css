@@ -351,3 +351,53 @@
 .composer[hidden] {
   display: none;
 }
+
+/* What ssh asks while it signs in: its own words, kept as it wrote them, and the answer. */
+.ssh-question {
+  width: min(560px, calc(100vw - 48px));
+}
+.ssh-question-text {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--stage-2);
+  border-radius: 10px;
+}
+.ssh-question-again {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--danger-tx);
+}
+.ssh-question-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.modal .ssh-question-answer input:not([type='checkbox']) {
+  width: 100%;
+  margin: 0;
+}
+.modal .ssh-question-answer label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.modal.ssh-question .hint {
+  margin: 12px 0;
+}
+.ssh-question-waiting {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--ink-2);
+}

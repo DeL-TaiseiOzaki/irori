@@ -94,6 +94,30 @@ weighed and dropped:
    - Still `BatchMode`: a host that needs a password, a passphrase or a
      host-key answer typed is not connected. Remote-SSH answers these in its
      window (it sets `SSH_ASKPASS` to itself); that is the next step toward it.
+   *Amended 2026-11-16 (0.2.77), owner request: what `ssh` asks is answered in
+   irori's window.* A password, a key's passphrase, a verification code and
+   whether to trust a host's key no longer need a terminal first.
+   - `ssh` is started without `BatchMode` and with `SSH_ASKPASS` naming a small
+     program of irori's (`src/host/ssh-askpass.ts`), which is how Remote-SSH
+     answers on macOS and Linux. The program hands the question to irori through
+     a socket only the person can open and prints the answer. The question is
+     shown in ssh's own words, which for a password or a code are the host's.
+   - The answer is handed to `ssh` and kept nowhere. irori remembers no
+     password: a key in an agent, or `ControlMaster`, is how a person avoids
+     typing one each time.
+   - On Windows the program is one of its own, `irori-askpass.exe`
+     (`native/askpass/Askpass.cs`). Win32-OpenSSH starts `SSH_ASKPASS` with the
+     question written after it unquoted, and Windows runs a script through
+     cmd.exe, where a host's words would be commands. Remote-SSH ships a batch
+     file for this and leaves that mode off on Windows by default.
+   - A connection is now one login, in which what is missing is installed and
+     a vault host of another version gives way (decision 5). Before, a first
+     connection took four logins, and a person with a verification code would
+     have typed four codes.
+   - No answer ends the login, since `ssh` would only ask again. After a login
+     that asked and failed, nothing asks by itself: only the person connecting
+     does. A retry of irori's own, for a hand-off's report, asks nothing and
+     fails for a host that needs an answer until the person connects.
 4. **The vault host outlives the connection.** `attach` joins a login's pipes to
    the vault host of a data folder and starts one when none answers; `serve` is
    that process, on a socket only its user can open. A device that attaches
@@ -157,8 +181,9 @@ weighed and dropped:
   such a vault as unavailable until the host is added there.
 - Not in this step: editing, creating, moving and deleting in a vault on a
   host; conversations with its own agent and its `irori` command; the terminal;
-  connected folders; routines; the shared Schema for runs there; answering
-  SSH's prompts in the window; hosts other than Linux on x64 and arm64.
+  connected folders; routines; the shared Schema for runs there; hosts other
+  than Linux on x64 and arm64. (SSH's prompts are answered in the window since
+  0.2.77.)
 - A host with glibc older than 2.28 cannot run the Node that is sent.
 - Where `systemd-logind` kills a user's processes at logout
   (`KillUserProcesses=yes`), the vault host ends with the login; the common

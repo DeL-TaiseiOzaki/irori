@@ -1,7 +1,9 @@
 // Keep packaging with Forge; only compiled application files and runtime packages ship.
 module.exports = {
   packagerConfig: {
-    asar: { unpack: '**/node_modules/node-pty/**/*' },
+    // node-pty's native parts, and the program ssh runs on Windows to ask the person
+    // something (src/host/ssh-askpass.ts): a file inside the archive cannot be started.
+    asar: { unpack: '{**/node_modules/node-pty/**/*,**/dist-host/irori-askpass.exe}' },
     executableName: 'irori',
     icon: require('node:path').resolve('assets/irori-icon'),
     appBundleId: 'io.github.deltaiseiozaki.irori',

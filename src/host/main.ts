@@ -24,6 +24,7 @@ import { vaultReads } from './vault-reads';
 import { RemoteHosts } from './remote-hosts';
 import { readSshConfigHosts } from './ssh-config';
 import { shippedPayload, sshLauncher } from './remote-payload';
+import { SshAskpass } from './ssh-askpass';
 import { isForwardedRead } from '../remote/protocol';
 import { SettingsService } from './settings';
 import { SearchService } from './search';
@@ -240,9 +241,24 @@ app
     const workspaces = new WorkspaceService(files);
     // Vaults on SSH hosts (ADR 061): the hosts this device knows, and the connections to
     // irori's vault host on each. What a vault host asks the person is asked here.
+    // What `ssh` asks while it signs in (a password, a code, a host's key) is asked in a
+    // window. On Windows the program `ssh` runs for that ships beside the application's
+    // archive, never inside it: a file in the archive cannot be started.
+    const askpass = new SshAskpass({
+      dataDir: files.dataDir,
+      windowsClient: path
+        .resolve(__dirname, 'irori-askpass.exe')
+        .replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`),
+    });
+    await askpass
+      .init()
+      .catch((error) => console.warn('ssh questions cannot be asked here', String(error)));
+    /** The window that shows each question of `ssh`: the one in front when it is first read. */
+    const askedIn = new Map<string, BrowserWindow>();
     const remote = new RemoteHosts({
       dataDir: files.dataDir,
       launcher: sshLauncher,
+      logins: askpass,
       payload: shippedPayload({
         dataDir: files.dataDir,
         bundle: path.resolve(__dirname, 'vault-host.cjs'),
@@ -1133,6 +1149,7 @@ app
       switchCloudToLocal: (...args) => changeCloud(args[0], () => cloud.switchToLocal(...args)),
       spaces: () => [...files.list(), ...remote.list()],
       remoteHosts: () => remote.hosts(),
+      answerRemoteHost: (hostId, questionId, answer) => remote.answer(hostId, questionId, answer),
       sshConfigHosts: () => readSshConfigHosts(),
       saveRemoteHost: (input) => remote.saveHost(input),
       removeRemoteHost: (id) => remote.removeHost(id),
@@ -1466,6 +1483,20 @@ app
           for (const other of windows) if (other !== window) emit({ type: 'windows' }, other);
         },
         otherWindows: () => tabs.elsewhere(id),
+        // One window asks what `ssh` asks; the others show the host as waiting.
+        remoteHosts: () => {
+          const hosts = remote.hosts();
+          const open = new Set(hosts.map((item) => item.asking?.id));
+          for (const question of askedIn.keys()) if (!open.has(question)) askedIn.delete(question);
+          return hosts.map((item) => {
+            if (!item.asking) return item;
+            let owner = askedIn.get(item.asking.id);
+            if (!owner || owner.isDestroyed()) askedIn.set(item.asking.id, (owner = front()));
+            if (owner === window) return item;
+            const { asking: _elsewhere, ...rest } = item;
+            return rest;
+          });
+        },
         moveTab: (tab, at) => moveTab(window, tab, at),
         movedTab: async () => {
           const coming = arriving.get(id);
@@ -1568,6 +1599,7 @@ app
       await terminals.closeAll();
       // A vault host goes on by itself while an agent works there; only the connections end.
       remote.close();
+      await askpass.close();
       await githubSignIn.cancel();
       await author.close();
       await git.close();
@@ -1795,6 +1827,8 @@ app
       });
       window.on('closed', () => {
         windows.delete(window);
+        // A question this window was showing is shown by another.
+        if ([...askedIn.values()].includes(window)) emit({ type: 'hosts' });
         tabs.forget(id);
         hover(window);
         if (fronts.includes(window)) fronts.splice(fronts.indexOf(window), 1);

@@ -11,7 +11,7 @@ That vault's agent runs on the host, so code runs on the other machine while you
 
 ## Before you start
 
-- irori uses this computer's `ssh` with its keys, agent and configuration. It cannot answer a password, a passphrase or a host-key question, so first check in a terminal that `ssh <destination>` connects by itself.
+- irori uses this computer's `ssh` with its keys, agent and configuration. A jump host (`ProxyJump`) written in your ssh configuration is used as it is. When `ssh` asks for something while it connects, [you answer in irori's window](#section-4).
 - The host runs Linux on x64 or arm64, with glibc 2.28 or later.
 - The vault's agent runs on the host. Install the CLI you use there (Claude Code, Codex…) and sign in.
 
@@ -33,6 +33,21 @@ irori reads `~/.ssh/config`, the files it includes and the system's file, and wr
 **Any other host.** Choose **Add one by its destination**, enter a **Name** and the **Destination** (what you would type after `ssh`: `user@host`, or a Host of your ssh configuration), a **Port (optional)** if needed, and choose **Add**.
 
 **Connect** connects a host in the list, **Edit** changes its name or destination, and **Remove** takes it off. Hosts are this computer's own record and are not part of the [environment saved on GitHub](settings.md#section-6).
+
+## When a password or a verification code is asked
+
+`ssh` may ask for something while it connects. irori shows the question in a dialog named **Connecting to (the host)**, in ssh's own words.
+
+- **A password, a key's passphrase, a verification code (two-step sign-in)**: type it and choose **Send**. What you type is hidden; **Show what I type** shows it. It is handed to `ssh`, and irori does not keep it.
+- **The key of a host you connect to for the first time**: check that the fingerprint shown is the right one, then choose **Continue**. `ssh` remembers the host's key and does not ask again.
+- After a wrong answer `ssh` asks the same again, and the dialog says so.
+- **Cancel** ends that connection. irori does not ask again by itself after that: it asks when you choose **Connect** (or **Retry** in the dialog that chooses a folder).
+- Through a jump host, the jump host and the destination each ask.
+- The words of a question are ssh's and the host's. Do not answer one you do not expect.
+
+A first connection asks for one login only: irori's files are put on the host within that same login. To skip typing every time, add your key to ssh-agent, or on macOS and Linux share the connection with ssh's `ControlMaster`.
+
+When irori reconnects by itself after a connection is cut (to collect a hand-off's report), it asks nothing. A host that needs an answer stays unconnected until you choose **Connect**.
 
 ## Add a vault
 

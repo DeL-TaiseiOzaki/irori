@@ -25,7 +25,10 @@ const bin = path.join(base, 'bin');
 await mkdir(bin);
 // irori runs `ssh [options] -- <destination> <command>`, where the command is one
 // POSIX `sh -c '…'` string. A destination named `broken` fails as ssh does, and so
-// does every one while the file `down` exists.
+// does every one while the file `down` exists. One named `asks` wants a password and a
+// verification code, asked as ssh asks them: through the program SSH_ASKPASS names, the
+// question as its argument and the answer on its output, three tries at the password.
+// Told to ask nothing (BatchMode), or with no such program, it is refused at once.
 const down = path.join(base, 'down');
 await writeFile(
   path.join(bin, 'ssh'),
@@ -42,6 +45,20 @@ await writeFile(
     '  fi',
     'done',
     'for last; do :; done',
+    'asks=; batch=',
+    'for arg; do',
+    '  [ "$arg" = asks ] && asks=1',
+    '  [ "$arg" = BatchMode=yes ] && batch=1',
+    'done',
+    'if [ -n "$asks" ]; then',
+    '  denied() { echo "you@asks: Permission denied (publickey,keyboard-interactive)." >&2; exit 255; }',
+    '  [ -z "$batch" ] && [ -n "$SSH_ASKPASS" ] || denied',
+    '  ok=; for try in 1 2 3; do',
+    '    [ "$("$SSH_ASKPASS" "(you@asks) Password: ")" = "open sesame" ] && { ok=1; break; }',
+    '  done',
+    '  [ -n "$ok" ] || denied',
+    '  [ "$("$SSH_ASKPASS" "(you@asks) Verification code: ")" = 123456 ] || denied',
+    'fi',
     'HOME="$IRORI_FAKE_SSH_HOME" exec sh -c "$last"',
     '',
   ].join('\n'),
@@ -168,6 +185,54 @@ try {
   await expect(broken.locator('.remote-state.error')).toBeVisible({ timeout: 30_000 });
   await broken.getByRole('button', { name: 'Broken を削除' }).click();
   await expect(broken).toHaveCount(0);
+
+  // A host that asks for a password and a verification code: ssh's own words are asked
+  // in the window, a wrong answer is asked again with a word about it, and the connection
+  // opens once both are given. What is typed is unseen until the person asks to see it.
+  await settings.getByRole('button', { name: '接続先を入力して追加' }).click();
+  await settings.getByRole('textbox', { name: 'SSH ホストの名前' }).fill('Asks');
+  await settings.getByRole('textbox', { name: 'SSH の接続先' }).fill('asks');
+  await settings.getByRole('button', { name: '追加', exact: true }).click();
+  const asks = settings.getByRole('region', { name: 'Asks' });
+  await asks.getByRole('button', { name: '接続', exact: true }).click();
+  const question = page.getByRole('dialog', { name: 'Asks に接続' });
+  const words = question.locator('.ssh-question-text');
+  const typed = question.getByRole('textbox', { name: 'ssh への答え' });
+  await expect(words).toHaveText('(you@asks) Password:');
+  await expect(typed).toHaveAttribute('type', 'password');
+  await expect(typed).toBeFocused();
+  await expect(asks).toContainText('入力を待っています');
+  await typed.fill('not this');
+  await question.getByRole('checkbox', { name: '入力を表示' }).check();
+  await expect(typed).toHaveAttribute('type', 'text');
+  await question.getByRole('button', { name: '送信' }).click();
+  await expect(question).toContainText('前の入力は受け付けられませんでした');
+  await expect(typed).toHaveValue('');
+  await expect(typed).toHaveAttribute('type', 'password');
+  await typed.fill('open sesame');
+  // The dialog has risen into place by now.
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: 'test-results/remote-hosts-question.png' });
+  await typed.press('Enter');
+  await expect(words).toHaveText('(you@asks) Verification code:');
+  await expect(question).not.toContainText('前の入力は受け付けられませんでした');
+  await typed.fill('123456');
+  await question.getByRole('button', { name: '送信' }).click();
+  await expect(question).toHaveCount(0);
+  await expect(asks).toContainText('接続済み', { timeout: 60_000 });
+  // Given no answer, the login ends and says so; nothing asks again until 接続 is pressed.
+  await asks.getByRole('button', { name: '編集' }).click();
+  await asks.getByRole('textbox', { name: 'SSH のポート' }).fill('2200');
+  await asks.getByRole('button', { name: '保存' }).click();
+  await asks.getByRole('button', { name: '接続', exact: true }).click();
+  await expect(words).toHaveText('(you@asks) Password:');
+  await page.keyboard.press('Escape');
+  await expect(question).toHaveCount(0);
+  await expect(asks.locator('.remote-state.error')).toContainText('入力を取り消した');
+  await page.waitForTimeout(500);
+  await expect(question).toHaveCount(0);
+  await asks.getByRole('button', { name: 'Asks を削除' }).click();
+  await expect(asks).toHaveCount(0);
 
   await server.getByRole('button', { name: 'Lab server に vault を追加' }).click();
   const chooser = page.getByRole('dialog', { name: 'Lab server のフォルダを vault にする' });
