@@ -1,5 +1,41 @@
 # Implementation status — notes, native agents and connection onboarding
 
+What ssh asks is answered in the window, 2026-11-16 (**0.2.78**;
+[ADR 061](decisions/061-vaults-on-ssh-hosts.md) decision 3 amended, [SSH-HOSTS](SSH-HOSTS.md#what-ssh-asks)):
+the owner asked that a verification code and a password be typed in irori's
+window, as VS Code's Remote-SSH lets them.
+- `SshAskpass` (`src/host/ssh-askpass.ts`) starts `ssh` without `BatchMode` and
+  with `SSH_ASKPASS` naming a program of irori's, which hands each question to
+  the main process through a socket in a folder of its own (a named pipe on
+  Windows) and prints the answer. `RemoteHost.asking` carries the question to
+  one window; `answerRemoteHost` takes the answer, which is kept nowhere.
+- The dialog `SshQuestions` shows ssh's words: words to type unseen, a host's
+  key to continue with or not, a notice. A wrong answer asked again says so,
+  and the dialog stays from one question to the next.
+- No answer ends the login, since `ssh` would ask again (`LoginCancelled`).
+  After a login that asked and failed, nothing asks by itself until the person
+  connects; a retry on a timer asks nothing.
+- A connection is one login. The starter takes what is missing from the same
+  login (`IRORI-NEEDS`, then `archive|binary|bundle <bytes>` and `go`), and
+  `attach` makes a vault host of another version give way (`$version`,
+  `IRORI-REPLACING`, `IRORI-BUSY`). Before, a first connection was four logins.
+- Windows: `irori-askpass.exe` from `native/askpass/Askpass.cs`, built by
+  `scripts/build-host.mjs` with the C# compiler of .NET Framework 4 and shipped
+  outside the archive. A script would be run by cmd.exe with the host's words;
+  Remote-SSH and the sources of OpenSSH and Win32-OpenSSH were read first.
+- Verified on Linux with the system's `ssh` (OpenSSH 9.6): against a real
+  `sshd` with PAM that asks for a password and a time-based code, driven
+  through the window by hand-written Playwright (host key, a wrong password,
+  the password, the code, connected, one connection seen by `sshd`); a key with
+  a passphrase and a jump host where each hop asks, from the command line;
+  `tests/remote-hosts.test.ts` and `tests/ssh-askpass.test.ts` against
+  `tests/fixtures/ssh-server.ts`; `scripts/remote-hosts-ui-smoke.ts` with a
+  stand-in `ssh` that asks as ssh does.
+- Not verified by hand: Windows and macOS. `scripts/package-smoke.ts` runs the
+  packaged app against the stand-in server on each system CI packages for.
+  The Windows program was compiled here with Mono's C# 5 compiler and run under
+  Mono against the same protocol; that is not Windows.
+
 Workspace tabs reordered by dragging, 2026-11-16 (**0.2.77**,
 [ADR 065](decisions/065-tabs-reordered-by-dragging.md)): the owner asked that a tab
 dragged along its strip change the order.

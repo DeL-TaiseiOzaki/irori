@@ -20,7 +20,7 @@ import { linkHref } from './note-links';
 import { skillAudience, skillName } from './skills';
 import { windowItemChoices } from './window-items';
 import { brainLook, categoryText } from './brains';
-import { remoteHostInput, remotePath } from './remote-hosts';
+import { remoteAnswerLimit, remoteHostInput, remotePath } from './remote-hosts';
 import { knowledgeFolderName, layerLabelChanges } from './layers';
 import { githubOwnerPattern, validGitEmail, validGitName, validRepositoryName } from './git';
 import {
@@ -291,6 +291,7 @@ export const hostArguments = {
   saveRemoteHost: z.tuple([remoteHostInput]),
   removeRemoteHost: z.tuple([id]),
   connectRemoteHost: z.tuple([id]),
+  answerRemoteHost: z.tuple([id, id, z.string().max(remoteAnswerLimit).nullable()]),
   remoteFolders: z.tuple([id, remotePath.optional()]),
   registerRemote: z.tuple([id, remotePath, name, categoryText]),
   createSpace: z.tuple([

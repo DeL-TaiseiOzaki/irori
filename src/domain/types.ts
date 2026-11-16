@@ -747,6 +747,11 @@ export interface HostAPI {
    * is written to that configuration.
    */
   sshConfigHosts(): Promise<import('./remote-hosts').SshConfigHost[]>;
+  /**
+   * Answers what `ssh` asks while it signs in to a host (`RemoteHost.asking`); `null`
+   * gives no answer and ends that login. The answer is handed to `ssh` and kept nowhere.
+   */
+  answerRemoteHost(hostId: string, questionId: string, answer: string | null): Promise<void>;
   /** Adds an SSH host, or changes one's name, destination or port. */
   saveRemoteHost(
     input: import('./remote-hosts').RemoteHostInput,

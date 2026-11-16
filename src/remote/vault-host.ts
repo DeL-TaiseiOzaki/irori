@@ -17,8 +17,8 @@ import { promises as fs, readFileSync } from 'node:fs';
 import { setLanguage } from '../domain/i18n';
 import type { HostEvent } from '../domain/types';
 import { createVaultHost, type HostQuestion } from './host';
-import { attachRequest, attachedLine, type AttachReply } from './protocol';
-import { readFrames, writeFrame } from './wire';
+import { attachRequest, attachedLine, busyLine, replacingLine, type AttachReply } from './protocol';
+import { decode, readFrames, writeFrame } from './wire';
 
 /**
  * The version of this vault host: the digest of its one built file, which the
@@ -130,6 +130,15 @@ async function serve(dataDir: string) {
         if (!('method' in frame)) return;
         const { id, method, args } = frame;
         try {
+          // Asked before attaching, by the login that is about to: no device is let go for it.
+          if (method === '$version') {
+            writeFrame(socket, {
+              id,
+              ok: true,
+              value: { version: vaultHostVersion, running: host.running },
+            });
+            return;
+          }
           if (method === '$attach') {
             const request = attachRequest.parse(args[0]);
             setLanguage(request.language);
@@ -195,9 +204,76 @@ async function serve(dataDir: string) {
   process.on('SIGHUP', () => {});
 }
 
+/** One question to a vault host on a connection of its own, and its answer; nothing when it gives none. */
+function asked(socket: net.Socket, method: string, args: unknown[]) {
+  return new Promise<unknown>((resolve) => {
+    let buffer = '';
+    const done = (value?: unknown) => {
+      socket.off('data', read);
+      resolve(value);
+    };
+    const read = (chunk: Buffer | string) => {
+      buffer += chunk;
+      for (let at = buffer.indexOf('\n'); at >= 0; at = buffer.indexOf('\n')) {
+        const line = buffer.slice(0, at);
+        buffer = buffer.slice(at + 1);
+        try {
+          const frame = decode(line);
+          if ('ok' in frame && frame.id === 1) return done(frame.ok ? frame.value : undefined);
+        } catch {
+          return done();
+        }
+      }
+    };
+    socket.on('data', read);
+    socket.once('close', () => done());
+    socket.once('error', () => done());
+    writeFrame(socket, { id: 1, method, args });
+  });
+}
+
+/**
+ * The vault host that answers in this folder, when it is this version. One of
+ * another version gives way here, within the login that found it, unless an agent
+ * is running on it: then `busy`. A vault host from before `$version` is asked the
+ * way a device attaches, which is also what lets this login ask it to end.
+ */
+async function sameVersion(socketPath: string): Promise<'same' | 'busy' | 'none'> {
+  const probe = await connect(socketPath).catch(() => undefined);
+  if (!probe) return 'none';
+  probe.setEncoding('utf8');
+  const attaching = () =>
+    asked(probe, '$attach', [{ version: vaultHostVersion, language: 'en' }]) as Promise<
+      AttachReply | undefined
+    >;
+  const said = (await asked(probe, '$version', [])) as
+    { version?: string; running?: boolean } | undefined;
+  if (said?.version === vaultHostVersion) {
+    probe.destroy();
+    return 'same';
+  }
+  const found = said?.running ? said : await attaching();
+  if (!found || found.running) {
+    probe.destroy();
+    return found ? 'busy' : 'none';
+  }
+  process.stdout.write(`${replacingLine}\n`);
+  const closed = new Promise<void>((resolve) => probe.once('close', () => resolve()));
+  await asked(probe, '$shutdown', []);
+  // It lets its device go last, once its place is free.
+  await Promise.race([closed, new Promise((resolve) => setTimeout(resolve, 20_000))]);
+  probe.destroy();
+  return 'none';
+}
+
 async function attach(dataDir: string) {
   const socketPath = path.join(dataDir, 'host.sock');
-  let socket = await connect(socketPath).catch(() => undefined);
+  const there = await sameVersion(socketPath);
+  if (there === 'busy') {
+    process.stdout.write(`${busyLine}\n`);
+    process.exit(0);
+  }
+  let socket = there === 'same' ? await connect(socketPath).catch(() => undefined) : undefined;
   if (!socket) {
     await fs.mkdir(dataDir, { recursive: true, mode: 0o700 });
     const logFile = path.join(dataDir, 'host.log');

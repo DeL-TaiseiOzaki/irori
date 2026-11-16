@@ -62,19 +62,36 @@ when the connection is cut. Next, in this order:
 3. Editing: the write operations move beside the reads with their guards
    (`src/host/vault-reads.ts` is where the main process and the vault host
    already share code).
-4. The terminal as `ssh -t`, connected folders, path links in replies for files
-   on a host, and SSH's prompts answered in the window.
+4. The terminal as `ssh -t`, connected folders, and path links in replies for
+   files on a host.
 
 0.2.75 lists the hosts of the person's ssh configuration where a host is added
 (`src/host/ssh-config.ts`; ADR 061 decision 3, amended), because the owner
-expects what VS Code's Remote-SSH gives. What still differs from Remote-SSH most
-is the prompts of item 4: irori connects in `BatchMode`, so a key with a
-passphrase and no agent, a password, or an unknown host key cannot connect until
-`ssh <name>` has been run in a terminal. Remote-SSH starts `ssh` with
-`SSH_ASKPASS` set to a helper of its own and shows each prompt as an input box.
-A suggestion, not an owner decision: do the same before item 2. The Windows
-side of this release (`%ProgramData%\ssh\ssh_config`, `Include` paths with
-backslashes) has not been run.
+expects what VS Code's Remote-SSH gives. Its Windows side
+(`%ProgramData%\ssh\ssh_config`, `Include` paths with backslashes) has not been
+run.
+
+0.2.78 answers what `ssh` asks in the window, at the owner's request: a
+password, a key's passphrase, a verification code and a host's key
+(`src/host/ssh-askpass.ts`, the dialog `SshQuestions`; [SSH-HOSTS](SSH-HOSTS.md#what-ssh-asks)).
+A connection is now one login. What to know before changing it:
+1. The owner uses Windows 11, where the program `ssh` runs is
+   `irori-askpass.exe` (`native/askpass/Askpass.cs`, built by
+   `scripts/build-host.mjs` with the C# compiler of .NET Framework 4). It must
+   stay a program and never become a script: Win32-OpenSSH writes the question
+   after it unquoted and Windows runs a script through cmd.exe, so a host's
+   words would be commands. `SSH_ASKPASS` is its name alone, found on the
+   search path: `ssh.exe` 9.5 did not start it from a folder named in Japanese.
+   Windows 10's inbox ssh (8.1) is older than what was tried; `ssh` there has
+   no `SSH_ASKPASS_REQUIRE`, and `DISPLAY` is set for it.
+2. On Windows this was run by CI's packaged-app smoke only, against a stand-in
+   server that asks for a password and a code. A real host with two-step
+   sign-in, a key with a passphrase and a jump host were run on Linux, by hand
+   on macOS and Windows not at all.
+3. irori keeps no password. If the owner asks for one to be remembered, the
+   system's keychain is the place, and that is a decision of theirs to make.
+4. A vault host from before 0.2.78 is replaced within the login that finds it;
+   `$version` is how a newer one is asked without taking its device's place.
 
 **The ontology is the declaration, 0.2.66** ([ADR 060](decisions/060-the-ontology-is-the-declaration.md),
 [ONTOLOGY](ONTOLOGY.md)). `.property/property.json` is a knowledge base's
