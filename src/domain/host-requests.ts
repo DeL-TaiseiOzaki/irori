@@ -34,6 +34,7 @@ import { newComment } from './comments';
 import { attachmentByteLimit } from './attachments';
 import { broughtChunkBytes } from './connections';
 import { passphraseLength } from './environment';
+import { overviewViews, tabLevels } from './workspace-tabs';
 
 const id = z.uuid(),
   path = z.string().max(4096),
@@ -57,6 +58,23 @@ const repository = z
   );
 const passphrase = z.string().min(passphraseLength.min).max(passphraseLength.max);
 const target = z.union([id, z.object({ scopeId: id, repository }).strict()]);
+// A tab dragged out of its window (ADR 063): the workspace, where it was left, and the
+// screen point it was let go at, which may lie left of or above the main screen.
+const movedTab = z
+  .object({
+    id,
+    place: z
+      .object({
+        level: z.enum(tabLevels),
+        overviewView: z.enum(overviewViews),
+        scopeId: id.optional(),
+        side: id.optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+const screenCoordinate = z.number().int().min(-100_000).max(100_000);
 const cols = z.number().int().min(2).max(500),
   rows = z.number().int().min(1).max(300);
 
@@ -414,6 +432,11 @@ export const hostArguments = {
     z.array(z.object({ id, scopeIds: z.array(id).max(200) }).strict()).max(100),
   ]),
   otherWindows: z.tuple([]),
+  moveTab: z.union([
+    z.tuple([movedTab]),
+    z.tuple([movedTab, z.object({ x: screenCoordinate, y: screenCoordinate }).strict()]),
+  ]),
+  movedTab: z.tuple([]),
   showMenu: z.tuple([z.number().int().min(0).max(100_000), z.number().int().min(0).max(100_000)]),
   respond: z.tuple([
     id,

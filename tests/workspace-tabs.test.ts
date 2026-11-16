@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { closeTab, onlyIn, openTab, replaceTab, WindowTabs } from '../src/domain/workspace-tabs';
 import type { WorkspaceProfile } from '../src/domain/types';
+import { hostArguments } from '../src/domain/host-requests';
 
 const tab = (id: string, scopeIds: string[] = [id]): WorkspaceProfile => ({
   id,
@@ -66,4 +67,18 @@ test('A window has alone only what no other window has open', () => {
       scopeIds,
     })),
   );
+});
+
+test('A tab dragged out takes its place along, and nothing else, to its new window', () => {
+  const workspace = '0b5e8f8e-5b0e-4c43-9a59-1c4d4b6e2f10';
+  const vault = '7f1d2c3b-4a5e-4f60-8b7a-9c0d1e2f3a4b';
+  const place = { level: 'brain', overviewView: 'columns', scopeId: vault, side: vault };
+  const accepts = (...args: unknown[]) => hostArguments.moveTab.safeParse(args).success;
+  assert.ok(accepts({ id: workspace }));
+  assert.ok(accepts({ id: workspace, place }, { x: -1280, y: 40 }));
+  assert.ok(!accepts({ id: workspace, place: { ...place, level: 'settings' } }));
+  assert.ok(!accepts({ id: workspace, place: { ...place, scopeId: '../vault' } }));
+  assert.ok(!accepts({ id: workspace, profile: { name: 'other' } }));
+  assert.ok(!accepts({ id: workspace }, { x: 10.5, y: 0 }));
+  assert.ok(hostArguments.movedTab.safeParse([]).success);
 });

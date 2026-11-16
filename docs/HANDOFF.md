@@ -1,5 +1,14 @@
 # irori continuation handoff
 
+**A workspace tab dragged out opens in a new window, 0.2.74**
+([ADR 063](decisions/063-tab-out-to-a-new-window.md)). Run on Linux under Xvfb
+only. Next:
+1. Try it by hand on Windows and macOS, with the pointer let go outside the
+   window and on a second screen; Chromium keeps the drag's pointer events
+   there, but irori has not been seen doing it on those systems.
+2. Not covered: dropping a tab onto another window's strip, reordering tabs,
+   and a menu or keyboard way to move a tab out.
+
 **Signing in to GitHub from irori, 0.2.73** ([ADR 062](decisions/062-signing-in-to-github-from-irori.md)).
 irori runs `gh auth login --web` from the account section, the restore sheet
 and the publish sheet, and sets an unset Git author from the account. Still

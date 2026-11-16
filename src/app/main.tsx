@@ -10,6 +10,7 @@ import {
   type OpenTab,
   openTab,
   replaceTab,
+  type TabPlace,
 } from '../domain/workspace-tabs';
 import { NoteActionDialog, noteActionsApply, TrashNotes, type NoteAction } from './NoteActions';
 import {
@@ -231,19 +232,12 @@ function navigationNotice(target: Navigation, found: boolean) {
     );
   return t(`${what}を特定できませんでした。`, `Could not locate the ${what}.`);
 }
-/** Where a workspace tab was left, to come back to when it is on show again. */
-type TabView = {
-  level: 'overview' | 'routines' | 'brain' | 'you';
-  overviewView: OverviewView;
-  scopeId?: string;
-  /** The vault beside, when one was open (ADR 038). */
-  side?: string;
-};
-/** What leaving the workspace on show, or closing a tab, waits on the person for. */
+/** What leaving the workspace on show, closing a tab or moving it out waits on the person for. */
 type Leaving =
   | { kind: 'home' }
   | { kind: 'switch'; profile: WorkspaceProfile }
-  | { kind: 'close'; profile: WorkspaceProfile; scopes: string[]; conversations: string[] };
+  | { kind: 'close'; profile: WorkspaceProfile; scopes: string[]; conversations: string[] }
+  | { kind: 'move'; profile: WorkspaceProfile; at: { x: number; y: number } };
 /** A run in progress: its space, and its conversation once the host has placed it. */
 type LiveRun = { scopeId: string; conversationId?: string };
 /** The AI chosen for each brain; a brain not chosen yet starts with the last choice. */
@@ -606,7 +600,12 @@ function App() {
     [startup, setStartup] = useState(true);
   // The workspaces open as tabs, and where each was left: its level, vault and note.
   const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceProfile[]>([]);
-  const tabViews = useRef<Record<string, TabView>>({});
+  const tabViews = useRef<Record<string, TabPlace>>({});
+  // Tabs dragged out to a window of their own (ADR 063): each stays here, and cannot be
+  // shown or closed, until that window shows it.
+  const [movingTabs, setMovingTabs] = useState<string[]>([]);
+  // A tab dragged out of another window, which this window was opened to show.
+  const [arriving, setArriving] = useState<{ profile: WorkspaceProfile; place?: TabPlace }>();
   useEffect(() => {
     if (workspace) setWorkspaceTabs((all) => replaceTab(all, workspace));
   }, [workspace]);
@@ -1463,7 +1462,10 @@ function App() {
     }
   }
   useEffect(() => {
-    void refreshSpaces().catch(report);
+    // A window opened for a tab dragged out of another shows it once the vaults are known.
+    void refreshSpaces()
+      .then(async () => setArriving(await host.movedTab()))
+      .catch(report);
     void host.agents().then(setInfos).catch(report);
     void host.otherWindows().then(setOtherTabs).catch(report);
     return hostEvents.onEvent((event) => {
@@ -1886,17 +1888,24 @@ function App() {
     while (await sendNextQueued(scopeId));
     setQueueSignal((signal) => ({ n: signal.n + 1, scopeId, resume: true }));
   }
+  useEffect(() => {
+    if (!arriving) return;
+    if (arriving.place) tabViews.current[arriving.profile.id] = arriving.place;
+    void openWorkspace(arriving.profile);
+  }, [arriving]);
+  /** Where the workspace on show is, to come back to (ADR 037 D6). */
+  const placeOnShow = (): TabPlace => ({
+    level,
+    overviewView,
+    scopeId: active?.scopeId,
+    side: sideSpace?.scopeId,
+  });
   /** Opens a workspace as a tab, or brings its tab on show where it was left. */
   async function openWorkspace(profile: WorkspaceProfile) {
-    if (gitBusy) return;
+    if (gitBusy || movingTabs.includes(profile.id)) return;
     // The tab on show remembers where it was left.
     if (workspace && workspaceTabs.some((tab) => tab.id === workspace.id))
-      tabViews.current[workspace.id] = {
-        level,
-        overviewView,
-        scopeId: active?.scopeId,
-        side: sideSpace?.scopeId,
-      };
+      tabViews.current[workspace.id] = placeOnShow();
     const before = workspaceTabs.find((tab) => tab.id === profile.id);
     const left = tabViews.current[profile.id];
     setBrainMode('files');
@@ -2325,6 +2334,7 @@ function App() {
     leaveWorkspace,
     showTab,
     closeWorkspace: (profile: WorkspaceProfile) => void closeWorkspace(profile),
+    moveOut,
     showOverview,
     showRoutines: () => goToLevel('routines'),
     enterBrain: (space: Space) => void enterBrain(space),
@@ -2892,11 +2902,45 @@ function App() {
       report(error);
     }
   }
-  /** Leaves the workspace on show for home or another tab, or closes a tab. */
+  /**
+   * Moves a tab dragged out of the strip to a window of its own (ADR 063). Nothing of it
+   * stops; a terminal of the tab on show closes once the person agrees, as on leaving it.
+   */
+  function moveOut(profile: WorkspaceProfile, at: { x: number; y: number }) {
+    if (gitBusy || connecting || goingHome || sending || movingTabs.includes(profile.id)) return;
+    if (workspaceTabs.length - movingTabs.length < 2) return;
+    const step: Leaving = { kind: 'move', profile, at };
+    const shown = !startup && profile.id === workspace?.id;
+    if (shown && (terminalSpace || iroriTerminal)) setLeaving(step);
+    else void leave(step);
+  }
+  /** Hands a tab to a new window, and lets go of it here once that window shows it. */
+  async function sendAway(profile: WorkspaceProfile, at: { x: number; y: number }) {
+    setMovingTabs((all) => [...all, profile.id]);
+    try {
+      if (await host.moveTab({ id: profile.id, place: tabViews.current[profile.id] }, at)) {
+        setWorkspaceTabs((all) => all.filter((tab) => tab.id !== profile.id));
+        delete tabViews.current[profile.id];
+      } else
+        report(
+          t(
+            `${profile.name} を新しいウィンドウで開けませんでした。`,
+            `Could not open ${profile.name} in a new window.`,
+          ),
+        );
+    } catch (error) {
+      report(error);
+    } finally {
+      setMovingTabs((all) => all.filter((id) => id !== profile.id));
+    }
+  }
+  /** Leaves the workspace on show for home or another tab, or closes or moves out a tab. */
   async function leave(step: Leaving) {
     setGoingHome(true);
     try {
-      const shown = !startup && (step.kind !== 'close' || step.profile.id === workspace?.id);
+      const shown =
+        !startup &&
+        (step.kind === 'home' || step.kind === 'switch' || step.profile.id === workspace?.id);
       if (shown) {
         if (!(await composer.flush()) || !(await save())) {
           setLeaving(undefined);
@@ -2910,11 +2954,26 @@ function App() {
       setLeaving(undefined);
       if (step.kind === 'switch') return void (await openWorkspace(step.profile));
       if (step.kind === 'home') return setStartup(true);
+      // The tab on show after it is the next that stays here, not one on its way out.
+      const { next } = closeWorkspaceTab(
+        workspaceTabs.filter((tab) => !movingTabs.includes(tab.id)),
+        step.profile.id,
+        workspace?.id,
+      );
+      if (step.kind === 'move') {
+        // The window shows the next tab while the new one opens; the moving tab keeps its place.
+        if (shown && next) await openWorkspace(next);
+        else if (shown) {
+          tabViews.current[step.profile.id] = placeOnShow();
+          setStartup(true);
+        }
+        return void sendAway(step.profile, step.at);
+      }
       await Promise.all([
         ...step.scopes.map((scopeId) => host.cancel(scopeId)),
         ...step.conversations.map((id) => host.cancel(you!.id, id)),
       ]);
-      const { tabs, next } = closeWorkspaceTab(workspaceTabs, step.profile.id, workspace?.id);
+      const { tabs } = closeWorkspaceTab(workspaceTabs, step.profile.id, workspace?.id);
       setWorkspaceTabs(tabs);
       await release(step.profile.scopeIds, tabs);
       if (shown && next) await openWorkspace(next);
@@ -2953,8 +3012,10 @@ function App() {
       running={runningScopes}
       waiting={waitingScopes}
       disabled={connecting || gitBusy || goingHome}
+      moving={movingTabs}
       onShow={act.showTab}
       onClose={act.closeWorkspace}
+      onMoveOut={act.moveOut}
       onAdd={act.leaveWorkspace}
     />
   );
@@ -2963,13 +3024,20 @@ function App() {
   const closingTerminals =
     !!(terminalSpace || iroriTerminal) &&
     !startup &&
-    (leaving?.kind !== 'close' || leaving.profile.id === workspace?.id);
+    (leaving?.kind === 'close' || leaving?.kind === 'move'
+      ? leaving.profile.id === workspace?.id
+      : true);
   const leavingTitle =
     leaving?.kind === 'close'
       ? t(`${leaving.profile.name} を閉じる`, `Close ${leaving.profile.name}`)
-      : leaving?.kind === 'switch'
-        ? t('ワークスペースを切り替える', 'Switch workspace')
-        : t('ホームに戻る', 'Go home');
+      : leaving?.kind === 'move'
+        ? t(
+            `${leaving.profile.name} を新しいウィンドウで開く`,
+            `Open ${leaving.profile.name} in a new window`,
+          )
+        : leaving?.kind === 'switch'
+          ? t('ワークスペースを切り替える', 'Switch workspace')
+          : t('ホームに戻る', 'Go home');
   const leavingDialog = leaving && (
     <Dialog label={leavingTitle} busy={goingHome} onClose={() => setLeaving(undefined)}>
       <form
@@ -2999,9 +3067,11 @@ function App() {
               ? stopping
                 ? t('停止して閉じる', 'Stop and close')
                 : t('閉じる', 'Close')
-              : leaving.kind === 'switch'
-                ? t('閉じて切り替える', 'Close and switch')
-                : t('閉じて戻る', 'Close and go home')}
+              : leaving.kind === 'move'
+                ? t('閉じて移す', 'Close and move')
+                : leaving.kind === 'switch'
+                  ? t('閉じて切り替える', 'Close and switch')
+                  : t('閉じて戻る', 'Close and go home')}
           </button>
         </div>
       </form>

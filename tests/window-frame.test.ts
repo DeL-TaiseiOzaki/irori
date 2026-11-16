@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { themes } from '../src/domain/types';
-import { titleBarHeight, windowChrome } from '../src/domain/window-frame';
+import { droppedWindowBounds, titleBarHeight, windowChrome } from '../src/domain/window-frame';
 
 const tokens = await readFile(new URL('../src/app/tokens.css', import.meta.url), 'utf8');
 const shell = await readFile(new URL('../src/app/shell.css', import.meta.url), 'utf8');
@@ -43,4 +43,28 @@ test('the title bar is as tall as the window controls laid over it, with its hai
   const rule = /\.titlebar \{([^}]*)\}/.exec(shell)?.[1] ?? '';
   assert.match(rule, new RegExp(`height: ${titleBarHeight + 1}px;`));
   assert.match(rule, /border-bottom: 1px solid/);
+});
+
+test('a window a tab was dragged out to stands under the pointer, inside the screen', () => {
+  // A screen whose menu bar takes its top 25 pixels.
+  const area = { x: 0, y: 25, width: 2560, height: 1375 };
+  const size = { width: 1440, height: 940 };
+  // Its first tab, in the title bar, is where the tab was let go.
+  const placed = droppedWindowBounds({ x: 400, y: 300 }, size, area);
+  assert.deepEqual(placed, { x: 290, y: 300 - titleBarHeight / 2, ...size });
+  // Near the screen's edges it moves back in, whole.
+  assert.deepEqual(droppedWindowBounds({ x: 2550, y: 1390 }, size, area), {
+    x: 1120,
+    y: 460,
+    ...size,
+  });
+  assert.deepEqual(droppedWindowBounds({ x: 5, y: 0 }, size, area), { x: 0, y: 25, ...size });
+  // A screen left of the main one has negative coordinates; a window larger than it shrinks.
+  const left = { x: -1280, y: 0, width: 1280, height: 800 };
+  assert.deepEqual(droppedWindowBounds({ x: -600, y: 200 }, size, left), {
+    x: -1280,
+    y: 0,
+    width: 1280,
+    height: 800,
+  });
 });

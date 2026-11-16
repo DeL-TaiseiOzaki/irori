@@ -1,5 +1,21 @@
 # Implementation status — notes, native agents and connection onboarding
 
+A workspace tab dragged out opens in a new window, 2026-11-16 (**0.2.74**,
+[ADR 063](decisions/063-tab-out-to-a-new-window.md)): the owner asked that, with
+several workspaces open, dragging one tab out makes it a window of its own.
+- `WorkspaceTabs` follows a held tab with the pointer; let go more than 24 px
+  below the strip or off the window, it calls `moveOut`. Only with two tabs or
+  more; nothing happens within the strip.
+- The host's `moveTab` opens a window at the drop point (`droppedWindowBounds`)
+  and resolves once that window's `windowTabs` includes the workspace; the new
+  window takes it with `movedTab`, with its level, Overview view and vaults
+  (`TabPlace`). The window it left shows its next tab at once and drops the
+  moving tab only then, so nothing stops; a terminal of the tab on show closes
+  after the person agrees.
+- `scripts/windows-ui-smoke.ts` drags a tab out with the mouse;
+  `tests/window-frame.test.ts` and `tests/workspace-tabs.test.ts` check the
+  placement and the validated arguments. Linux under Xvfb only.
+
 Signing in to GitHub from irori, 2026-11-16 (**0.2.73**,
 [#332](https://github.com/DeL-TaiseiOzaki/irori/pull/332), published as
 `v0.2.73-preview.1`; [ADR 062](decisions/062-signing-in-to-github-from-irori.md)):
