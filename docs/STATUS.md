@@ -1,5 +1,27 @@
 # Implementation status — notes, native agents and connection onboarding
 
+irori-templete out of shipped code, 2026-11-16 (**0.2.72**,
+[#329](https://github.com/DeL-TaiseiOzaki/irori/pull/329), published as
+`v0.2.72-preview.1`): irori-templete
+[#20](https://github.com/DeL-TaiseiOzaki/irori-templete/pull/20) (its ADR 010)
+stopped restating the folder index rule and cites ADR 028, while comments in
+`src/` still said the template states it. The owner asked that a change to the
+template never need an irori release.
+- Four comments in `src/` (`folder-index.ts`, `files.ts`, `note-links.ts`,
+  `PageProperties.tsx`) cite irori's own decisions or say nothing of the
+  template; no shipped file names irori-templete. irori behaves as in 0.2.71.
+- `AGENTS.md`: what ships does not name irori-templete or restate its rules;
+  how irori relates to the template is written in `docs/` only.
+- ADR 028's consequence now says the rule is irori's and that the template's
+  agents run `irori index` instead of writing indexes (docs only).
+- irori-templete [#21](https://github.com/DeL-TaiseiOzaki/irori-templete/pull/21)
+  (its ADR 011) adds a `review` skill; nothing in irori changes for it.
+- `publish.yml` published
+  [v0.2.72-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.72-preview.1)
+  from `8f717aa` with the pull request's CI run `43734132905`. Anonymous
+  downloads matched `SHA256SUMS.txt`: Windows 179,387,392 bytes, Mac
+  145,636,980 bytes and `irori-0.2.72-full.nupkg` 178,557,997 bytes.
+
 `irori call` in the irori agent's design note, 2026-11-15 (docs and tests only;
 nothing ships): two sentences of [YOUR-AI](YOUR-AI.md) still spoke as before
 ADR 050 and 0.2.70.
