@@ -52,7 +52,8 @@ the owner expects what VS Code's Remote-SSH gives, a host written in
   #331.
 
 A workspace tab dragged out opens in a new window, 2026-11-16 (**0.2.74**,
-[ADR 063](decisions/063-tab-out-to-a-new-window.md)): the owner asked that, with
+[#331](https://github.com/DeL-TaiseiOzaki/irori/pull/331), published as
+`v0.2.74-preview.1`; [ADR 063](decisions/063-tab-out-to-a-new-window.md)): the owner asked that, with
 several workspaces open, dragging one tab out makes it a window of its own.
 - `WorkspaceTabs` follows a held tab with the pointer; let go more than 24 px
   below the strip or off the window, it calls `moveOut`. Only with two tabs or
@@ -66,6 +67,11 @@ several workspaces open, dragging one tab out makes it a window of its own.
 - `scripts/windows-ui-smoke.ts` drags a tab out with the mouse;
   `tests/window-frame.test.ts` and `tests/workspace-tabs.test.ts` check the
   placement and the validated arguments. Linux under Xvfb only.
+- `publish.yml` published
+  [v0.2.74-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.74-preview.1)
+  from `7473283` with the pull request's CI run `43829554251`. Anonymous
+  downloads matched `SHA256SUMS.txt`: Windows 179,394,560 bytes, Mac
+  145,683,711 bytes and `irori-0.2.74-full.nupkg` 178,564,418 bytes.
 
 Signing in to GitHub from irori, 2026-11-16 (**0.2.73**,
 [#332](https://github.com/DeL-TaiseiOzaki/irori/pull/332), published as
