@@ -16,8 +16,9 @@ several workspaces open, dragging one tab out makes it a window of its own.
   `tests/window-frame.test.ts` and `tests/workspace-tabs.test.ts` check the
   placement and the validated arguments. Linux under Xvfb only.
 
-Signing in to GitHub from irori, 2026-11-16 (**0.2.73**, branch
-`claude/github-sign-in`, not yet merged; [ADR 062](decisions/062-signing-in-to-github-from-irori.md)):
+Signing in to GitHub from irori, 2026-11-16 (**0.2.73**,
+[#332](https://github.com/DeL-TaiseiOzaki/irori/pull/332), published as
+`v0.2.73-preview.1`; [ADR 062](decisions/062-signing-in-to-github-from-irori.md)):
 the owner could not sign in from **設定 → アカウント**, which named
 `gh auth login` and offered only **再確認**, and asked that the GitHub name and
 email be set in irori and connect by themselves.
@@ -37,6 +38,11 @@ email be set in irori and connect by themselves.
 - Verified on Linux with a stand-in gh (`tests/github-sign-in.test.ts`,
   `scripts/account-ui-smoke.ts`). A real `gh auth login --web` against
   github.com, and Windows and macOS, were not run.
+- `publish.yml` published
+  [v0.2.73-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.73-preview.1)
+  from `7b9c84a` with the pull request's CI run `43825139086`. Anonymous
+  downloads matched `SHA256SUMS.txt`: Windows 179,394,560 bytes, Mac
+  145,667,735 bytes and `irori-0.2.73-full.nupkg` 178,563,297 bytes.
 
 irori-templete out of shipped code, 2026-11-16 (**0.2.72**,
 [#329](https://github.com/DeL-TaiseiOzaki/irori/pull/329), published as
