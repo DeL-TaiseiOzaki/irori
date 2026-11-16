@@ -1,16 +1,18 @@
 # irori continuation handoff
 
-**Workspace tabs move between windows, 0.2.74 and 0.2.76**
+**Workspace tabs move between windows and along the strip, 0.2.74 to 0.2.77**
 ([ADR 063](decisions/063-tab-out-to-a-new-window.md),
-[ADR 064](decisions/064-tab-joins-another-window.md)). A tab dragged out opens in a
+[ADR 064](decisions/064-tab-joins-another-window.md),
+[ADR 065](decisions/065-tabs-reordered-by-dragging.md)). A tab dragged out opens in a
 new window, or joins the tabs of the window it is let go on; a window's only tab
-joins and its window closes. Run on Linux under Xvfb only. Next:
+joins and its window closes; along the strip it is reordered. Run on Linux under
+Xvfb only. Next:
 1. Try it by hand on Windows and macOS, with the pointer let go outside the
    window, on another window's title bar and on a second screen; Chromium keeps
    the drag's pointer events there, but irori has not been seen doing it on
    those systems.
-2. Not covered: reordering tabs by dragging, and a menu or keyboard way to move
-   a tab between windows.
+2. Not covered: a menu or keyboard way to reorder tabs or move them between
+   windows.
 
 **Signing in to GitHub from irori, 0.2.73** ([ADR 062](decisions/062-signing-in-to-github-from-irori.md)).
 irori runs `gh auth login --web` from the account section, the restore sheet

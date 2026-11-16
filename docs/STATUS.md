@@ -1,5 +1,17 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Workspace tabs reordered by dragging, 2026-11-16 (**0.2.77**,
+[ADR 065](decisions/065-tabs-reordered-by-dragging.md)): the owner asked that a tab
+dragged along its strip change the order.
+- `WorkspaceTabs` measures the other tabs when a drag begins; along the strip it
+  shows a mark (`.workspace-tab-slot`) in the gap the tab would take and, let go
+  there, calls `onReorder`; the app moves it with `reorderTab`. Out of the strip
+  the drag still moves the tab to another window (ADR 063, 064).
+- The ghost hangs under the pointer along the strip so the mark stays seen.
+- `scripts/windows-ui-smoke.ts` reorders two tabs with the mouse and lets one go
+  where it stands; `tests/workspace-tabs.test.ts` covers `reorderTab`. Linux
+  under Xvfb only.
+
 A workspace tab let go on another window's tabs joins them, 2026-11-16 (**0.2.76**,
 [#337](https://github.com/DeL-TaiseiOzaki/irori/pull/337), published as
 `v0.2.76-preview.1`; [ADR 064](decisions/064-tab-joins-another-window.md)): the owner asked that a tab

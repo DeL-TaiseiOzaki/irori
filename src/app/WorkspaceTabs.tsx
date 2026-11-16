@@ -16,6 +16,18 @@ const onScreen = (event: PointerEvent): Point => ({
   y: Math.round(event.screenY),
 });
 
+/** The other tabs of the strip as a drag along it began (ADR 065). */
+type Places = { others: DOMRect[]; from: number; origin: number };
+/** The place among the other tabs a tab let go `x` across the window takes. */
+const placeAt = (places: Places, x: number) =>
+  places.others.filter((box) => box.left + box.width / 2 < x).length;
+/** Where across the strip the mark stands for a place: in the gap before that tab. */
+function slotOf(places: Places, index: number) {
+  const { others, origin } = places;
+  const edge = index < others.length ? others[index].left - 1 : others[others.length - 1].right + 1;
+  return edge - origin;
+}
+
 /**
  * Where a tab let go `x` across the window joins this window's tabs (ADR 064): after
  * every tab whose middle is left of it.
@@ -32,9 +44,10 @@ export function stripIndexAt(x: number) {
 /**
  * The open workspaces along the window's top, as a browser keeps its pages:
  * one on show, the others still running. + shows the start screen to open another.
- * A tab dragged out of the strip, below it or off the window, joins the tabs of the
- * window it is let go on, which shows where while it is over them (ADR 064), or else
- * opens in a window of its own while two or more are open (ADR 063).
+ * A tab dragged along the strip takes the place it is let go at (ADR 065). One dragged
+ * out of it, below it or off the window, joins the tabs of the window it is let go on,
+ * which shows where while it is over them (ADR 064), or else opens in a window of its
+ * own while two or more are open (ADR 063).
  * Memoised: it re-renders for its own data, not for every keystroke in the editor.
  */
 export const WorkspaceTabs = memo(function WorkspaceTabs({
@@ -49,6 +62,7 @@ export const WorkspaceTabs = memo(function WorkspaceTabs({
   onClose,
   onMoveOut,
   onDragOver,
+  onReorder,
   onAdd,
 }: {
   tabs: WorkspaceProfile[];
@@ -67,13 +81,22 @@ export const WorkspaceTabs = memo(function WorkspaceTabs({
   onMoveOut: (profile: WorkspaceProfile, at: Point) => void;
   /** Where a tab dragged out of the strip is on the screen; none once it is not. */
   onDragOver: (drag?: { name: string; at: Point }) => void;
+  /** A tab let go along the strip, before the `index`-th of the other tabs. */
+  onReorder: (profile: WorkspaceProfile, index: number) => void;
   onAdd: () => void;
 }) {
   useLanguage();
   // The tab held down, where, and the strip's foot; `dragged` once it moved far enough.
-  const held = useRef<{ id: string; x: number; y: number; foot: number; dragged: boolean }>(
-    undefined,
-  );
+  // `places` are the other tabs as they stood when the drag began, and `from` the place
+  // among them the tab already has (ADR 065).
+  const held = useRef<{
+    id: string;
+    x: number;
+    y: number;
+    foot: number;
+    dragged: boolean;
+    places?: Places;
+  }>(undefined);
   // A drag ends with a click on the tab it started on, in the same task; it shows nothing.
   const swallow = useRef(false);
   const [drag, setDrag] = useState<{
@@ -82,6 +105,8 @@ export const WorkspaceTabs = memo(function WorkspaceTabs({
     x: number;
     y: number;
     out: boolean;
+    /** Where across the strip the tab would go, when that is another place. */
+    slot?: number;
   }>();
   // Out of the strip, the host learns where the tab is once a frame, so the window whose
   // tabs are under it shows where it would join them. `told` once it was told any.
@@ -129,9 +154,35 @@ export const WorkspaceTabs = memo(function WorkspaceTabs({
     if (!start.dragged && Math.hypot(event.clientX - start.x, event.clientY - start.y) < dragFrom)
       return;
     start.dragged = true;
+    start.places ??= measure(event.currentTarget, profile.id);
     const away = out(event, start.foot);
-    setDrag({ id: profile.id, name: profile.name, x: event.clientX, y: event.clientY, out: away });
+    const index = away ? undefined : placeAt(start.places, event.clientX);
+    setDrag({
+      id: profile.id,
+      name: profile.name,
+      x: event.clientX,
+      y: event.clientY,
+      out: away,
+      slot:
+        index === undefined || index === start.places.from
+          ? undefined
+          : slotOf(start.places, index),
+    });
     point(away ? { name: profile.name, at: onScreen(event) } : undefined);
+  }
+  /** The other tabs' places across the strip, and the one the dragged tab has among them. */
+  function measure(button: Element, id: string): Places {
+    const list = button.closest('.workspace-tab-list');
+    const boxes = [
+      ...(list?.querySelectorAll(':scope > .workspace-tab:not([data-incoming])') ?? []),
+    ].map((tab) => tab.getBoundingClientRect());
+    const from = tabs.findIndex((tab) => tab.id === id);
+    const origin = (list?.getBoundingClientRect().left ?? 0) - (list?.scrollLeft ?? 0);
+    return {
+      others: boxes.filter((_, index) => index !== from),
+      from,
+      origin,
+    };
   }
   function letGo(event: PointerEvent, profile: WorkspaceProfile, cancelled = false) {
     const start = held.current;
@@ -142,7 +193,10 @@ export const WorkspaceTabs = memo(function WorkspaceTabs({
     if (start?.id !== profile.id || !start.dragged) return;
     swallow.current = true;
     setTimeout(() => (swallow.current = false));
-    if (!cancelled && out(event, start.foot)) onMoveOut(profile, onScreen(event));
+    if (cancelled) return;
+    if (out(event, start.foot)) return onMoveOut(profile, onScreen(event));
+    const index = start.places && placeAt(start.places, event.clientX);
+    if (index !== undefined && index !== start.places?.from) onReorder(profile, index);
   }
   // A window's one tab moves only onto another window's tabs (ADR 064).
   const alone = tabs.length - moving.length < 2;
@@ -154,6 +208,9 @@ export const WorkspaceTabs = memo(function WorkspaceTabs({
   return (
     <nav className="workspace-tabs chrome" aria-label={t('ワークスペース', 'Workspaces')}>
       <div className="workspace-tab-list">
+        {drag?.slot !== undefined && (
+          <i className="workspace-tab-slot" style={{ left: drag.slot }} aria-hidden="true" />
+        )}
         {tabs.map((profile, index) => {
           const ai = state(profile);
           const current = profile.id === shown;
