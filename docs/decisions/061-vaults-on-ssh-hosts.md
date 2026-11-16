@@ -68,6 +68,32 @@ weighed and dropped:
    login lasts as long as the connection: Windows OpenSSH cannot share
    connections, so nothing is run per file or per run. The vault host listens on
    no network port. Nothing is forwarded from the host to this device.
+   *Amended 2026-11-16 (0.2.75), owner request.* The owner expects what VS
+   Code's Remote-SSH gives: a host written in `~/.ssh/config` is chosen, not
+   typed again. irori now reads the person's ssh configuration
+   (`src/host/ssh-config.ts`): `~/.ssh/config`, the files it includes and the
+   system's file, the same places Remote-SSH reads. It offers each word of a
+   `Host` line that is a name and not a pattern (`*`, `?` and a leading `!`
+   mark patterns). Choosing one adds a host whose destination is that name.
+   `ssh` still applies the configuration, so irori decides nothing about the
+   connection and follows later changes to the file. Beside each name irori
+   shows the address, user and port, for telling the machines apart only.
+   - The reading follows `ssh` and not Remote-SSH where the two differ, and a
+     test compares it with `ssh -G`. The first value obtained wins, and a
+     pattern's block (`Host *`) gives its values to the hosts it matches. A
+     file included inside a block is read for that block's hosts alone, so a
+     name in it that the block does not match is not offered: `ssh` would
+     never apply its settings. Remote-SSH skips such files.
+   - A `Match` block other than `Match all` depends on what irori cannot tell
+     (a command's result, the address after substitution). The hosts it names
+     are not offered, which Remote-SSH does offer; the hosts of a file it
+     includes are. What it sets is shown for no host it might hold for.
+   - irori writes nothing to these files, where Remote-SSH adds a host by
+     writing a block: a host added by its destination stays irori's own record
+     (`remote-hosts.json`).
+   - Still `BatchMode`: a host that needs a password, a passphrase or a
+     host-key answer typed is not connected. Remote-SSH answers these in its
+     window (it sets `SSH_ASKPASS` to itself); that is the next step toward it.
 4. **The vault host outlives the connection.** `attach` joins a login's pipes to
    the vault host of a data folder and starts one when none answers; `serve` is
    that process, on a socket only its user can open. A device that attaches

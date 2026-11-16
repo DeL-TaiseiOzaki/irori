@@ -60,6 +60,17 @@ when the connection is cut. Next, in this order:
 4. The terminal as `ssh -t`, connected folders, path links in replies for files
    on a host, and SSH's prompts answered in the window.
 
+0.2.75 lists the hosts of the person's ssh configuration where a host is added
+(`src/host/ssh-config.ts`; ADR 061 decision 3, amended), because the owner
+expects what VS Code's Remote-SSH gives. What still differs from Remote-SSH most
+is the prompts of item 4: irori connects in `BatchMode`, so a key with a
+passphrase and no agent, a password, or an unknown host key cannot connect until
+`ssh <name>` has been run in a terminal. Remote-SSH starts `ssh` with
+`SSH_ASKPASS` set to a helper of its own and shows each prompt as an input box.
+A suggestion, not an owner decision: do the same before item 2. The Windows
+side of this release (`%ProgramData%\ssh\ssh_config`, `Include` paths with
+backslashes) has not been run.
+
 **The ontology is the declaration, 0.2.66** ([ADR 060](decisions/060-the-ontology-is-the-declaration.md),
 [ONTOLOGY](ONTOLOGY.md)). `.property/property.json` is a knowledge base's
 ontology; irori applies it to the pages (`checkOntology`), shows it

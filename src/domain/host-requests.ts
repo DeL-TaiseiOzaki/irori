@@ -287,6 +287,7 @@ export const hostArguments = {
   openWorkFolder: z.tuple([id]),
   register: z.tuple([path, name, categoryText]),
   remoteHosts: z.tuple([]),
+  sshConfigHosts: z.tuple([]),
   saveRemoteHost: z.tuple([remoteHostInput]),
   removeRemoteHost: z.tuple([id]),
   connectRemoteHost: z.tuple([id]),

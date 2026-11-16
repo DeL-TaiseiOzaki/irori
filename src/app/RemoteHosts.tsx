@@ -1,7 +1,7 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { Category, Space } from '../domain/types';
-import type { RemoteFolders, RemoteHost } from '../domain/remote-hosts';
+import type { RemoteFolders, RemoteHost, SshConfigHost } from '../domain/remote-hosts';
 import { remotePath, sshDestination } from '../domain/remote-hosts';
 import { categoryChoices, categoryName, categoryValue } from '../domain/brains';
 import { baseName } from '../domain/paths';
@@ -238,11 +238,129 @@ export function HostForm({
   );
 }
 
+/** What the ssh configuration says of a host, in one line; nothing when it says no more than the name. */
+function configPlace(item: SshConfigHost) {
+  const place = `${item.user ? `${item.user}@` : ''}${item.hostName ?? item.alias}${
+    item.port ? `:${item.port}` : ''
+  }`;
+  return place === item.alias ? '' : place;
+}
+
+/** How many hosts of the ssh configuration are shown at once, and from how many a filter is offered. */
+const configRows = { shown: 50, filter: 8 };
+
+/**
+ * The hosts of the person's own ssh configuration that are not SSH hosts here
+ * yet (ADR 061, amended): one click adds one by its name alone, as VS Code's
+ * Remote-SSH connects to one. `ssh` reads the rest from the configuration each
+ * time it connects, so a change there needs none here. A long list is filtered
+ * by typing, as Remote-SSH's is.
+ */
+function ConfigHosts({
+  action,
+  onAdded,
+}: {
+  /** What a click on a host goes on to do, said on its row. */
+  action: string;
+  onAdded: (remote: RemoteHost) => void;
+}) {
+  const { hosts, version } = useRemoteHosts();
+  // Read again when the hosts change, and each time a part that offers them opens.
+  const config = useResource(() => host.sshConfigHosts(), [], { refresh: version });
+  const { busy, error, run } = useAction();
+  const [query, setQuery] = useState('');
+  // A host added by its name is known by that name; one given a port is another connection.
+  const known = new Set((hosts ?? []).filter((item) => !item.port).map((item) => item.destination));
+  const offered = (config.data ?? []).filter((item) => !known.has(item.alias));
+  if (!offered.length) return null;
+  const wanted = query.trim().toLowerCase();
+  const found = wanted
+    ? offered.filter((item) =>
+        [item.alias, item.hostName, item.user].some((said) => said?.toLowerCase().includes(wanted)),
+      )
+    : offered;
+  const more = found.length - configRows.shown;
+  const add = (item: SshConfigHost) =>
+    run(async () => {
+      // Its name here is its name there; one already taken here gets a number.
+      const taken = new Set((hosts ?? []).map((remote) => remote.name));
+      const base = item.alias.slice(0, 56);
+      let name = base;
+      for (let count = 2; taken.has(name); count++) name = `${base} ${count}`;
+      onAdded(await host.saveRemoteHost({ name, destination: item.alias }));
+    });
+  const title = t('ssh の設定にあるホスト', 'Hosts in your ssh configuration');
+  return (
+    <section className="remote-config" aria-label={title}>
+      <h5>
+        {title}
+        <small className="mono">~/.ssh/config</small>
+      </h5>
+      {offered.length > configRows.filter && (
+        <input
+          type="search"
+          aria-label={t(
+            'ssh の設定のホストを絞り込む',
+            'Filter the hosts of your ssh configuration',
+          )}
+          placeholder={t(
+            `${offered.length} 件のホストを名前で絞り込む`,
+            `Filter ${offered.length} hosts by name`,
+          )}
+          value={query}
+          spellCheck={false}
+          autoCapitalize="off"
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      )}
+      <ul>
+        {found.slice(0, configRows.shown).map((item) => {
+          const place = configPlace(item);
+          return (
+            <li key={item.alias}>
+              <button
+                type="button"
+                className="remote-choice-host"
+                disabled={busy}
+                onClick={() => void add(item)}
+              >
+                <Icon name="server" size={16} />
+                <span>
+                  <strong>{item.alias}</strong>
+                  {place && <small className="mono">{place}</small>}
+                </span>
+                <span className="remote-config-action">{action}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {!found.length && (
+        <p className="hint">
+          {t(
+            '一致するホストがありません。設定にないホストは、接続先を入力して追加できます。',
+            'No host matches. One that is not in the configuration is added by its destination.',
+          )}
+        </p>
+      )}
+      {more > 0 && (
+        <p className="hint">
+          {t(
+            `ほかに ${more} 件あります。名前で絞り込むと表示されます。`,
+            `${more} more. Filter by name to see them.`,
+          )}
+        </p>
+      )}
+      {error && <ErrorMessage text={error} />}
+    </section>
+  );
+}
+
 /** What a person must know before adding an SSH host: the settings part's lead says it too. */
 export function sshHostsLead() {
   return t(
-    'vault を SSH ホストに置けます。irori はこのコンピューターの ssh を、その鍵と設定のまま使います。パスワードやパスフレーズの入力には答えられないため、先にターミナルで「ssh 接続先」がそれだけでつながることを確かめてください。対応するのは Linux（x64・arm64）のホストで、irori は自分のファイルをホストの ~/.irori-host に置きます。SSH ホストの vault は、いまは読み取り専用で表示します。その vault のエージェントは irori agent が仕事を任せたときにホストで動くため、ホストに CLI（Claude Code、Codex など）をインストールしてログインしておいてください。',
-    "A vault can live on an SSH host. irori uses this computer's ssh with its keys and configuration. It cannot answer a password or passphrase prompt, so first check in a terminal that `ssh <destination>` connects by itself. Hosts run Linux (x64 or arm64), and irori keeps its own files in ~/.irori-host there. A vault on an SSH host is shown read-only for now. Its agent runs on the host when the irori agent hands it work, so install the CLI there (Claude Code, Codex…) and sign in.",
+    'vault を SSH ホストに置けます。irori はこのコンピューターの ssh を、その鍵と設定のまま使います。ssh の設定（~/.ssh/config）に書いたホストは、名前を選ぶだけで追加できます。パスワードやパスフレーズの入力には答えられないため、先にターミナルで「ssh 接続先」がそれだけでつながることを確かめてください。対応するのは Linux（x64・arm64）のホストで、irori は自分のファイルをホストの ~/.irori-host に置きます。SSH ホストの vault は、いまは読み取り専用で表示します。その vault のエージェントは irori agent が仕事を任せたときにホストで動くため、ホストに CLI（Claude Code、Codex など）をインストールしてログインしておいてください。',
+    "A vault can live on an SSH host. irori uses this computer's ssh with its keys and configuration. A host written in your ssh configuration (~/.ssh/config) is added by choosing its name. It cannot answer a password or passphrase prompt, so first check in a terminal that `ssh <destination>` connects by itself. Hosts run Linux (x64 or arm64), and irori keeps its own files in ~/.irori-host there. A vault on an SSH host is shown read-only for now. Its agent runs on the host when the irori agent hands it work, so install the CLI there (Claude Code, Codex…) and sign in.",
   );
 }
 
@@ -293,12 +411,13 @@ export function RemoteHostsSettings({
         <h4>{t('SSH ホストを追加', 'Add an SSH host')}</h4>
         <div className="settings-group">
           <div className="settings-item">
+            <ConfigHosts action={t('追加', 'Add')} onAdded={() => {}} />
             {adding ? (
               <HostForm onSaved={() => setAdding(false)} onCancel={() => setAdding(false)} />
             ) : (
               <button type="button" className="settings-action" onClick={() => setAdding(true)}>
                 <Icon name="plus" size={14} />
-                {t('SSH ホストを追加', 'Add an SSH host')}
+                {t('接続先を入力して追加', 'Add one by its destination')}
               </button>
             )}
           </div>
@@ -467,12 +586,14 @@ export function RemoteHostChoice({ onChoose }: { onChoose: (remote: RemoteHost) 
       {!hosts.length && !adding && (
         <p className="hint">
           {t(
-            'SSH ホストがまだありません。追加すると、そのホストのフォルダを vault にできます。設定の「SSH ホスト」でも管理できます。',
-            'There are no SSH hosts yet. Add one to make a folder there a vault; Settings → SSH hosts manages them too.',
+            'SSH ホストがまだありません。ホストを選ぶか追加すると、そのホストのフォルダを vault にできます。設定の「SSH ホスト」でも管理できます。',
+            'There are no SSH hosts yet. Choose or add one to make a folder there a vault; Settings → SSH hosts manages them too.',
           )}
         </p>
       )}
-      {adding || !hosts.length ? (
+      {/* Chosen from the ssh configuration, a host is added and its folders open at once. */}
+      <ConfigHosts action={t('フォルダを選ぶ', 'Choose a folder')} onAdded={onChoose} />
+      {adding ? (
         <>
           <p className="remote-lead">{sshHostsLead()}</p>
           <HostForm
@@ -480,13 +601,13 @@ export function RemoteHostChoice({ onChoose }: { onChoose: (remote: RemoteHost) 
               setAdding(false);
               onChoose(remote);
             }}
-            onCancel={hosts.length ? () => setAdding(false) : undefined}
+            onCancel={() => setAdding(false)}
           />
         </>
       ) : (
         <button type="button" className="remote-choice-add" onClick={() => setAdding(true)}>
           <Icon name="plus" size={14} />
-          {t('SSH ホストを追加', 'Add an SSH host')}
+          {t('接続先を入力して追加', 'Add one by its destination')}
         </button>
       )}
     </div>
