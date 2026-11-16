@@ -406,6 +406,13 @@ export type HostEvent =
   | { type: 'vaults'; workspace?: WorkspaceProfile }
   /** Another window opened or closed a workspace tab, or closed (ADR 051). */
   | { type: 'windows' }
+  /**
+   * A tab dragged out of another window is over this window's tabs, `x` across the
+   * window; without `x`, it left them (ADR 064).
+   */
+  | { type: 'tabOver'; x?: number; name?: string }
+  /** A tab dragged out of another window was let go on this window's tabs (ADR 064). */
+  | { type: 'tabArrives' }
   /** An SSH host was added, changed or removed, or its connection or its vaults changed (ADR 061). */
   | { type: 'hosts' };
 export interface StartRun {
@@ -1032,18 +1039,30 @@ export interface HostAPI {
   /** The workspaces and vaults irori's other windows have open; closing a tab leaves them be. */
   otherWindows(): Promise<import('./workspace-tabs').OpenTab[]>;
   /**
-   * Opens a tab dragged out of this window in a window of its own, its first tab at the
-   * screen point `at` (ADR 063). True once that window shows it: until then the tab stays
-   * here, so nothing it runs is left without a window. False when it could not.
+   * Moves a tab dragged out of this window, let go at the screen point `at`: into the
+   * window whose tabs are there (ADR 064), else into a window of its own with its first
+   * tab there (ADR 063). True once that window shows it: until then the tab stays here,
+   * so nothing it runs is left without a window. False when it could not.
    */
   moveTab(
     tab: import('./workspace-tabs').MovedTab,
     at?: { x: number; y: number },
   ): Promise<boolean>;
-  /** The tab this window was opened to show, dragged out of another, with where it was left. */
+  /**
+   * The tab dragged out of another window that this window was opened to show, or that
+   * was let go on its tabs, with where it was left and, on its tabs, the point across the
+   * window it was let go at (ADR 063, 064).
+   */
   movedTab(): Promise<
-    { profile: WorkspaceProfile; place?: import('./workspace-tabs').TabPlace } | undefined
+    | { profile: WorkspaceProfile; place?: import('./workspace-tabs').TabPlace; x?: number }
+    | undefined
   >;
+  /**
+   * Where a tab dragged out of this window is on the screen, while it is out of the
+   * strip; none once the drag ends there. The window whose tabs are under it shows
+   * where the tab would join them (ADR 064).
+   */
+  dragTab(drag?: { name: string; at: { x: number; y: number } }): Promise<void>;
   /**
    * Opens irori's menu at a point of this window, under the title bar's menu button:
    * on Windows and Linux the window has no menu bar of its own (ADR 054).

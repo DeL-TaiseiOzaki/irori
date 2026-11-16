@@ -2,7 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { themes } from '../src/domain/types';
-import { droppedWindowBounds, titleBarHeight, windowChrome } from '../src/domain/window-frame';
+import {
+  droppedWindowBounds,
+  stripUnder,
+  titleBarHeight,
+  windowChrome,
+} from '../src/domain/window-frame';
 
 const tokens = await readFile(new URL('../src/app/tokens.css', import.meta.url), 'utf8');
 const shell = await readFile(new URL('../src/app/shell.css', import.meta.url), 'utf8');
@@ -67,4 +72,23 @@ test('a window a tab was dragged out to stands under the pointer, inside the scr
     width: 1280,
     height: 800,
   });
+});
+
+test('a tab let go on the title bar of the window seen there joins it', () => {
+  const first = { window: 'first', bounds: { x: 0, y: 0, width: 980, height: 680 } };
+  const second = { window: 'second', bounds: { x: 300, y: 344, width: 980, height: 680 } };
+  const onSecondBar = { x: 800, y: 344 + titleBarHeight / 2 };
+  // The second window is in front where the two overlap: its title bar is seen there.
+  assert.equal(stripUnder(onSecondBar, [second, first], 'first'), 'second');
+  // Behind the first window, its title bar cannot be seen and is not joined.
+  assert.equal(stripUnder(onSecondBar, [first, second], 'second'), undefined);
+  assert.equal(stripUnder(onSecondBar, [first, second], 'first'), undefined);
+  // A window's page below its title bar, its own title bar, or no window at all: none.
+  assert.equal(stripUnder({ x: 800, y: 344 + 60 }, [second, first], 'first'), undefined);
+  assert.equal(stripUnder({ x: 400, y: 10 }, [second, first], 'first'), undefined);
+  assert.equal(stripUnder({ x: 1279, y: 10 }, [second, first], 'first'), undefined);
+  assert.equal(stripUnder({ x: 400, y: 10 }, [second, first], 'second'), 'first');
+  // The hairline under the title bar still counts; the right edge does not.
+  assert.equal(stripUnder({ x: 10, y: titleBarHeight }, [first], 'second'), 'first');
+  assert.equal(stripUnder({ x: 980, y: 10 }, [first], 'second'), undefined);
 });

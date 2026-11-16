@@ -9,7 +9,8 @@ import { showEveryWindowItem } from '../tests/fixtures/window-items';
 
 // Several windows over one irori (ADR 051): each has its own tabs, what one has
 // open the others leave alone, and closing one leaves the rest running. A tab
-// dragged out of its window opens in a window of its own (ADR 063).
+// dragged out of its window opens in a window of its own (ADR 063), or joins the
+// tabs of another window it is let go on (ADR 064).
 const base = await mkdtemp(path.join(tmpdir(), 'irori windows UI 日本語 '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
@@ -120,18 +121,73 @@ try {
   await expect(page.locator('.workspace-tab-drag')).toHaveCount(0);
   expect(await windowCount()).toBe(2);
   await moved.screenshot({ path: 'test-results/irori-windows-moved.png' });
-  // A window's only tab stays: dragging it out opens nothing.
+  // A window's only tab moves only onto another window's tabs (ADR 064): let go
+  // anywhere else, it stays and nothing opens.
   const only = (await tabOf(movedStrip, '次の作業').boundingBox())!;
   await moved.mouse.move(only.x + only.width / 2, only.y + only.height / 2);
   await moved.mouse.down();
   await moved.mouse.move(only.x + only.width / 2, only.y + 240, { steps: 8 });
-  await expect(moved.locator('.workspace-tab-drag')).toHaveCount(0);
+  await expect(moved.locator('.workspace-tab-drag')).toContainText(
+    'ほかのウィンドウのタブの上で離す',
+  );
   await moved.mouse.up();
+  await expect(moved.locator('.workspace-tab-drag')).toHaveCount(0);
   await expect(tabOf(movedStrip, '次の作業')).toBeVisible();
+  expect(await windowCount()).toBe(2);
+
+  // Let go on the first window's tabs, it joins them where it was let go, comes on show
+  // there, and its emptied window closes. The first window shows where while it is over.
+  // The windows are placed so the second overlaps the first below its title bar.
+  const place = (second: { x: number; y: number }) =>
+    app.evaluate(({ BrowserWindow }, second) => {
+      const [first, other] = BrowserWindow.getAllWindows().sort((a, b) => a.id - b.id);
+      first.setBounds({ x: 0, y: 0, width: 980, height: 680 });
+      other.setBounds({ ...second, width: 980, height: 680 });
+      other.focus();
+    }, second);
+  await place({ x: 300, y: 344 });
+  const firstTab = (await tabOf(strip, '最初の作業').boundingBox())!;
+  const held2 = (await tabOf(movedStrip, '次の作業').boundingBox())!;
+  await moved.mouse.move(held2.x + held2.width / 2, held2.y + held2.height / 2);
+  await moved.mouse.down();
+  // The first window's title bar, after its tab, seen from the second window's page.
+  const ontoFirst = { x: firstTab.x + firstTab.width + 40 - 300, y: firstTab.y + 10 - 344 };
+  await moved.mouse.move(ontoFirst.x, ontoFirst.y, { steps: 10 });
+  await expect(strip.locator('.workspace-tab[data-incoming]')).toHaveText('次の作業');
+  await page.screenshot({
+    path: 'test-results/irori-windows-joining.png',
+    clip: { x: 0, y: 0, width: 600, height: 60 },
+  });
+  await moved.mouse.up();
+  await expect.poll(windowCount).toBe(1);
+  await expect(strip.locator('.workspace-tab[data-incoming]')).toHaveCount(0);
+  await expect(tabOf(strip, '次の作業')).toHaveAttribute('aria-current', 'page');
+  expect(await strip.locator('.workspace-tab').allInnerTexts()).toEqual(['最初の作業', '次の作業']);
+
+  // A window at its start screen takes a tab let go on its title bar, and the window it
+  // came from keeps its other tab.
+  const [empty] = await Promise.all([
+    app.waitForEvent('window'),
+    app.evaluate(({ Menu }) => Menu.getApplicationMenu()!.getMenuItemById('new-window')!.click()),
+  ]);
+  empty.on('pageerror', (error) => errors.push(String(error)));
+  await expect(empty.getByRole('heading', { name: 'ワークスペースを選択' })).toBeVisible();
+  await place({ x: 300, y: 344 });
+  const second = (await tabOf(strip, '次の作業').boundingBox())!;
+  await page.mouse.move(second.x + second.width / 2, second.y + second.height / 2);
+  await page.mouse.down();
+  // Its title bar where it covers the first window: the window in front is the one joined.
+  await page.mouse.move(800, 344 + 18, { steps: 10 });
+  await expect(empty.locator('.workspace-tab[data-incoming]')).toHaveText('次の作業');
+  await page.mouse.up();
+  const emptyStrip = empty.getByRole('navigation', { name: 'ワークスペース' });
+  await expect(tabOf(emptyStrip, '次の作業')).toHaveAttribute('aria-current', 'page');
+  await expect(strip).not.toContainText('次の作業');
+  await expect(tabOf(strip, '最初の作業')).toHaveAttribute('aria-current', 'page');
   expect(await windowCount()).toBe(2);
   expect(errors).toEqual([]);
   console.log(
-    'Windows UI passed: new window from the menu, separate tabs, protection of what another window has open, terminal kept when another window closes, a tab dragged out to a window of its own. No model inference.',
+    'Windows UI passed: new window from the menu, separate tabs, protection of what another window has open, terminal kept when another window closes, a tab dragged out to a window of its own, and dropped on the tabs of another window to join them. No model inference.',
   );
 } finally {
   await app.close();

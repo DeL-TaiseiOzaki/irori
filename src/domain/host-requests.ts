@@ -58,8 +58,8 @@ const repository = z
   );
 const passphrase = z.string().min(passphraseLength.min).max(passphraseLength.max);
 const target = z.union([id, z.object({ scopeId: id, repository }).strict()]);
-// A tab dragged out of its window (ADR 063): the workspace, where it was left, and the
-// screen point it was let go at, which may lie left of or above the main screen.
+// A tab dragged out of its window (ADR 063, 064): the workspace, where it was left, and
+// the screen point it was let go at, which may lie left of or above the main screen.
 const movedTab = z
   .object({
     id,
@@ -438,6 +438,17 @@ export const hostArguments = {
     z.tuple([movedTab, z.object({ x: screenCoordinate, y: screenCoordinate }).strict()]),
   ]),
   movedTab: z.tuple([]),
+  dragTab: z.union([
+    z.tuple([]),
+    z.tuple([
+      z
+        .object({
+          name: z.string().max(120),
+          at: z.object({ x: screenCoordinate, y: screenCoordinate }).strict(),
+        })
+        .strict(),
+    ]),
+  ]),
   showMenu: z.tuple([z.number().int().min(0).max(100_000), z.number().int().min(0).max(100_000)]),
   respond: z.tuple([
     id,

@@ -208,6 +208,22 @@
   color: var(--act);
   font-size: 11.5px;
 }
+/* Where a tab dragged out of another window would join these tabs (ADR 064). */
+.workspace-tab[data-incoming] {
+  flex: none;
+  padding: 0 12px;
+  max-width: 180px;
+  background: var(--act-soft);
+  box-shadow: inset 0 0 0 1px var(--act-line);
+  color: var(--tx);
+  font-weight: 500;
+  pointer-events: none;
+}
+.workspace-tab[data-incoming] > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* The start screen under the tabs takes the window's rest. */
 .app.app-start > .start {
   flex: 1;
