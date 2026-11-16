@@ -106,6 +106,17 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-11-16: **0.2.77** ([#339](https://github.com/DeL-TaiseiOzaki/irori/pull/339),
+workspace tabs reordered by dragging them along the strip, ADR 065) as `6836b1f`,
+by `publish.yml` alone (push run `43964312005`). Merged at 21:51:37 UTC, the
+release out at 21:53:04 (1:27), the page deployed by 21:54:43 (3:06), and the
+drift check passed at 21:55:08. Anonymous downloads of the Windows installer,
+the Mac image and `irori-0.2.77-full.nupkg` matched `SHA256SUMS.txt`, and the
+live page links the 0.2.77 installers. CI passed on its first run; a local full
+`test:ui` once failed in the remote hosts smoke's reconnect step (line 251),
+which passed alone twice and in CI. Seen on Linux under Xvfb and through CI's
+packaged-app smokes; not by hand on Windows or macOS.
+
 Published 2026-11-16: **0.2.76** ([#337](https://github.com/DeL-TaiseiOzaki/irori/pull/337),
 a workspace tab let go on another window's tabs joins them, ADR 064) as
 `66fd122`, by `publish.yml` alone (push run `43953151069`). Merged at 20:45:58

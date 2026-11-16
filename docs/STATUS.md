@@ -1,7 +1,8 @@
 # Implementation status — notes, native agents and connection onboarding
 
 Workspace tabs reordered by dragging, 2026-11-16 (**0.2.77**,
-[ADR 065](decisions/065-tabs-reordered-by-dragging.md)): the owner asked that a tab
+[#339](https://github.com/DeL-TaiseiOzaki/irori/pull/339), published as
+`v0.2.77-preview.1`; [ADR 065](decisions/065-tabs-reordered-by-dragging.md)): the owner asked that a tab
 dragged along its strip change the order.
 - `WorkspaceTabs` measures the other tabs when a drag begins; along the strip it
   shows a mark (`.workspace-tab-slot`) in the gap the tab would take and, let go
@@ -11,6 +12,11 @@ dragged along its strip change the order.
 - `scripts/windows-ui-smoke.ts` reorders two tabs with the mouse and lets one go
   where it stands; `tests/workspace-tabs.test.ts` covers `reorderTab`. Linux
   under Xvfb only.
+- `publish.yml` published
+  [v0.2.77-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.77-preview.1)
+  from `6836b1f` (push run `43964312005`). Anonymous downloads matched
+  `SHA256SUMS.txt`: Windows 179,404,288 bytes, Mac 145,697,641 bytes and
+  `irori-0.2.77-full.nupkg` 178,572,072 bytes.
 
 A workspace tab let go on another window's tabs joins them, 2026-11-16 (**0.2.76**,
 [#337](https://github.com/DeL-TaiseiOzaki/irori/pull/337), published as
