@@ -1,7 +1,8 @@
 # Implementation status — notes, native agents and connection onboarding
 
 SSH hosts from the person's ssh configuration, 2026-11-16 (**0.2.75**,
-[#333](https://github.com/DeL-TaiseiOzaki/irori/pull/333);
+[#333](https://github.com/DeL-TaiseiOzaki/irori/pull/333), published as
+`v0.2.75-preview.1`;
 [ADR 061](decisions/061-vaults-on-ssh-hosts.md) decision 3 amended, [SSH-HOSTS](SSH-HOSTS.md)):
 the owner expects what VS Code's Remote-SSH gives, a host written in
 `~/.ssh/config` chosen and not typed again.
@@ -42,6 +43,13 @@ the owner expects what VS Code's Remote-SSH gives, a host written in
   with backslashes), macOS, and a real host chosen from a real configuration.
   A file with a UTF-8 byte-order mark is listed here, but OpenSSH 9.6 on Linux
   refuses it, so its hosts would fail to connect with ssh's own message.
+- `publish.yml` published
+  [v0.2.75-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.75-preview.1)
+  from `7eea894` with the pull request's CI run `43831403986`. Anonymous
+  downloads matched `SHA256SUMS.txt`: Windows 179,400,192 bytes, Mac
+  145,697,978 bytes and `irori-0.2.75-full.nupkg` 178,568,772 bytes. The pull
+  request was renumbered twice while open: 0.2.73 went to #332 and 0.2.74 to
+  #331.
 
 A workspace tab dragged out opens in a new window, 2026-11-16 (**0.2.74**,
 [ADR 063](decisions/063-tab-out-to-a-new-window.md)): the owner asked that, with
