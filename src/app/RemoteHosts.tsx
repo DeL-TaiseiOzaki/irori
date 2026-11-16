@@ -1,7 +1,12 @@
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { Category, Space } from '../domain/types';
-import type { RemoteFolders, RemoteHost, SshConfigHost } from '../domain/remote-hosts';
+import type {
+  RemoteFolders,
+  RemoteHost,
+  RemoteHostQuestion,
+  SshConfigHost,
+} from '../domain/remote-hosts';
 import { remotePath, sshDestination } from '../domain/remote-hosts';
 import { categoryChoices, categoryName, categoryValue } from '../domain/brains';
 import { baseName } from '../domain/paths';
@@ -356,11 +361,169 @@ function ConfigHosts({
   );
 }
 
+/**
+ * What `ssh` asks while it signs in to a host, asked in this window (ADR 061,
+ * amended): a password, a key's passphrase, a verification code, or whether to
+ * trust a host's key. The words are ssh's own, and for a password or a code the
+ * host's; what is typed goes to `ssh` and is kept nowhere. Mounted once for the
+ * window, so that it shows whatever part asked for the connection.
+ */
+export function SshQuestions() {
+  const { hosts } = useRemoteHosts();
+  const remote = hosts?.find((item) => item.asking);
+  const asking = remote?.asking;
+  // An answered question stays a moment, unanswerable, while `ssh` goes on: its next
+  // one, a code after a password, then takes its place without the dialog leaving.
+  const [shown, setShown] = useState<{ remote: RemoteHost; question: RemoteHostQuestion }>();
+  useEffect(() => {
+    if (remote && asking) return setShown({ remote, question: asking });
+    const timer = setTimeout(() => setShown(undefined), 700);
+    return () => clearTimeout(timer);
+  }, [remote?.id, asking?.id]);
+  if (!shown) return null;
+  const label = t(`${shown.remote.name} に接続`, `Connecting to ${shown.remote.name}`);
+  return createPortal(
+    <SshQuestion
+      label={label}
+      remote={shown.remote}
+      question={shown.question}
+      over={asking?.id !== shown.question.id}
+      onCancelled={() => setShown(undefined)}
+    />,
+    document.body,
+  );
+}
+
+function SshQuestion({
+  label,
+  remote,
+  question,
+  over,
+  onCancelled,
+}: {
+  label: string;
+  remote: RemoteHost;
+  question: RemoteHostQuestion;
+  /** Answered, or taken back by `ssh`: shown until the next question or the dialog's end. */
+  over: boolean;
+  /** The person gave no answer: the login ends, and the dialog with it. */
+  onCancelled: () => void;
+}) {
+  const [value, setValue] = useState('');
+  const [visible, setVisible] = useState(false);
+  const { busy, error, run } = useAction();
+  const typed = useRef<HTMLInputElement>(null);
+  // A new question starts empty and unseen, whatever was typed for the last one.
+  useEffect(() => {
+    setValue('');
+    setVisible(false);
+    typed.current?.focus();
+  }, [question.id]);
+  const stopped = busy || over;
+  const answer = (words: string | null) => {
+    if (stopped) return;
+    void run(async () => {
+      await host.answerRemoteHost(remote.id, question.id, words);
+      if (words === null) onCancelled();
+    });
+  };
+  const hostKey = question.kind === 'confirm' && /fingerprint|host key/i.test(question.text);
+  return (
+    <Dialog label={label} busy={busy} onClose={() => answer(null)}>
+      <form
+        className="modal ssh-question"
+        aria-label={label}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (question.kind !== 'notice') answer(question.kind === 'confirm' ? 'yes' : value);
+        }}
+      >
+        <h2>{label}</h2>
+        <p className="remote-destination-line">
+          <Icon name="server" size={14} />
+          <span className="mono">{destinationOf(remote)}</span>
+        </p>
+        <p className="hint">
+          {question.kind === 'secret'
+            ? t(
+                'ssh が次の入力を求めています。入力した内容は ssh に渡すだけで、irori は保存しません。',
+                'ssh asks for the following. What you type is handed to ssh; irori does not keep it.',
+              )
+            : hostKey
+              ? t(
+                  'ssh がこのホストの鍵をまだ知りません。表示された指紋（fingerprint）が正しいことを確かめてから続けてください。続けると、ssh がこのホストの鍵を記憶します。',
+                  "ssh does not know this host's key yet. Check that the fingerprint shown is the right one before you continue. If you continue, ssh remembers this host's key.",
+                )
+              : question.kind === 'confirm'
+                ? t('ssh が確認を求めています。', 'ssh asks you to confirm.')
+                : t('ssh からのお知らせです。', 'A notice from ssh.')}
+        </p>
+        {question.again && (
+          <p className="ssh-question-again">
+            {t(
+              '同じ内容をもう一度尋ねられています。前の入力は受け付けられませんでした。',
+              'ssh asks the same again: the last answer was not accepted.',
+            )}
+          </p>
+        )}
+        <pre className="ssh-question-text">{question.text}</pre>
+        {question.kind === 'secret' && (
+          <div className="ssh-question-answer">
+            <input
+              ref={typed}
+              type={visible ? 'text' : 'password'}
+              aria-label={t('ssh への答え', 'Answer to ssh')}
+              className="mono"
+              value={value}
+              autoFocus
+              autoComplete="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              disabled={stopped}
+              onChange={(event) => setValue(event.target.value)}
+            />
+            <label>
+              <input
+                type="checkbox"
+                checked={visible}
+                disabled={stopped}
+                onChange={(event) => setVisible(event.target.checked)}
+              />
+              {t('入力を表示', 'Show what I type')}
+            </label>
+          </div>
+        )}
+        {over && (
+          <p className="ssh-question-waiting" role="status">
+            {t('ssh の応答を待っています…', 'Waiting for ssh…')}
+          </p>
+        )}
+        {error && <ErrorMessage text={error} />}
+        <div className="remote-actions">
+          <button
+            type="button"
+            disabled={stopped}
+            autoFocus={question.kind !== 'secret'}
+            onClick={() => answer(null)}
+          >
+            {t('キャンセル', 'Cancel')}
+          </button>
+          {question.kind !== 'notice' && (
+            <button type="submit" className="primary" disabled={stopped}>
+              {question.kind === 'confirm' ? t('続ける', 'Continue') : t('送信', 'Send')}
+            </button>
+          )}
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
 /** What a person must know before adding an SSH host: the settings part's lead says it too. */
 export function sshHostsLead() {
   return t(
-    'vault を SSH ホストに置けます。irori はこのコンピューターの ssh を、その鍵と設定のまま使います。ssh の設定（~/.ssh/config）に書いたホストは、名前を選ぶだけで追加できます。パスワードやパスフレーズの入力には答えられないため、先にターミナルで「ssh 接続先」がそれだけでつながることを確かめてください。対応するのは Linux（x64・arm64）のホストで、irori は自分のファイルをホストの ~/.irori-host に置きます。SSH ホストの vault は、いまは読み取り専用で表示します。その vault のエージェントは irori agent が仕事を任せたときにホストで動くため、ホストに CLI（Claude Code、Codex など）をインストールしてログインしておいてください。',
-    "A vault can live on an SSH host. irori uses this computer's ssh with its keys and configuration. A host written in your ssh configuration (~/.ssh/config) is added by choosing its name. It cannot answer a password or passphrase prompt, so first check in a terminal that `ssh <destination>` connects by itself. Hosts run Linux (x64 or arm64), and irori keeps its own files in ~/.irori-host there. A vault on an SSH host is shown read-only for now. Its agent runs on the host when the irori agent hands it work, so install the CLI there (Claude Code, Codex…) and sign in.",
+    'vault を SSH ホストに置けます。irori はこのコンピューターの ssh を、その鍵と設定のまま使います。ssh の設定（~/.ssh/config）に書いたホストは、名前を選ぶだけで追加できます。接続のときに ssh がパスワード・鍵のパスフレーズ・検証コード・ホストの鍵の確認を求めたら、irori のウィンドウで答えられます。入力した内容は ssh に渡すだけで、保存しません。対応するのは Linux（x64・arm64）のホストで、irori は自分のファイルをホストの ~/.irori-host に置きます。SSH ホストの vault は、いまは読み取り専用で表示します。その vault のエージェントは irori agent が仕事を任せたときにホストで動くため、ホストに CLI（Claude Code、Codex など）をインストールしてログインしておいてください。',
+    "A vault can live on an SSH host. irori uses this computer's ssh with its keys and configuration. A host written in your ssh configuration (~/.ssh/config) is added by choosing its name. When ssh asks for a password, a key's passphrase, a verification code or whether to trust a host's key while it connects, you answer in irori's window; what you type is handed to ssh and not kept. Hosts run Linux (x64 or arm64), and irori keeps its own files in ~/.irori-host there. A vault on an SSH host is shown read-only for now. Its agent runs on the host when the irori agent hands it work, so install the CLI there (Claude Code, Codex…) and sign in.",
   );
 }
 
@@ -636,6 +799,12 @@ export function RemoteFolderDialog({
   const [name, setName] = useState(''),
     [category, setCategory] = useState('');
   const [retry, setRetry] = useState(0);
+  // Opening this is asking for the host: a login given no answer before asks again, and a
+  // failure of a moment ago is tried again. Sent before the folders are asked for.
+  const reach = () => void host.connectRemoteHost(chosen.id).catch(() => {});
+  useEffect(() => {
+    if (remote.state !== 'connected') reach();
+  }, [chosen.id]);
   const listing = useResource(
     // The host's home without a folder: the request then names none, not an empty one.
     () => (folder ? host.remoteFolders(chosen.id, folder) : host.remoteFolders(chosen.id)),
@@ -730,7 +899,13 @@ export function RemoteFolderDialog({
           {listing.error ? (
             <div className="remote-folder-problem">
               <ErrorMessage text={listing.error} />
-              <button type="button" onClick={() => setRetry((value) => value + 1)}>
+              <button
+                type="button"
+                onClick={() => {
+                  reach();
+                  setRetry((value) => value + 1);
+                }}
+              >
                 {t('再試行', 'Retry')}
               </button>
             </div>

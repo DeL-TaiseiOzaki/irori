@@ -189,7 +189,7 @@ import './stage.css';
 import './agent-panel.css';
 import './views.css';
 import { Startup, RegisterSpace } from './Startup';
-import { useRemoteHosts } from './RemoteHosts';
+import { SshQuestions, useRemoteHosts } from './RemoteHosts';
 import { appIcon } from './branding';
 import { shortcut } from './shortcuts';
 import { Icon } from './Icon';
@@ -4571,6 +4571,7 @@ void loadDeviceSettings().finally(() => {
   createRoot(document.getElementById('root')!).render(
     <ErrorBoundary FallbackComponent={AppCrash}>
       <App />
+      <SshQuestions />
     </ErrorBoundary>,
   );
 });

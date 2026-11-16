@@ -30,6 +30,23 @@ export type RemoteHostInput = z.infer<typeof remoteHostInput>;
 
 export type RemoteHostState = 'offline' | 'connecting' | 'connected' | 'error';
 
+/**
+ * What `ssh` asks the person while it signs in to a host (ADR 061, amended): a
+ * password, a key's passphrase, a verification code, or whether to trust the
+ * host's key. `text` is the question in ssh's own words, which for a code or a
+ * password come from the host.
+ */
+export interface RemoteHostQuestion {
+  id: string;
+  text: string;
+  /** `secret`: words to type, unseen unless shown. `confirm`: yes or no. `notice`: nothing to answer. */
+  kind: 'secret' | 'confirm' | 'notice';
+  /** Asked before in this login in the same words: `ssh` did not take the last answer. */
+  again?: boolean;
+}
+/** The longest answer taken to a question of `ssh`. */
+export const remoteAnswerLimit = 4096;
+
 /** What an SSH host says of itself once irori's vault host answers there. */
 export interface RemoteHostAbout {
   user: string;
@@ -48,6 +65,8 @@ export interface RemoteHost {
   state: RemoteHostState;
   /** What irori is doing to connect, or why it could not. */
   detail?: string;
+  /** What `ssh` asks the person now, in the window that is to show it. */
+  asking?: RemoteHostQuestion;
   about?: RemoteHostAbout;
   /** How many of its vaults are on this device's list. */
   vaults: number;

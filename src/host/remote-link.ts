@@ -4,12 +4,26 @@ import type { ChildProcess } from 'node:child_process';
 import { t, type Language } from '../domain/i18n';
 import type { HostEvent } from '../domain/types';
 import { decode, encode, type Frame } from '../remote/wire';
-import { attachedLine, needsLine, type AttachReply } from '../remote/protocol';
+import {
+  attachedLine,
+  busyLine,
+  doneLine,
+  failedLine,
+  needsLine,
+  replacingLine,
+  type AttachReply,
+} from '../remote/protocol';
 
 /** Runs commands on one SSH host: each call is one login. */
 export interface RemoteLauncher {
   /** Starts `command` in the host's shell; the child's pipes are the far process's. */
   run(command: string): ChildProcess;
+  /** Whether the person is being asked something for a login now: that time is theirs, not the host's. */
+  asking?(): boolean;
+  /** Whether the person gave no answer to what a login asked, which ended it. */
+  cancelled?(): boolean;
+  /** Ends what is asked for logins that are over. */
+  settle?(): void;
 }
 
 /** What this device sends an SSH host so that irori's vault host runs there. */
@@ -32,38 +46,34 @@ const places = (version: string, node: string) => ({
   bundle: `${base}/bin/${version}/vault-host.cjs`,
   data: `${base}/data`,
 });
-/** The line an install prints when everything it was sent is in place. */
-const doneLine = 'IRORI-DONE';
-
-// Each command is one word for the host's login shell, whatever shell that is:
+// The command is one word for the host's login shell, whatever shell that is:
 // a POSIX script in single quotes, itself free of single quotes.
 const script = (text: string) => `sh -c '${text}'`;
 
-/** Attaches to the vault host, or says what is missing for it to start. */
+/**
+ * Attaches to the vault host. Where it is not installed, says what is missing and
+ * takes it from the same login: a line `archive|binary|bundle <bytes> [member]`,
+ * then that many bytes, answered by a line each, and `go` to start. One login is
+ * one sign-in, so a person asked for a password or a code is asked once.
+ */
 const starter = (version: string, node: string) => {
   const at = places(version, node);
+  const failed = `{ echo ${failedLine}; exit 1; }`;
   return script(
     `umask 077; n="${at.node}"; b="${at.bundle}"; ` +
-      `if [ -x "$n" ] && [ -f "$b" ]; then exec "$n" "$b" attach --data "${at.data}"; fi; ` +
-      `echo ${needsLine} "$(uname -s)" "$(uname -m)" $([ -x "$n" ] && echo node) $([ -f "$b" ] && echo bundle)`,
+      `if [ ! -x "$n" ] || [ ! -f "$b" ]; then ` +
+      `echo ${needsLine} "$(uname -s)" "$(uname -m)" $([ -x "$n" ] && echo node) $([ -f "$b" ] && echo bundle); ` +
+      `go=; while read -r what size member; do case "$what" in ` +
+      `archive) d="\${n%/node}"; w="$d.new"; rm -rf "$w"; mkdir -p "$w" && head -c "$size" | tar -xzf - -C "$w" "$member" && ` +
+      `mkdir -p "$d" && mv "$w/$member" "$n" && chmod 700 "$n"; s=$?; rm -rf "$w"; [ $s -eq 0 ] || ${failed}; echo ${doneLine};; ` +
+      `binary) mkdir -p "\${n%/node}" && head -c "$size" > "$n.new" && chmod 700 "$n.new" && mv "$n.new" "$n" || ${failed}; echo ${doneLine};; ` +
+      `bundle) mkdir -p "\${b%/vault-host.cjs}" && head -c "$size" > "$b.new" && mv "$b.new" "$b" || ${failed}; echo ${doneLine};; ` +
+      `go) go=1; break;; ` +
+      `*) exit 1;; ` +
+      `esac; done; [ -n "$go" ] || exit 1; fi; ` +
+      `exec "$n" "$b" attach --data "${at.data}"`,
   );
 };
-const installBundle = (version: string) =>
-  script(
-    `umask 077; d="${base}/bin/${version}"; mkdir -p "$d" && cat > "$d/vault-host.cjs.new" && ` +
-      `mv "$d/vault-host.cjs.new" "$d/vault-host.cjs" && echo ${doneLine}`,
-  );
-const installNodeArchive = (node: string, member: string) =>
-  script(
-    `umask 077; d="${base}/node/${node}"; w="$d.new"; rm -rf "$w"; mkdir -p "$w" && ` +
-      `tar -xzf - -C "$w" "${member}" && mkdir -p "$d" && mv "$w/${member}" "$d/node" && chmod 700 "$d/node"; ` +
-      `s=$?; rm -rf "$w"; [ $s -eq 0 ] && echo ${doneLine}`,
-  );
-const installNodeBinary = (node: string) =>
-  script(
-    `umask 077; d="${base}/node/${node}"; mkdir -p "$d" && cat > "$d/node.new" && ` +
-      `chmod 700 "$d/node.new" && mv "$d/node.new" "$d/node" && echo ${doneLine}`,
-  );
 
 /** The kinds of host irori's vault host runs on. */
 const architectures: Record<string, string> = {
@@ -107,74 +117,117 @@ export class RemoteLink {
   seq?: number;
   constructor(private options: RemoteLinkOptions) {}
 
-  /** Sends bytes to a command on the host and resolves once it says they are in place. */
-  private async install(command: string, source: Readable, total: number, label: string) {
-    const child = this.options.launcher.run(command);
-    let out = '';
+  /**
+   * One login: starts `ssh`, sends what the host says it lacks, and resolves once
+   * the vault host answers. Whatever the login shell prints first is passed over.
+   */
+  private login(bundle: { version: string; bytes: Buffer }, node: string) {
+    const { launcher, payload, onProgress } = this.options;
+    const child = launcher.run(starter(bundle.version, node));
     let err = '';
-    child.stdout!.on('data', (chunk) => (out = (out + chunk).slice(-4000)));
     child.stderr!.on('data', (chunk) => (err = (err + chunk).slice(-4000)));
-    let sent = 0;
-    let shown = -1;
-    source.on('data', (chunk: Buffer) => {
-      sent += chunk.length;
-      const step = Math.floor((sent / total) * 20);
-      if (step === shown) return;
-      shown = step;
-      this.options.onProgress(`${label} (${megabytes(sent)} / ${megabytes(total)} MB)`);
-    });
-    const exited = new Promise<number | null>((resolve, reject) => {
-      child.once('error', reject);
-      child.once('close', resolve);
-    });
-    source.on('error', () => child.kill());
     child.stdin!.on('error', () => {});
-    source.pipe(child.stdin!);
-    const code = await exited;
-    if (code !== 0 || !out.includes(doneLine))
-      throw Error(
-        t(
-          `SSH ホストに irori の部品を置けませんでした。\n${reason(err)}`,
-          `Could not put irori's files on the SSH host.\n${reason(err)}`,
-        ),
-      );
-  }
-
-  /** Starts `ssh` and reads up to the line that says whether the vault host answered. */
-  private start(command: string) {
-    const child = this.options.launcher.run(command);
-    let err = '';
-    child.stderr!.on('data', (chunk) => (err = (err + chunk).slice(-4000)));
     let buffer = '';
     let attached = false;
-    return new Promise<{ child: ChildProcess; needs?: string[] }>((resolve, reject) => {
-      const failed = (message?: string) =>
+    return new Promise<ChildProcess>((resolve, reject) => {
+      let over = false;
+      const failed = (message?: string) => {
+        if (over) return;
+        over = true;
+        clearInterval(timer);
+        if (!attached) child.kill();
         reject(
-          Error(
-            message ??
-              t(
-                `SSH で接続できませんでした。\n${reason(err)}`,
-                `Could not connect over SSH.\n${reason(err)}`,
+          launcher.cancelled?.()
+            ? new LoginCancelled()
+            : Error(
+                message ??
+                  t(
+                    `SSH で接続できませんでした。\n${reason(err)}`,
+                    `Could not connect over SSH.\n${reason(err)}`,
+                  ),
               ),
-          ),
         );
-      const timer = setTimeout(() => {
-        child.kill();
-        failed();
-      }, 90_000);
-      child.once('error', (error) => {
-        clearTimeout(timer);
+      };
+      // How long the host may stay silent. While the person is asked for a password
+      // or a code, or a part is on its way, the time is not the host's.
+      let quiet = 0;
+      let sending = false;
+      const timer = setInterval(() => {
+        if (attached || sending || launcher.asking?.()) quiet = 0;
+        else if (++quiet >= 90) failed();
+      }, 1000);
+      /** Resolves with the next line the starter says of a part: in place, or not. */
+      let part: ((placed: boolean) => void) | undefined;
+      const send = async (header: string, source: Readable, total: number, label: string) => {
+        const placed = new Promise<boolean>((done) => (part = done));
+        let sent = 0;
+        let shown = -1;
+        source.on('data', (chunk: Buffer) => {
+          sent += chunk.length;
+          const step = Math.floor((sent / total) * 20);
+          if (step === shown) return;
+          shown = step;
+          onProgress(`${label} (${megabytes(sent)} / ${megabytes(total)} MB)`);
+        });
+        source.on('error', () => failed());
+        sending = true;
+        child.stdin!.write(`${header}\n`);
+        // The login goes on after this part: its input stays open.
+        source.pipe(child.stdin!, { end: false });
+        const ok = await placed;
+        sending = false;
+        if (!ok)
+          throw Error(
+            t(
+              `SSH ホストに irori の部品を置けませんでした。\n${reason(err)}`,
+              `Could not put irori's files on the SSH host.\n${reason(err)}`,
+            ),
+          );
+      };
+      const install = async ([system, machine, ...there]: string[]) => {
+        const arch = architectures[machine];
+        if (system !== 'Linux' || !arch)
+          throw Error(
+            t(
+              `この SSH ホスト（${system} ${machine}）にはまだ対応していません。Linux の x64 と arm64 で動きます。`,
+              `This SSH host (${system} ${machine}) is not supported yet. Linux on x64 and arm64 is.`,
+            ),
+          );
+        if (!there.includes('node')) {
+          onProgress(t('Node を用意しています', 'Getting Node ready'));
+          const runtime = await payload.node(arch);
+          const file = 'archive' in runtime ? runtime.archive : runtime.binary;
+          const { size } = await fs.stat(file);
+          await send(
+            'archive' in runtime ? `archive ${size} ${runtime.member}` : `binary ${size}`,
+            createReadStream(file),
+            size,
+            t('Node を送っています', 'Sending Node'),
+          );
+        }
+        if (!there.includes('bundle'))
+          await send(
+            `bundle ${bundle.bytes.length}`,
+            Readable.from([bundle.bytes]),
+            bundle.bytes.length,
+            t('irori の vault host を送っています', "Sending irori's vault host"),
+          );
+        onProgress(t('vault host を起動しています', 'Starting the vault host'));
+        child.stdin!.write('go\n');
+      };
+      child.once('error', (error) =>
         failed(
           t(
             `ssh を起動できませんでした（${error.message}）。OpenSSH クライアントが必要です。`,
             `Could not start ssh (${error.message}). The OpenSSH client is needed.`,
           ),
-        );
-      });
+        ),
+      );
       child.once('close', () => {
-        clearTimeout(timer);
-        if (attached) this.ended(child);
-        else failed();
+        if (attached) return this.ended(child);
+        // A part on its way says itself that it could not be put there.
+        if (part) return part(false);
+        failed();
       });
       child.stdout!.setEncoding('utf8');
       child.stdout!.on('data', (chunk: string) => {
@@ -186,15 +239,26 @@ export class RemoteLink {
             this.received(child, line);
             continue;
           }
-          // Whatever the login shell printed first is passed over.
+          quiet = 0;
           if (line === attachedLine) {
             attached = true;
-            clearTimeout(timer);
-            resolve({ child });
-          } else if (line.startsWith(`${needsLine} `)) {
-            clearTimeout(timer);
-            resolve({ child, needs: line.split(' ').slice(1) });
-          }
+            over = true;
+            clearInterval(timer);
+            resolve(child);
+          } else if (line === doneLine || line === failedLine) {
+            part?.(line === doneLine);
+            part = undefined;
+          } else if (line === replacingLine)
+            onProgress(t('vault host を入れ替えています', 'Replacing the vault host'));
+          else if (line === busyLine)
+            failed(
+              t(
+                'この SSH ホストでは、別のバージョンの irori がエージェントを実行中です。終わってから接続します。',
+                'Another version of irori is running an agent on this SSH host. irori connects once it finishes.',
+              ),
+            );
+          else if (line.startsWith(`${needsLine} `))
+            install(line.split(' ').slice(1)).catch((error: Error) => failed(error.message));
         }
       });
     });
@@ -267,83 +331,40 @@ export class RemoteLink {
     });
   }
 
-  /** Connects, installing and replacing what is needed; resolves with what the vault host says of itself. */
+  /**
+   * Connects in one login, in which what is missing is installed and a vault host of
+   * another version gives way; resolves with what the vault host says of itself.
+   */
   async connect(): Promise<AttachReply> {
-    const { payload, onProgress } = this.options;
+    const { payload, launcher, onProgress } = this.options;
     const bundle = await payload.bundle();
-    const node = payload.nodeVersion;
-    for (let attempt = 0; attempt < 4; attempt++) {
-      onProgress(t('SSH で接続しています', 'Connecting over SSH'));
-      const started = await this.start(starter(bundle.version, node));
-      if (started.needs) {
-        const [system, machine, ...there] = started.needs;
-        const arch = architectures[machine];
-        if (system !== 'Linux' || !arch)
-          throw Error(
-            t(
-              `この SSH ホスト（${system} ${machine}）にはまだ対応していません。Linux の x64 と arm64 で動きます。`,
-              `This SSH host (${system} ${machine}) is not supported yet. Linux on x64 and arm64 is.`,
-            ),
-          );
-        if (!there.includes('node')) {
-          onProgress(t('Node を用意しています', 'Getting Node ready'));
-          const runtime = await payload.node(arch);
-          const file = 'archive' in runtime ? runtime.archive : runtime.binary;
-          await this.install(
-            'archive' in runtime
-              ? installNodeArchive(node, runtime.member)
-              : installNodeBinary(node),
-            createReadStream(file),
-            (await fs.stat(file)).size,
-            t('Node を送っています', 'Sending Node'),
-          );
-        }
-        if (!there.includes('bundle'))
-          await this.install(
-            installBundle(bundle.version),
-            Readable.from([bundle.bytes]),
-            bundle.bytes.length,
-            t('irori の vault host を送っています', "Sending irori's vault host"),
-          );
-        continue;
-      }
-      this.child = started.child;
-      this.open = true;
-      const reply = await this.request<AttachReply>('$attach', [
-        {
-          version: bundle.version,
-          language: this.options.language(),
-          ...(this.seq !== undefined && { resume: this.seq }),
-        },
-      ]);
-      if (reply.version === bundle.version) {
-        if (!reply.resumed) this.seq = reply.seq;
-        this.seq ??= reply.seq;
-        return reply;
-      }
-      // A vault host of another version answered: it gives way once nothing runs on it.
-      if (reply.running) {
-        this.close();
-        throw Error(
-          t(
-            'この SSH ホストでは、別のバージョンの irori がエージェントを実行中です。終わってから接続します。',
-            'Another version of irori is running an agent on this SSH host. irori connects once it finishes.',
-          ),
-        );
-      }
-      onProgress(t('vault host を入れ替えています', 'Replacing the vault host'));
-      const closed = new Promise<void>((resolve) => started.child.once('close', () => resolve()));
-      this.open = false;
-      await this.request('$shutdown', []).catch(() => {});
-      await closed;
-      this.seq = undefined;
+    onProgress(t('SSH で接続しています', 'Connecting over SSH'));
+    try {
+      this.child = await this.login(bundle, payload.nodeVersion);
+    } finally {
+      // Nothing is asked for a login that is over, whichever way it ended.
+      launcher.settle?.();
     }
-    throw Error(
-      t(
-        'SSH ホストで vault host を起動できませんでした。',
-        'The vault host did not start on the SSH host.',
-      ),
-    );
+    this.open = true;
+    const reply = await this.request<AttachReply>('$attach', [
+      {
+        version: bundle.version,
+        language: this.options.language(),
+        ...(this.seq !== undefined && { resume: this.seq }),
+      },
+    ]);
+    if (reply.version !== bundle.version) {
+      this.close();
+      throw Error(
+        t(
+          'SSH ホストで vault host を起動できませんでした。',
+          'The vault host did not start on the SSH host.',
+        ),
+      );
+    }
+    if (!reply.resumed) this.seq = reply.seq;
+    this.seq ??= reply.seq;
+    return reply;
   }
 
   /** Ends the connection; the vault host goes on by itself while an agent works there. */
@@ -357,6 +378,18 @@ export class RemoteLink {
   }
   get connected() {
     return this.open && !!this.child;
+  }
+}
+
+/** The person gave no answer to what `ssh` asked, so the login was ended. */
+export class LoginCancelled extends Error {
+  constructor() {
+    super(
+      t(
+        '入力を取り消したため、接続していません。もう一度接続すると、あらためて尋ねます。',
+        'Not connected: the question was cancelled. Connecting again asks again.',
+      ),
+    );
   }
 }
 

@@ -1,6 +1,6 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { cp, mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -193,6 +193,8 @@ test(
     const connected = await remote.connect(host.id);
     assert.equal(connected.state, 'connected');
     assert.equal(connected.about?.home, far.home);
+    // Installed and started in the login that found nothing there: one sign-in, not four.
+    assert.equal(far.logins.length, 1);
     // What was sent is under one folder of the far home, readable by its user alone.
     assert.deepEqual((await readdir(path.join(far.home, '.irori-host'))).sort(), [
       'bin',
@@ -630,10 +632,158 @@ test(
     const later = updated();
     await later.init();
     t.after(() => later.close());
+    const before = far.logins.length;
     assert.equal((await later.connect(host.id)).state, 'connected');
+    // The newer bundle was sent and the older vault host gave way within one login.
+    assert.equal(far.logins.length - before, 1);
     assert.notEqual((await readFile(pidFile, 'utf8')).trim(), first);
     assert.match((await later.read(vault.scopeId, 'notes/train.md')).text, /zebrafinch-42/);
     assert.equal((await readdir(path.join(far.home, '.irori-host/bin'))).length, 2);
+  },
+);
+
+// What `ssh` asks while it signs in, answered here (ADR 061, amended): the system's
+// own `ssh` against a server of this test's that asks for a password and a
+// verification code, as a host with two-step sign-in does. The commands of a login
+// run in a shell of this machine with another home folder, as in `farHost`.
+const haveSsh = spawnSync('ssh', ['-V']).status === 0;
+const asksOnly = {
+  skip:
+    (process.platform === 'win32' && 'the stand-in for an SSH host is a POSIX shell') ||
+    (!haveSsh && 'no ssh on this computer'),
+  timeout: 120000,
+};
+async function asking(t: TestContext, asks: { prompt: string; answer: string }[]) {
+  const { sshServer } = await import('./fixtures/ssh-server');
+  const { SshAskpass } = await import('../src/host/ssh-askpass');
+  const { sshLauncher } = await import('../src/host/remote-payload');
+  const far = await farHost(t);
+  const server = await sshServer({ asks, home: far.home });
+  const dataDir = path.join(far.base, 'device');
+  await mkdir(dataDir, { recursive: true });
+  // This test's own configuration: the person's known hosts are neither read nor written.
+  const config = path.join(far.base, 'ssh_config');
+  await writeFile(
+    config,
+    `Host *\n  UserKnownHostsFile "${path.join(far.base, 'known_hosts')}"\n  GlobalKnownHostsFile /dev/null\n  StrictHostKeyChecking ask\n  IdentitiesOnly yes\n  IdentityFile /dev/null\n  PreferredAuthentications keyboard-interactive\n`,
+  );
+  const askpass = new SshAskpass({ dataDir, runtime: process.execPath });
+  await askpass.init();
+  const events: HostEvent[] = [];
+  const hosts = (logins: boolean) =>
+    new RemoteHosts({
+      dataDir,
+      launcher: (host, session) => sshLauncher(host, session, ['-F', config]),
+      ...(logins && { logins: askpass }),
+      payload: far.payload,
+      language: () => 'en',
+      localScopes: () => [],
+      emit: (event) => events.push(event),
+      ask: async () => true,
+    });
+  const remote = hosts(true);
+  await remote.init();
+  // In this order: a login still asking is ended by its hosts, before what it talks to goes.
+  t.after(async () => {
+    remote.close();
+    await askpass.close();
+    await server.close();
+  });
+  const host = await remote.saveHost({
+    name: 'asks',
+    destination: 'tester@127.0.0.1',
+    port: server.port,
+  });
+  /** The next question `ssh` asks, once it shows. */
+  const question = () => until(() => remote.hosts()[0].asking);
+  return { far, server, remote, host, hosts, question, events };
+}
+
+test(
+  "a host's key, a password and a verification code are asked here and answered once: one login",
+  asksOnly,
+  async (t) => {
+    const { server, remote, host, question, far } = await asking(t, [
+      { prompt: 'Password: ', answer: 'correct horse' },
+      { prompt: 'Verification code: ', answer: '424242' },
+    ]);
+    const connecting = remote.connect(host.id);
+    // A host never seen: ssh's own question, with the fingerprint, to say yes or no to.
+    const key = await question();
+    assert.equal(key.kind, 'confirm');
+    assert.match(key.text, /fingerprint is:? SHA256:/);
+    assert.match(key.text, /\(yes\/no\/\[fingerprint\]\)\?$/);
+    assert.equal(remote.hosts()[0].state, 'connecting');
+    remote.answer(host.id, key.id, 'yes');
+    // A wrong password: ssh asks again in the same words, and the question says so.
+    const first = await question();
+    assert.deepEqual(
+      [first.kind, first.text, first.again],
+      ['secret', '(tester@127.0.0.1) Password:', undefined],
+    );
+    remote.answer(host.id, first.id, 'wrong');
+    const second = await until(async () => {
+      const next = remote.hosts()[0].asking;
+      return next && next.id !== first.id && next;
+    });
+    assert.deepEqual([second.text, second.again], ['(tester@127.0.0.1) Password:', true]);
+    remote.answer(host.id, second.id, 'correct horse');
+    const code = await until(async () => {
+      const next = remote.hosts()[0].asking;
+      return next && next.id !== second.id && next;
+    });
+    assert.equal(code.text, '(tester@127.0.0.1) Verification code:');
+    // An answer that is no longer waited for is refused, not kept for the next question.
+    assert.throws(() => remote.answer(host.id, second.id, 'late'), /終わっています/);
+    remote.answer(host.id, code.id, '424242');
+    const connected = await connecting;
+    assert.equal(connected.state, 'connected');
+    assert.equal(connected.asking, undefined);
+    assert.equal(connected.about?.home, far.home);
+    // Everything was installed and started within the one login that asked.
+    assert.equal(server.state.logins, 1);
+    assert.equal(server.state.connections, 1);
+    assert.deepEqual((await readdir(path.join(far.home, '.irori-host'))).sort(), [
+      'bin',
+      'data',
+      'node',
+    ]);
+    assert.equal((await remote.folders(host.id, far.home)).path, far.home);
+  },
+);
+
+test(
+  'no answer ends the login, and nothing asks again until the person connects',
+  asksOnly,
+  async (t) => {
+    const { server, remote, host, question, hosts } = await asking(t, [
+      { prompt: 'Password: ', answer: 'correct horse' },
+    ]);
+    const { LoginCancelled } = await import('../src/host/remote-link');
+    const connecting = remote.connect(host.id);
+    connecting.catch(() => {});
+    remote.answer(host.id, (await question()).id, 'yes');
+    remote.answer(host.id, (await question()).id, null);
+    await assert.rejects(connecting, LoginCancelled);
+    assert.equal(remote.hosts()[0].state, 'error');
+    assert.equal(remote.hosts()[0].asking, undefined);
+    assert.equal(server.state.logins, 0);
+    // What a window reads by itself is told why, and starts no login that would ask again.
+    const seen = server.state.connections;
+    await assert.rejects(remote.folders(host.id), LoginCancelled);
+    assert.equal(server.state.connections, seen);
+    // The person connecting is asked again; the host's key is known by now.
+    const again = remote.connect(host.id);
+    const password = await question();
+    assert.equal(password.text, '(tester@127.0.0.1) Password:');
+    remote.answer(host.id, password.id, 'correct horse');
+    assert.equal((await again).state, 'connected');
+    assert.equal(server.state.logins, 1);
+    // Where nobody can be asked, a host that asks is not signed in to, and nothing waits.
+    const silent = hosts(false);
+    await silent.init();
+    await assert.rejects(silent.connect(host.id), /Permission denied/);
+    assert.equal(silent.hosts()[0].asking, undefined);
   },
 );
 
