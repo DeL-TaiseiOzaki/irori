@@ -39,7 +39,30 @@ internal static class Askpass
             while (at < commandLine.Length && commandLine[at] != ' ' && commandLine[at] != '\t') at++;
         }
         while (at < commandLine.Length && (commandLine[at] == ' ' || commandLine[at] == '\t')) at++;
-        return commandLine.Substring(at);
+        return Unquoted(commandLine.Substring(at));
+    }
+
+    /// <summary>
+    /// The question without the quotes another ssh puts around it. Win32-OpenSSH writes the
+    /// question as it is; the ssh that comes with Git passes it as one quoted argument, a
+    /// quote inside it written as a backslash and a quote. Only a text that is one such
+    /// argument from end to end is taken out of its quotes.
+    /// </summary>
+    internal static string Unquoted(string text)
+    {
+        if (text.Length < 2 || text[0] != '"' || text[text.Length - 1] != '"') return text;
+        var inner = new StringBuilder();
+        for (int at = 1; at < text.Length - 1; at++)
+        {
+            if (text[at] == '\\' && at + 1 < text.Length - 1 && text[at + 1] == '"')
+            {
+                inner.Append('"');
+                at++;
+            }
+            else if (text[at] == '"') return text;
+            else inner.Append(text[at]);
+        }
+        return inner.ToString();
     }
 
     private static void ReadAll(Stream stream, byte[] buffer, int count)

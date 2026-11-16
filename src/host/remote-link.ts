@@ -224,9 +224,10 @@ export class RemoteLink {
         ),
       );
       child.once('close', () => {
-        part?.(false);
-        if (attached) this.ended(child);
-        else failed();
+        if (attached) return this.ended(child);
+        // A part on its way says itself that it could not be put there.
+        if (part) return part(false);
+        failed();
       });
       child.stdout!.setEncoding('utf8');
       child.stdout!.on('data', (chunk: string) => {
