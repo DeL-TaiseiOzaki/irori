@@ -1,7 +1,8 @@
 # Implementation status — notes, native agents and connection onboarding
 
 A workspace tab let go on another window's tabs joins them, 2026-11-16 (**0.2.76**,
-[ADR 064](decisions/064-tab-joins-another-window.md)): the owner asked that a tab
+[#337](https://github.com/DeL-TaiseiOzaki/irori/pull/337), published as
+`v0.2.76-preview.1`; [ADR 064](decisions/064-tab-joins-another-window.md)): the owner asked that a tab
 dragged out could go back, onto another window's tabs.
 - `moveTab` now looks for the window whose title bar is at the drop point
   (`stripUnder`, with the windows in the order they were last focused) and hands
@@ -19,6 +20,11 @@ dragged out could go back, onto another window's tabs.
   `tests/window-frame.test.ts` and `tests/workspace-tabs.test.ts` cover
   `stripUnder`, `insertTab`, `onlyTab` and `dragTab`'s arguments. Linux under
   Xvfb only.
+- `publish.yml` published
+  [v0.2.76-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.76-preview.1)
+  from `66fd122` (push run `43953151069`). Anonymous downloads matched
+  `SHA256SUMS.txt`: Windows 179,399,168 bytes, Mac 145,691,978 bytes and
+  `irori-0.2.76-full.nupkg` 178,568,897 bytes.
 
 SSH hosts from the person's ssh configuration, 2026-11-16 (**0.2.75**,
 [#333](https://github.com/DeL-TaiseiOzaki/irori/pull/333), published as

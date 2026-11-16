@@ -104,6 +104,16 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-11-16: **0.2.76** ([#337](https://github.com/DeL-TaiseiOzaki/irori/pull/337),
+a workspace tab let go on another window's tabs joins them, ADR 064) as
+`66fd122`, by `publish.yml` alone (push run `43953151069`). Merged at 20:45:58
+UTC, the release out at 20:47:26 (1:28), the page deployed by 20:48:29 (2:31),
+and the drift check passed at 20:48:50. Anonymous downloads of the Windows
+installer, the Mac image and `irori-0.2.76-full.nupkg` matched
+`SHA256SUMS.txt`, and the live page links the 0.2.76 installers. CI passed on
+its first run. Seen on Linux under Xvfb and through CI's packaged-app smokes;
+not by hand on Windows or macOS.
+
 Published 2026-11-16: **0.2.75** ([#333](https://github.com/DeL-TaiseiOzaki/irori/pull/333),
 the hosts of the person's ssh configuration are offered as SSH hosts, and a
 stopped Codex no longer ends the turn of the one started in its place) as
