@@ -458,6 +458,10 @@ require('node:readline').createInterface({ input: process.stdin }).on('line', (l
   log({ method: m.method, params: m.params });
   if (m.method.startsWith('thread/')) {
     config = (m.params && m.params.config) || {};
+    // Asked for by a test: something this Codex started outlives it for a moment and
+    // holds its pipes, so that they close after the process has gone.
+    if (fs.existsSync('codex-lingers') && listed().some((hook) => hook.trustStatus !== 'trusted'))
+      require('node:child_process').spawn('/bin/sh', ['-c', "trap '' TERM; sleep 10"], { stdio: 'inherit', detached: true }).unref();
     const agents = require('node:path').join(m.params.cwd, 'AGENTS.md');
     send({ id: m.id, result: { thread: { id: m.params.threadId || 'thread-1' }, instructionSources: fs.existsSync('codex-skips-agents') || !fs.existsSync(agents) ? [] : [agents] } });
     return;
@@ -566,7 +570,10 @@ test(
       'PostToolUse hook feedback from the Schema:\nEDITED notes/a.md',
     );
     // Codex fingerprints otherwise: irori starts it once more with the trust Codex reported.
+    // The Codex it stops closes its pipes late, after the next one has started: that end
+    // is not the run's end.
     await writeFile(path.join(h.kb, 'codex-salt'), '');
+    await writeFile(path.join(h.kb, 'codex-lingers'), '');
     const again = await h.execute('codex', 'run schema-hooks', {
       conversationId: undefined,
     });
@@ -576,6 +583,7 @@ test(
     );
     assert.equal(posts.length, 2);
     assert.match(posts[1].stdout, /NO-RM/);
+    await rm(path.join(h.kb, 'codex-lingers'));
     // Codex that does not list irori's hooks: nothing is sent.
     await writeFile(
       path.join(h.bin, 'codex'),

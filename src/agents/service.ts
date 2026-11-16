@@ -2847,6 +2847,10 @@ export class AgentService {
     const stderr = new Tail(6000);
     child.stderr!.on('data', (b) => stderr.add(String(b)));
     child.on('close', (code) => {
+      // A Codex stopped for the one started in its place (a next turn, or once more for
+      // the hooks' trust) may close its pipes after that one has begun: its end is not
+      // the end of the turn that went on without it.
+      if (run.child !== child) return;
       if (!finished && !run.cancelled) failure = Error(`Codex exited (${code}): ${stderr}`);
       run.finish?.();
     });

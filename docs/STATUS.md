@@ -30,6 +30,14 @@ the owner expects what VS Code's Remote-SSH gives, a host written in
   skipped where no `ssh` answers it, one reads 6,000 hosts) and
   `scripts/remote-hosts-ui-smoke.ts` with a 61-host configuration in a real
   Electron under Xvfb.
+- Also in 0.2.74, found through this pull request's CI: `AgentService.codex`
+  let a stopped Codex end the turn of the Codex started in its place. `killTree`
+  waits for the process's `exit`, the `close` handler came later and called
+  whatever `run.finish` then was, so the new turn's. It showed as
+  `tests/schema-reach.test.ts` failing now and then (`1 !== 2`). The handler now
+  returns when its process is no longer the run's, and the test holds the
+  stopped process's pipes open so that the order is always the bad one. The
+  same path for a next turn (`runCli`) was read, not reproduced.
 - Not verified: a Windows client (`%ProgramData%\ssh\ssh_config`, an `Include`
   with backslashes), macOS, and a real host chosen from a real configuration.
   A file with a UTF-8 byte-order mark is listed here, but OpenSSH 9.6 on Linux
