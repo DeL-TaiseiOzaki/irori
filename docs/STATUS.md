@@ -42,8 +42,10 @@ the owner expects what VS Code's Remote-SSH gives, a host written in
   with backslashes), macOS, and a real host chosen from a real configuration.
   A file with a UTF-8 byte-order mark is listed here, but OpenSSH 9.6 on Linux
   refuses it, so its hosts would fail to connect with ssh's own message.
-Signing in to GitHub from irori, 2026-11-16 (**0.2.73**, branch
-`claude/github-sign-in`, not yet merged; [ADR 062](decisions/062-signing-in-to-github-from-irori.md)):
+
+Signing in to GitHub from irori, 2026-11-16 (**0.2.73**,
+[#332](https://github.com/DeL-TaiseiOzaki/irori/pull/332), published as
+`v0.2.73-preview.1`; [ADR 062](decisions/062-signing-in-to-github-from-irori.md)):
 the owner could not sign in from **設定 → アカウント**, which named
 `gh auth login` and offered only **再確認**, and asked that the GitHub name and
 email be set in irori and connect by themselves.
@@ -63,6 +65,11 @@ email be set in irori and connect by themselves.
 - Verified on Linux with a stand-in gh (`tests/github-sign-in.test.ts`,
   `scripts/account-ui-smoke.ts`). A real `gh auth login --web` against
   github.com, and Windows and macOS, were not run.
+- `publish.yml` published
+  [v0.2.73-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.73-preview.1)
+  from `7b9c84a` with the pull request's CI run `43825139086`. Anonymous
+  downloads matched `SHA256SUMS.txt`: Windows 179,394,560 bytes, Mac
+  145,667,735 bytes and `irori-0.2.73-full.nupkg` 178,563,297 bytes.
 
 irori-templete out of shipped code, 2026-11-16 (**0.2.72**,
 [#329](https://github.com/DeL-TaiseiOzaki/irori/pull/329), published as

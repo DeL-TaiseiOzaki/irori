@@ -92,6 +92,17 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-11-16: **0.2.73** ([#332](https://github.com/DeL-TaiseiOzaki/irori/pull/332),
+irori signs the GitHub CLI in from the window and sets the Git author, ADR 062)
+as `7b9c84a`, by `publish.yml` alone (push run `43826617176`, packages from app
+run `43825139086`). Merged at 07:50:18 UTC, the release out at 07:51:50 (1:32),
+the page deployed by 07:53:12 (2:54), and the drift check passed at 07:53:36.
+Anonymous downloads of the Windows installer, the Mac image and
+`irori-0.2.73-full.nupkg` matched `SHA256SUMS.txt`, and the live page links the
+0.2.73 installers. CI passed on its first run. Seen on Linux with a stand-in gh
+and through CI's packaged-app smokes; not against github.com, and not by hand
+on Windows or macOS.
+
 Published 2026-11-15: **0.2.70** ([#326](https://github.com/DeL-TaiseiOzaki/irori/pull/326),
 `irori call`'s help and refusal say it hands work on every CLI, and the shared
 Schema's description names rules and hooks) as `adcc2e0`, by `publish.yml`
