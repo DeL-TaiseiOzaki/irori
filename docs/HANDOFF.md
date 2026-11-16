@@ -90,6 +90,17 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-11-16: **0.2.74** ([#331](https://github.com/DeL-TaiseiOzaki/irori/pull/331),
+a workspace tab dragged out opens in a window of its own, ADR 063) as
+`7473283`, by `publish.yml` alone (push run `43830837704`, packages from app
+run `43829554251`). Merged at 08:23:36 UTC, the release out at 08:25:43 (2:07),
+the page deployed by 08:27:51 (4:15), and the drift check passed at 08:28:12.
+Anonymous downloads of the Windows installer, the Mac image and
+`irori-0.2.74-full.nupkg` matched `SHA256SUMS.txt`, and the live page links the
+0.2.74 installers. The branch merged `main` twice while waiting (0.2.73 and its
+record landed first), and CI passed on each head. Seen on Linux under Xvfb and
+through CI's packaged-app smokes; not by hand on Windows or macOS.
+
 Published 2026-11-16: **0.2.73** ([#332](https://github.com/DeL-TaiseiOzaki/irori/pull/332),
 irori signs the GitHub CLI in from the window and sets the Git author, ADR 062)
 as `7b9c84a`, by `publish.yml` alone (push run `43826617176`, packages from app
