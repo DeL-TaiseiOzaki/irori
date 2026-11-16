@@ -1,6 +1,7 @@
 # Implementation status — notes, native agents and connection onboarding
 
-SSH hosts from the person's ssh configuration, 2026-11-16 (**0.2.73**;
+SSH hosts from the person's ssh configuration, 2026-11-16 (**0.2.73**,
+[#333](https://github.com/DeL-TaiseiOzaki/irori/pull/333);
 [ADR 061](decisions/061-vaults-on-ssh-hosts.md) decision 3 amended, [SSH-HOSTS](SSH-HOSTS.md)):
 the owner expects what VS Code's Remote-SSH gives, a host written in
 `~/.ssh/config` chosen and not typed again.
