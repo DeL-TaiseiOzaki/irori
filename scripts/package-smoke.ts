@@ -507,7 +507,8 @@ try {
       }, far.port);
       const question = page.getByRole('dialog', { name: 'Smoke box に接続' });
       const words = question.locator('.ssh-question-text');
-      await expect(words).toContainText('fingerprint is SHA256:', { timeout: 60_000 });
+      // OpenSSH words this line with or without a colon after "is", by its version.
+      await expect(words).toHaveText(/fingerprint is:? SHA256:/, { timeout: 60_000 });
       await question.getByRole('button', { name: '続ける' }).click();
       await expect(words).toContainText('Password:', { timeout: 60_000 });
       await question.getByRole('textbox', { name: 'ssh への答え' }).fill('correct horse');

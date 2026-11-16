@@ -711,7 +711,7 @@ test(
     // A host never seen: ssh's own question, with the fingerprint, to say yes or no to.
     const key = await question();
     assert.equal(key.kind, 'confirm');
-    assert.match(key.text, /fingerprint is SHA256:/);
+    assert.match(key.text, /fingerprint is:? SHA256:/);
     assert.match(key.text, /\(yes\/no\/\[fingerprint\]\)\?$/);
     assert.equal(remote.hosts()[0].state, 'connecting');
     remote.answer(host.id, key.id, 'yes');
