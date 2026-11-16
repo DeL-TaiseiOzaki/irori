@@ -137,13 +137,15 @@ vault's rules, hooks or `CLAUDE.md`. irori no longer writes these files.
   HashiCorp Vault's CLI on the run's `PATH`.
 - Usage: `irori call <vault agent or vault name> "<task>"`, or the task on
   standard input (the client reads it when only the name is given). A name is
-  a handed vault's sub-agent name (`vault-<slug>`) or its name when only one
-  handed vault has it (`vaultOf`). The client waits without a deadline,
-  prints the vault agent's report and exits 0; on failure it prints
+  a handed vault's vault agent name (`vault-<slug>`) or the vault's name when
+  only one handed vault has it (`vaultOf`). The client waits without a
+  deadline, prints the vault agent's report and exits 0; on failure it prints
   `irori: <reason>` and exits non-zero. The agent service answers `call`
-  itself (`AgentService.call`); a vault agent's `irori call` is refused with
-  the reason (`callRefused`). Claude Code ends a shell command after two
-  minutes by default, so the irori agent's Claude Code runs with
+  itself (`AgentService.call`) when the request hands vaults. Otherwise the
+  command is refused with the reason (`callRefused`): a vault agent's
+  `irori call` is the irori agent's, and an irori agent's request that hands
+  no vault has none to hand work to. Claude Code ends a shell command after
+  two minutes by default, so the irori agent's Claude Code runs with
   `BASH_DEFAULT_TIMEOUT_MS` and `BASH_MAX_TIMEOUT_MS` set to a day.
 - The host starts a run in that vault (`AgentService.handOff`) on the irori
   agent's CLI, in the irori agent's access mode, with the model of the vault's

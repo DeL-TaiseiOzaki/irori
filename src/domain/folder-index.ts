@@ -6,8 +6,8 @@ import { inFolder, underFolder } from './layers';
  * The folder indexes of an Open Knowledge Format bundle (ADR 028), generated
  * from its pages: every folder with a page in it or below it gets an `index.md`
  * that lists its subfolders and its pages, one line each.
- * The rule is the one irori-templete states for its `lint`, so a person pressing
- * the button and an agent applying the rule write the same bytes.
+ * The rule is the one ADR 028 states, so a person pressing the button and an
+ * agent running `irori index` write the same bytes.
  *
  * Paths here are the checkout's own spelling, so a decomposed name is written to
  * where it is; what goes into an index is NFC, so the bytes are the same on any

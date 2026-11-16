@@ -791,8 +791,14 @@ test('a vault agent’s command reaches its own vault alone, and notes and comme
     ['remove', 'Mine'],
     ['run', 'x'],
     ['clone', 'octo/kb'],
+    ['call', 'vault-other', 'Tidy the inbox.'],
   ])
     await assert.rejects(setup.run(argv, cwd, context), /is the irori agent's/, argv[0]);
+  // The irori agent's `irori call` comes here only from a request that hands no vault.
+  await assert.rejects(
+    setup.run(['call', 'vault-other', 'Tidy the inbox.'], cwd, { by: 'Pi (irori agent)' }),
+    /this request hands none/,
+  );
   // Another vault is out of reach, by name or by path.
   await assert.rejects(setup.run(['set', 'Other', '--name', 'X'], cwd, context), /is not yours/);
   await assert.rejects(

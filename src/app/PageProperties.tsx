@@ -20,7 +20,7 @@ import { Icon } from './Icon';
 import { useResource } from './useResource';
 import './page-properties.css';
 
-/** Labels for the keys the Open Knowledge Format and irori-templete use. */
+/** Labels for keys pages commonly carry; any other key shows as written. */
 const knownLabels: Record<string, [string, string]> = {
   type: ['種類', 'Type'],
   status: ['状態', 'Status'],

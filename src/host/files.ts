@@ -1817,7 +1817,7 @@ export class FileService {
 /**
  * Whether a folder irori registers for the first time keeps its OKF bundle at
  * its root (ADR 035): no `Knowledge_Base/`, and a root `index.md` whose
- * frontmatter names `okf_version`, as irori-templete lays a knowledge base out.
+ * frontmatter names `okf_version`.
  */
 async function bundleAtRoot(root: string) {
   try {
