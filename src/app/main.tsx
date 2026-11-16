@@ -2,10 +2,11 @@ import { classify, isPropertyPage } from '../domain/scopes';
 import { layerFolder, movedPath } from '../domain/layers';
 import { defaultNoteDirectoryOf } from '../domain/notes';
 import { useDraft, flushDrafts } from './useDraft';
-import { WorkspaceTabs } from './WorkspaceTabs';
+import { stripIndexAt, WorkspaceTabs } from './WorkspaceTabs';
 import { TitleBar } from './TitleBar';
 import {
   closeTab as closeWorkspaceTab,
+  insertTab,
   onlyIn,
   type OpenTab,
   openTab,
@@ -601,11 +602,18 @@ function App() {
   // The workspaces open as tabs, and where each was left: its level, vault and note.
   const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceProfile[]>([]);
   const tabViews = useRef<Record<string, TabPlace>>({});
-  // Tabs dragged out to a window of their own (ADR 063): each stays here, and cannot be
+  // Tabs dragged out to another window (ADR 063, 064): each stays here, and cannot be
   // shown or closed, until that window shows it.
   const [movingTabs, setMovingTabs] = useState<string[]>([]);
-  // A tab dragged out of another window, which this window was opened to show.
-  const [arriving, setArriving] = useState<{ profile: WorkspaceProfile; place?: TabPlace }>();
+  // A tab dragged out of another window that this window was opened to show, or that was
+  // let go on its tabs `x` across it (ADR 064).
+  const [arriving, setArriving] = useState<{
+    profile: WorkspaceProfile;
+    place?: TabPlace;
+    x?: number;
+  }>();
+  // A tab dragged out of another window, over this window's tabs: where it would join them.
+  const [tabOver, setTabOver] = useState<{ index: number; name: string }>();
   useEffect(() => {
     if (workspace) setWorkspaceTabs((all) => replaceTab(all, workspace));
   }, [workspace]);
@@ -1474,6 +1482,19 @@ function App() {
         if (event.scopeId === current.current.doc?.scopeId) void reconcile();
       } else if (event.type === 'windows') {
         void host.otherWindows().then(setOtherTabs).catch(report);
+      } else if (event.type === 'tabOver') {
+        const name = event.name ?? '';
+        const index = event.x === undefined ? undefined : stripIndexAt(event.x);
+        setTabOver((now) =>
+          index === undefined
+            ? undefined
+            : now?.index === index && now.name === name
+              ? now
+              : { index, name },
+        );
+      } else if (event.type === 'tabArrives') {
+        setTabOver(undefined);
+        void host.movedTab().then(setArriving).catch(report);
       } else if (event.type === 'vaults') {
         // The irori agent registered a vault; the workspace on show takes it in.
         const joined = event.workspace;
@@ -1890,8 +1911,15 @@ function App() {
   }
   useEffect(() => {
     if (!arriving) return;
-    if (arriving.place) tabViews.current[arriving.profile.id] = arriving.place;
-    void openWorkspace(arriving.profile);
+    const { profile, place, x } = arriving;
+    // Its place comes along, unless this window has the workspace open already.
+    if (place && !workspaceTabs.some((tab) => tab.id === profile.id))
+      tabViews.current[profile.id] = place;
+    // It joins the tabs where it was let go, so the window it left lets go of it, and comes
+    // on show as a click on it would bring it (ADR 064).
+    const index = x === undefined ? workspaceTabs.length : stripIndexAt(x);
+    setWorkspaceTabs((all) => insertTab(all, profile, index));
+    showTab(profile);
   }, [arriving]);
   /** Where the workspace on show is, to come back to (ADR 037 D6). */
   const placeOnShow = (): TabPlace => ({
@@ -2335,6 +2363,9 @@ function App() {
     showTab,
     closeWorkspace: (profile: WorkspaceProfile) => void closeWorkspace(profile),
     moveOut,
+    // A drag that ended sends no argument: the host checks how many it is given.
+    dragTab: (drag?: { name: string; at: { x: number; y: number } }) =>
+      void (drag ? host.dragTab(drag) : host.dragTab()).catch(report),
     showOverview,
     showRoutines: () => goToLevel('routines'),
     enterBrain: (space: Space) => void enterBrain(space),
@@ -2903,29 +2934,51 @@ function App() {
     }
   }
   /**
-   * Moves a tab dragged out of the strip to a window of its own (ADR 063). Nothing of it
-   * stops; a terminal of the tab on show closes once the person agrees, as on leaving it.
+   * Moves a tab dragged out of the strip to the window whose tabs it was let go on
+   * (ADR 064), or to a window of its own (ADR 063). Nothing of it stops; a terminal of
+   * the tab on show closes once the person agrees, as on leaving it.
    */
   function moveOut(profile: WorkspaceProfile, at: { x: number; y: number }) {
     if (gitBusy || connecting || goingHome || sending || movingTabs.includes(profile.id)) return;
-    if (workspaceTabs.length - movingTabs.length < 2) return;
+    if (workspaceTabs.length - movingTabs.length < 2) return void joinAway(profile, at);
     const step: Leaving = { kind: 'move', profile, at };
     const shown = !startup && profile.id === workspace?.id;
     if (shown && (terminalSpace || iroriTerminal)) setLeaving(step);
     else void leave(step);
   }
-  /** Hands a tab to a new window, and lets go of it here once that window shows it. */
-  async function sendAway(profile: WorkspaceProfile, at: { x: number; y: number }) {
+  /**
+   * Moves this window's one tab into the tabs of the window it was let go on (ADR 064),
+   * its note saved first. Where no window's tabs are, nothing happens; once the other
+   * window shows it, the host closes this one.
+   */
+  async function joinAway(profile: WorkspaceProfile, at: { x: number; y: number }) {
+    if (!startup && profile.id === workspace?.id) {
+      try {
+        if (!(await composer.flush()) || !(await save()))
+          return report(t('ノートが未保存です。', 'The note is unsaved.'));
+        await flushDrafts();
+      } catch (error) {
+        return report(error);
+      }
+      tabViews.current[profile.id] = placeOnShow();
+    }
+    await sendAway(profile, at, true);
+  }
+  /**
+   * Hands a tab to another window, and lets go of it here once that window shows it.
+   * `alone`, it moves only onto another window's tabs: staying is not a failure.
+   */
+  async function sendAway(profile: WorkspaceProfile, at: { x: number; y: number }, alone = false) {
     setMovingTabs((all) => [...all, profile.id]);
     try {
       if (await host.moveTab({ id: profile.id, place: tabViews.current[profile.id] }, at)) {
         setWorkspaceTabs((all) => all.filter((tab) => tab.id !== profile.id));
         delete tabViews.current[profile.id];
-      } else
+      } else if (!alone)
         report(
           t(
-            `${profile.name} を新しいウィンドウで開けませんでした。`,
-            `Could not open ${profile.name} in a new window.`,
+            `${profile.name} を別のウィンドウで開けませんでした。`,
+            `Could not open ${profile.name} in another window.`,
           ),
         );
     } catch (error) {
@@ -3013,9 +3066,11 @@ function App() {
       waiting={waitingScopes}
       disabled={connecting || gitBusy || goingHome}
       moving={movingTabs}
+      incoming={tabOver}
       onShow={act.showTab}
       onClose={act.closeWorkspace}
       onMoveOut={act.moveOut}
+      onDragOver={act.dragTab}
       onAdd={act.leaveWorkspace}
     />
   );
@@ -3032,8 +3087,8 @@ function App() {
       ? t(`${leaving.profile.name} を閉じる`, `Close ${leaving.profile.name}`)
       : leaving?.kind === 'move'
         ? t(
-            `${leaving.profile.name} を新しいウィンドウで開く`,
-            `Open ${leaving.profile.name} in a new window`,
+            `${leaving.profile.name} を別のウィンドウに移す`,
+            `Move ${leaving.profile.name} to another window`,
           )
         : leaving?.kind === 'switch'
           ? t('ワークスペースを切り替える', 'Switch workspace')
@@ -3080,7 +3135,7 @@ function App() {
   if (startup)
     return (
       <div className="app app-start">
-        <TitleBar onError={report}>{workspaceTabs.length > 0 && tabStrip}</TitleBar>
+        <TitleBar onError={report}>{(workspaceTabs.length > 0 || tabOver) && tabStrip}</TitleBar>
         <Startup
           spaces={spaces}
           refresh={refreshSpaces}

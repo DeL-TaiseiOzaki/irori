@@ -1,5 +1,25 @@
 # Implementation status — notes, native agents and connection onboarding
 
+A workspace tab let go on another window's tabs joins them, 2026-11-16 (**0.2.76**,
+[ADR 064](decisions/064-tab-joins-another-window.md)): the owner asked that a tab
+dragged out could go back, onto another window's tabs.
+- `moveTab` now looks for the window whose title bar is at the drop point
+  (`stripUnder`, with the windows in the order they were last focused) and hands
+  it the tab with a `tabArrives` event; `movedTab` gives the point across it, and
+  the window puts the tab there (`insertTab`, `stripIndexAt`) and shows it as a
+  click would.
+- While a tab is out of its strip, `WorkspaceTabs` sends `dragTab` once a frame;
+  the host sends `tabOver` to the window under it, which shows the name outlined
+  where the tab would go, and clears it when the tab leaves or is let go.
+- A window's only tab can be dragged; it only joins another window's tabs, after
+  its note is saved, and the host then closes the emptied window
+  (`WindowTabs.onlyTab`). Changes ADR 063 D2.
+- `scripts/windows-ui-smoke.ts` joins a window's only tab to another window and
+  drops a tab on the title bar of a window at its start screen;
+  `tests/window-frame.test.ts` and `tests/workspace-tabs.test.ts` cover
+  `stripUnder`, `insertTab`, `onlyTab` and `dragTab`'s arguments. Linux under
+  Xvfb only.
+
 SSH hosts from the person's ssh configuration, 2026-11-16 (**0.2.75**,
 [#333](https://github.com/DeL-TaiseiOzaki/irori/pull/333);
 [ADR 061](decisions/061-vaults-on-ssh-hosts.md) decision 3 amended, [SSH-HOSTS](SSH-HOSTS.md)):

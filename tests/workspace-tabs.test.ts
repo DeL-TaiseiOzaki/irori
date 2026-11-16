@@ -1,6 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { closeTab, onlyIn, openTab, replaceTab, WindowTabs } from '../src/domain/workspace-tabs';
+import {
+  closeTab,
+  insertTab,
+  onlyIn,
+  openTab,
+  replaceTab,
+  WindowTabs,
+} from '../src/domain/workspace-tabs';
 import type { WorkspaceProfile } from '../src/domain/types';
 import { hostArguments } from '../src/domain/host-requests';
 
@@ -81,4 +88,38 @@ test('A tab dragged out takes its place along, and nothing else, to its new wind
   assert.ok(!accepts({ id: workspace, profile: { name: 'other' } }));
   assert.ok(!accepts({ id: workspace }, { x: 10.5, y: 0 }));
   assert.ok(hostArguments.movedTab.safeParse([]).success);
+});
+
+test('A tab dropped into the tabs stands where it was let go; an open one keeps its place', () => {
+  const tabs = [tab('a'), tab('b'), tab('c')];
+  assert.deepEqual(ids(insertTab(tabs, tab('d'), 1)), ['a', 'd', 'b', 'c']);
+  assert.deepEqual(ids(insertTab(tabs, tab('d'), 0)), ['d', 'a', 'b', 'c']);
+  assert.deepEqual(ids(insertTab(tabs, tab('d'), 9)), ['a', 'b', 'c', 'd']);
+  assert.deepEqual(ids(insertTab([], tab('d'), 0)), ['d']);
+  const renamed = { ...tab('b'), name: 'B2' };
+  const kept = insertTab(tabs, renamed, 0);
+  assert.deepEqual(ids(kept), ['a', 'b', 'c']);
+  assert.equal(kept[1].name, 'B2');
+});
+
+test('A window whose one tab joins another window is left with none', () => {
+  const windows = new WindowTabs();
+  windows.set(1, [tab('a')]);
+  windows.set(2, [tab('a'), tab('b')]);
+  windows.set(3, []);
+  assert.ok(windows.onlyTab(1, 'a'));
+  assert.ok(!windows.onlyTab(1, 'b'));
+  assert.ok(!windows.onlyTab(2, 'a'));
+  assert.ok(!windows.onlyTab(3, 'a'));
+  assert.ok(!windows.onlyTab(4, 'a'));
+});
+
+test('Where a dragged tab is goes to the host as a name and a screen point, or nothing', () => {
+  const accepts = (...args: unknown[]) => hostArguments.dragTab.safeParse(args).success;
+  assert.ok(accepts());
+  assert.ok(accepts({ name: '作業', at: { x: -1280, y: 18 } }));
+  assert.ok(!accepts(undefined));
+  assert.ok(!accepts({ name: '作業', at: { x: 1.5, y: 18 } }));
+  assert.ok(!accepts({ name: 'x'.repeat(121), at: { x: 0, y: 0 } }));
+  assert.ok(!accepts({ name: '作業', at: { x: 0, y: 0 }, id: 'other' }));
 });

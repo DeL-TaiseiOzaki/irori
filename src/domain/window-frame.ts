@@ -35,6 +35,28 @@ export function droppedWindowBounds(
 }
 
 /**
+ * The window a tab dragged out of `from` joins when it is let go at `at` (ADR 064).
+ * `windows` stand front to back. The first that holds the point is the one seen there:
+ * it is joined when it is not `from` and the point lies on its title bar, where its tabs
+ * are. A point no window holds, or one that falls on a window's page, joins none.
+ */
+export function stripUnder<T>(
+  at: Point,
+  windows: { window: T; bounds: Rectangle }[],
+  from: T,
+): T | undefined {
+  const front = windows.find(
+    ({ bounds }) =>
+      at.x >= bounds.x &&
+      at.x < bounds.x + bounds.width &&
+      at.y >= bounds.y &&
+      at.y < bounds.y + bounds.height,
+  );
+  if (!front || front.window === from) return undefined;
+  return at.y < front.bounds.y + titleBarHeight + 1 ? front.window : undefined;
+}
+
+/**
  * What the host paints around the renderer for a theme: the window's first paint and
  * the system's window controls, which sit on the title bar. Hearth, dark and a system
  * choice keep graphite chrome; light is paper throughout. The values are the chrome's

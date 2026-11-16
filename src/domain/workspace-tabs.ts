@@ -59,8 +59,21 @@ export type TabPlace = {
   /** The vault beside, when one was open (ADR 038). */
   side?: string;
 };
-/** A tab dragged out of its window, on its way to a window of its own (ADR 063). */
+/**
+ * A tab dragged out of its window, on its way to a window of its own (ADR 063) or to
+ * another window's tabs (ADR 064).
+ */
 export type MovedTab = { id: string; place?: TabPlace };
+
+/**
+ * A workspace dropped into the tabs at `index` (ADR 064); one already open keeps its
+ * place and takes the newer profile.
+ */
+export function insertTab(tabs: WorkspaceProfile[], profile: WorkspaceProfile, index: number) {
+  if (tabs.some((tab) => tab.id === profile.id)) return replaceTab(tabs, profile);
+  const at = Math.max(0, Math.min(index, tabs.length));
+  return [...tabs.slice(0, at), profile, ...tabs.slice(at)];
+}
 
 /**
  * The tabs each of irori's windows has open (ADR 051). A window closes as its tabs
@@ -73,6 +86,11 @@ export class WindowTabs {
   }
   forget(window: number) {
     this.open.delete(window);
+  }
+  /** Whether `workspace` is the one tab `window` has open (ADR 064). */
+  onlyTab(window: number, workspace: string) {
+    const tabs = this.open.get(window) ?? [];
+    return tabs.length > 0 && tabs.every((tab) => tab.id === workspace);
   }
   /** The tabs the windows other than `window` have open, each workspace once. */
   elsewhere(window: number): OpenTab[] {

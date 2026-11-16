@@ -90,7 +90,12 @@ import {
 import type { NoteRef } from '../domain/note-operations';
 import { isDamaged } from '../domain/conversation';
 import { WindowTabs, type MovedTab } from '../domain/workspace-tabs';
-import { droppedWindowBounds, titleBarHeight, windowChrome } from '../domain/window-frame';
+import {
+  droppedWindowBounds,
+  stripUnder,
+  titleBarHeight,
+  windowChrome,
+} from '../domain/window-frame';
 import { startDictation } from './dictation';
 import { SerialQueue } from './serial-queue';
 /** irori's windows (ADR 051): each keeps its own workspace tabs over the one host. */
@@ -208,9 +213,18 @@ app
         if (!window.isDestroyed()) window.webContents.send('irori:event', event);
     };
     const tabs = new WindowTabs();
-    // Tabs dragged out of a window (ADR 063), by the window opened for each: it takes its
-    // tab once it has loaded, and `done` tells the window it came from whether it shows it.
-    const arriving = new Map<number, { tab: MovedTab; done: (shown: boolean) => void }>();
+    // Tabs dragged out of a window (ADR 063, 064), by the window that takes each: one opened
+    // for it once it has loaded, one it was let go on at once, `x` across it. `done` tells
+    // the window the tab came from whether it is shown.
+    const arriving = new Map<
+      number,
+      { tab: MovedTab; x?: number; done: (shown: boolean) => void }
+    >();
+    // irori's windows, the one last in front first: the window seen at a point of the
+    // screen is the first of them there (ADR 064).
+    const fronts: BrowserWindow[] = [];
+    // The window whose tabs a dragged tab is over, by the window it was dragged out of.
+    const hovering = new Map<BrowserWindow, BrowserWindow>();
     // A terminal is its window's: its output goes there alone once the window is known.
     const terminalOwners = new Map<string, BrowserWindow>();
     const updates = new UpdateService({
@@ -1351,6 +1365,7 @@ app
       | 'otherWindows'
       | 'moveTab'
       | 'movedTab'
+      | 'dragTab'
       | 'showMenu';
     /**
      * For a vault on an SSH host (ADR 061), what this device answers itself. Its
@@ -1451,14 +1466,18 @@ app
           for (const other of windows) if (other !== window) emit({ type: 'windows' }, other);
         },
         otherWindows: () => tabs.elsewhere(id),
-        moveTab: (tab, at) => moveTab(tab, at),
+        moveTab: (tab, at) => moveTab(window, tab, at),
         movedTab: async () => {
           const coming = arriving.get(id);
           if (!coming) return undefined;
           const profile = (await workspaces.list()).find((item) => item.id === coming.tab.id);
           // A workspace removed on the way is not shown; its tab stays where it was.
           if (!profile) coming.done(false);
-          return profile && { profile, place: coming.tab.place };
+          return profile && { profile, place: coming.tab.place, x: coming.x };
+        },
+        dragTab: (drag) => {
+          const over = drag && tabsAt(window, drag.at);
+          hover(window, over && { window: over, name: drag.name, x: across(over, drag.at) });
         },
         showMenu: (x, y) => {
           Menu.getApplicationMenu()?.popup({ window, x, y });
@@ -1739,6 +1758,9 @@ app
       window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
       // A drive or sync app often gets ready while irori is in the background.
       window.on('focus', () => void cloud.retry(undefined, true));
+      window.on('focus', () =>
+        fronts.splice(0, fronts.length, window, ...fronts.filter((other) => other !== window)),
+      );
       // A reloaded/crashed renderer cannot keep controlling its old sessions. Alone, it
       // stopped everything; beside other windows, only what was its own.
       const stopRendererSessions = () => {
@@ -1751,6 +1773,7 @@ app
             .then((share) => share.stop())
             .catch((error) => console.warn('Window sessions could not be stopped', String(error)));
         tabs.forget(id);
+        hover(window);
       };
       window.webContents.on('render-process-gone', stopRendererSessions);
       window.webContents.on('did-start-loading', stopRendererSessions);
@@ -1773,32 +1796,78 @@ app
       window.on('closed', () => {
         windows.delete(window);
         tabs.forget(id);
+        hover(window);
+        if (fronts.includes(window)) fronts.splice(fronts.indexOf(window), 1);
+        for (const [from, over] of hovering) if (over === window) hovering.delete(from);
         for (const [terminal, owner] of terminalOwners)
           if (owner === window) terminalOwners.delete(terminal);
         emit({ type: 'windows' });
       });
       return { window, loaded: window.loadFile(entry) };
     }
+    /** The window other than `from` whose tabs are at a point of the screen (ADR 064). */
+    function tabsAt(from: BrowserWindow, at: { x: number; y: number }) {
+      const seen = [...fronts, ...[...windows].filter((window) => !fronts.includes(window))].filter(
+        (window) => !window.isDestroyed() && window.isVisible() && !window.isMinimized(),
+      );
+      return stripUnder(
+        at,
+        seen.map((window) => ({ window, bounds: window.getContentBounds() })),
+        from,
+      );
+    }
+    /** How far across `window` a point of the screen is. */
+    const across = (window: BrowserWindow, at: { x: number; y: number }) =>
+      at.x - window.getContentBounds().x;
     /**
-     * Opens a tab dragged out of a window in a window of its own (ADR 063), true once that
-     * window shows it. The tab stays in the window it left until then, so what it runs is
-     * never in no window's tabs, and stays there when the new window cannot show it.
+     * Shows in a window's tabs where a tab dragged out of `from` would join them, and
+     * takes it away from the window it was over before; without `over`, from every one.
      */
-    async function moveTab(tab: MovedTab, at?: { x: number; y: number }) {
+    function hover(from: BrowserWindow, over?: { window: BrowserWindow; name: string; x: number }) {
+      const before = hovering.get(from);
+      if (before && before !== over?.window) emit({ type: 'tabOver' }, before);
+      if (!over) return void hovering.delete(from);
+      hovering.set(from, over.window);
+      emit({ type: 'tabOver', name: over.name, x: over.x }, over.window);
+    }
+    /**
+     * Moves a tab dragged out of `from` and let go at `at`: into the window whose tabs are
+     * there (ADR 064), else into a window of its own (ADR 063). True once that window shows
+     * it. The tab stays in `from` until then, so what it runs is never in no window's tabs,
+     * and stays there when the other window cannot show it. A window's one tab only joins
+     * another window's tabs, and the window it leaves then closes as a closed window does.
+     */
+    async function moveTab(from: BrowserWindow, tab: MovedTab, at?: { x: number; y: number }) {
+      const over = at && tabsAt(from, at);
+      hover(from);
       if (!(await workspaces.list()).some((profile) => profile.id === tab.id)) return false;
-      const { window, loaded } = createWindow(at);
+      // A window takes one tab at a time; one let go there meanwhile opens its own.
+      const into =
+        over && !over.isDestroyed() && !arriving.has(over.webContents.id) ? over : undefined;
+      const last = () => !from.isDestroyed() && tabs.onlyTab(from.webContents.id, tab.id);
+      if (!into && last()) return false;
+      const opened = into ? undefined : createWindow(at);
+      const window = into ?? opened!.window;
       const id = window.webContents.id;
-      return new Promise<boolean>((resolve) => {
-        const done = (shown: boolean) => {
+      const shown = await new Promise<boolean>((resolve) => {
+        const closed = () => done(false);
+        const done = (taken: boolean) => {
           clearTimeout(late);
           if (arriving.get(id)?.tab === tab) arriving.delete(id);
-          resolve(shown);
+          if (!window.isDestroyed()) window.removeListener('closed', closed);
+          resolve(taken);
         };
         const late = setTimeout(() => done(false), 30_000);
-        arriving.set(id, { tab, done });
-        window.once('closed', () => done(false));
-        loaded.catch(() => done(false));
+        arriving.set(id, { tab, x: into && at && across(into, at), done });
+        window.once('closed', closed);
+        opened?.loaded.catch(() => done(false));
+        if (into) {
+          into.focus();
+          emit({ type: 'tabArrives' }, into);
+        }
       });
+      if (shown && last()) from.close();
+      return shown;
     }
     /**
      * The menu, in the reader's language: File carries New Window (ADR 051). macOS shows it in
