@@ -3,6 +3,7 @@ import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream, promises as fs } from 'node:fs';
 import { agentEnv, launch } from '../agents/process';
+import { withPath } from '../agents/command-bridge';
 import { t } from '../domain/i18n';
 import type { RemoteLauncher, RemotePayload } from './remote-link';
 import type { LoginSession } from './ssh-askpass';
@@ -23,7 +24,8 @@ export const sshLauncher = (
   first: string[] = [],
 ): RemoteLauncher => ({
   run: (command) => {
-    const env = { ...agentEnv(), ...session?.env };
+    let env = { ...agentEnv(), ...session?.env };
+    if (session?.found) env = withPath(env, session.found.searchPath);
     if (!session) {
       // `BatchMode` on the command line does not reach the `ssh` a jump host is reached
       // with, which reads the environment: no program of the desktop's asks for it either.
@@ -48,7 +50,7 @@ export const sshLauncher = (
         host.destination,
         command,
       ],
-      os.homedir(),
+      session?.found?.cwd ?? os.homedir(),
       env,
     );
     // Given no answer, `ssh` asks again or goes on to another way in: it is stopped instead.

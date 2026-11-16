@@ -80,8 +80,10 @@ A connection is now one login. What to know before changing it:
    `scripts/build-host.mjs` with the C# compiler of .NET Framework 4). It must
    stay a program and never become a script: Win32-OpenSSH writes the question
    after it unquoted and Windows runs a script through cmd.exe, so a host's
-   words would be commands. Windows 10's inbox ssh (8.1) is older than what was
-   tried; `ssh` there has no `SSH_ASKPASS_REQUIRE`, and `DISPLAY` is set for it.
+   words would be commands. `SSH_ASKPASS` is its name alone, found on the
+   search path: `ssh.exe` 9.5 did not start it from a folder named in Japanese.
+   Windows 10's inbox ssh (8.1) is older than what was tried; `ssh` there has
+   no `SSH_ASKPASS_REQUIRE`, and `DISPLAY` is set for it.
 2. On Windows this was run by CI's packaged-app smoke only, against a stand-in
    server that asks for a password and a code. A real host with two-step
    sign-in, a key with a passphrase and a jump host were run on Linux, by hand

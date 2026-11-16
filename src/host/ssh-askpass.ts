@@ -42,6 +42,11 @@ export type AskLogin = (question: LoginQuestion, gone: AbortSignal) => Promise<s
 export interface LoginSession {
   /** What `ssh` is started with so that its questions come here. */
   env: NodeJS.ProcessEnv;
+  /**
+   * Where `ssh` is started so that it finds the program by its name alone (Windows): a
+   * folder put first on its search path, and the folder it runs in.
+   */
+  found?: { searchPath: string; cwd: string };
   /** Whether a question is waiting for the person now. */
   asking(): boolean;
   /** Whether the person gave no answer to one, which ends the attempt. */
@@ -118,6 +123,7 @@ export interface SshAskpassOptions {
 
 export class SshAskpass {
   private program?: string;
+  private found?: { searchPath: string; cwd: string };
   private address?: string;
   private server?: net.Server;
   private folder?: string;
@@ -141,7 +147,15 @@ export class SshAskpass {
         ))
       )
         return;
-      this.program = built;
+      // Win32-OpenSSH does not start a program whose path has letters outside the system's
+      // own code page in it, as a person's folder may (seen with 9.5: CreateProcessW
+      // error 2). So `ssh` is given the program's name alone and finds it on its search
+      // path, which Windows hands on as it is. It is started in a folder of irori's data,
+      // where nothing of that name is: Windows looks there before the search path.
+      const cwd = path.join(dataDir, 'ssh');
+      await mkdir(cwd, { recursive: true });
+      this.program = path.basename(built);
+      this.found = { searchPath: path.dirname(built), cwd };
       this.address = `\\\\.\\pipe\\irori-ssh-${randomBytes(16).toString('hex')}`;
     } else {
       const directory = path.join(dataDir, 'ssh');
@@ -251,6 +265,7 @@ export class SshAskpass {
         IRORI_SSH_ASKPASS: this.address,
         IRORI_SSH_ASKPASS_SESSION: id,
       },
+      ...(this.found && { found: this.found }),
       asking: () => state.open.size > 0,
       cancelled: () => state.cancelled,
       onCancel: (stop) => {

@@ -62,6 +62,11 @@ host's key are asked in a window (`RemoteHost.asking`, the dialog `SshQuestions`
   `scripts/build-host.mjs` with the C# compiler of .NET Framework 4 and shipped
   outside the archive. Win32-OpenSSH writes the question after the program
   unquoted, so a script would be run by cmd.exe with a host's words as commands.
+  It also fails to start a program whose path has letters outside the system's
+  code page (CI's first run: `CreateProcessW failed error:2` from a folder named
+  in Japanese), so `SSH_ASKPASS` is the program's name alone, its folder is first
+  on `ssh`'s search path, and `ssh` runs in `<data>/ssh`, where Windows looks
+  before the search path and finds nothing of that name.
 - No answer ends the login (`LoginCancelled`): `ssh` would only ask again. After
   a login that asked and failed, nothing asks by itself until the person
   connects (`hold`). A retry irori makes on a timer asks nothing (`BatchMode`).

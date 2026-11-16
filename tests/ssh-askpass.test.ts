@@ -1,7 +1,7 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { SshAskpass, type AskLogin, type LoginQuestion } from '../src/host/ssh-askpass';
@@ -152,3 +152,26 @@ test('on Windows nothing can be asked without the program built for it', async (
   );
   await missing.close();
 });
+
+test(
+  'on Windows ssh is given the name of its program alone, and where to find it',
+  { skip: process.platform !== 'win32' && 'a named pipe is listened on, which Windows has' },
+  async (t) => {
+    // A folder with letters ssh.exe cannot take in a path: the reason the name goes alone.
+    const dataDir = await mkdtemp(path.join(tmpdir(), 'irori askpass 日本語 '));
+    t.after(() => rm(dataDir, { recursive: true, force: true }));
+    const built = path.join(dataDir, 'app', 'irori-askpass.exe');
+    await mkdir(path.dirname(built), { recursive: true });
+    await writeFile(built, 'MZ');
+    const service = new SshAskpass({ dataDir, windowsClient: built });
+    await service.init();
+    t.after(() => service.close());
+    const session = service.session(async () => 'x')!;
+    assert.equal(session.env.SSH_ASKPASS, 'irori-askpass.exe');
+    assert.ok(session.env.IRORI_SSH_ASKPASS!.startsWith('\\\\.\\pipe\\irori-ssh-'));
+    assert.deepEqual(session.found, {
+      searchPath: path.dirname(built),
+      cwd: path.join(dataDir, 'ssh'),
+    });
+  },
+);
