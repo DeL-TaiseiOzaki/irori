@@ -14,6 +14,8 @@ import {
   type EnvironmentRestore,
   type EnvironmentState,
 } from '../domain/environment';
+import { validGitEmail, validGitName, type GitAuthor } from '../domain/git';
+import { GitHubSignIn, signedInText } from './GitHubSignIn';
 import './account.css';
 
 const host = window.irori;
@@ -50,13 +52,23 @@ function tookIn({ restored, workspaces, routines, agentFiles, secrets }: Environ
   return t(`${ja.join('・')}を取り込みました。`, `Took in ${en.join(', ')} and ${last}.`);
 }
 
-/** The environment on the GitHub account, read once and again on request. */
+/**
+ * The environment on the GitHub account, read once and again on request. When
+ * it cannot be read because the GitHub CLI is signed out or missing, the window
+ * offers to sign in instead of the error (ADR 062).
+ */
 function useEnvironment() {
   const [state, setState] = useState<EnvironmentState>();
   const [error, setError] = useState('');
+  const [unavailable, setUnavailable] = useState<'signed-out' | 'missing'>();
   const load = () => {
     setError('');
-    void host.environment().then(setState, (e) => setError(errorText(e)));
+    setUnavailable(undefined);
+    void host.environment().then(setState, async (e) => {
+      const status = await host.githubStatus().catch(() => undefined);
+      setUnavailable(status && status.state !== 'signed-in' ? status.state : undefined);
+      setError(errorText(e));
+    });
   };
   useEffect(load, []);
   // An error is worded in the language it was read in: read it again in a new one.
@@ -67,7 +79,125 @@ function useEnvironment() {
     read.current = language;
     if (error) load();
   }, [language]);
-  return { state, setState, error, load };
+  return { state, setState, error, unavailable, load };
+}
+
+/**
+ * The name and email this device's commits carry (`git config --global`).
+ * Where a part is unset and gh is signed in, the account's are filled in to save.
+ */
+function GitAuthorFields({ refresh }: { refresh: number }) {
+  const [author, setAuthor] = useState<GitAuthor>();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [failed, setFailed] = useState('');
+  const [saved, setSaved] = useState(false);
+  const { busy, error, run } = useAction();
+  const take = (value: GitAuthor) => {
+    setAuthor(value);
+    setName(value.name || value.github?.name || '');
+    setEmail(value.email || value.github?.email || '');
+  };
+  useEffect(() => {
+    let live = true;
+    setFailed('');
+    void host.gitAuthor().then(
+      (value) => live && take(value),
+      (e) => live && setFailed(errorText(e)),
+    );
+    return () => {
+      live = false;
+    };
+  }, [refresh]);
+  const changed = !!author && (name.trim() !== author.name || email.trim() !== author.email);
+  const valid = validGitName(name.trim()) && validGitEmail(email.trim());
+  const offered =
+    !!author?.github &&
+    ((!author.name && name === author.github.name) ||
+      (!author.email && email === author.github.email));
+  async function save() {
+    await run(async () => {
+      setSaved(false);
+      take(await host.saveGitAuthor({ name: name.trim(), email: email.trim() }));
+      setSaved(true);
+    });
+  }
+  const label = t('Git の作成者', 'Git author');
+  return (
+    <form
+      className="account-author"
+      aria-label={label}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (changed && valid && !busy) void save();
+      }}
+    >
+      <h4>{label}</h4>
+      <p className="account-hint">
+        {t(
+          'commit に記録される名前とメールアドレスです。この端末の Git 全体の設定（git config --global）に保存します。',
+          'The name and email recorded on commits, kept in Git’s own settings for this device (git config --global).',
+        )}
+      </p>
+      {failed ? (
+        <ErrorMessage text={failed} />
+      ) : (
+        <>
+          <label>
+            <span>{t('名前', 'Name')}</span>
+            <input
+              value={name}
+              disabled={!author || busy}
+              maxLength={200}
+              autoComplete="name"
+              onChange={(e) => {
+                setSaved(false);
+                setName(e.target.value);
+              }}
+            />
+          </label>
+          <label>
+            <span>{t('メールアドレス', 'Email')}</span>
+            <input
+              type="email"
+              value={email}
+              disabled={!author || busy}
+              maxLength={254}
+              autoComplete="email"
+              onChange={(e) => {
+                setSaved(false);
+                setEmail(e.target.value);
+              }}
+            />
+          </label>
+          {author && !author.name && !author.email && !author.github && (
+            <p className="account-hint">
+              {t(
+                'まだ設定されていません。GitHub にログインすると、そのアカウントの名前とメールアドレスが入ります。',
+                'Not set yet. Signing in to GitHub fills in the account’s name and email.',
+              )}
+            </p>
+          )}
+          {offered && (
+            <p className="account-hint">
+              {t(
+                'GitHub のアカウントから入れました。保存すると、この端末の commit に使われます。',
+                'Filled in from your GitHub account. Save to use it for commits on this device.',
+              )}
+            </p>
+          )}
+          <div className="account-actions">
+            <button type="submit" disabled={busy || !changed || !valid}>
+              <Icon name="check" size={14} />
+              {t('作成者を保存', 'Save author')}
+            </button>
+          </div>
+          {saved && <p role="status">{t('作成者を保存しました。', 'Author saved.')}</p>}
+          {error && <ErrorMessage text={error} />}
+        </>
+      )}
+    </form>
+  );
 }
 
 /**
@@ -82,10 +212,12 @@ export function AccountSection({
   heading?: boolean;
   onRestore: () => void;
 }) {
-  const { state, setState, error, load } = useEnvironment();
+  const { state, setState, error, unavailable, load } = useEnvironment();
   const { busy, error: issue, run } = useAction();
   const [saved, setSaved] = useState(false);
   const [passphrase, setPassphrase] = useState('');
+  const [signedIn, setSignedIn] = useState('');
+  const [authorRead, setAuthorRead] = useState(0);
   async function save() {
     await run(async () => {
       setSaved(false);
@@ -106,6 +238,11 @@ export function AccountSection({
   return (
     <section className="settings-account" aria-label={t('アカウント', 'Account')}>
       {heading && <h3>{t('アカウント', 'Account')}</h3>}
+      {signedIn && (
+        <p role="status" className="account-signed-in">
+          {signedIn}
+        </p>
+      )}
       {state ? (
         <>
           <p className="account-name">
@@ -209,6 +346,16 @@ export function AccountSection({
           {saved && <p role="status">{t('保存しました。', 'Saved.')}</p>}
           {issue && <ErrorMessage text={issue} />}
         </>
+      ) : error && unavailable ? (
+        <GitHubSignIn
+          state={unavailable}
+          onCheck={load}
+          onSignedIn={(result) => {
+            setSignedIn(signedInText(result));
+            setAuthorRead((n) => n + 1);
+            load();
+          }}
+        />
       ) : error ? (
         <>
           <ErrorMessage text={error} />
@@ -220,6 +367,7 @@ export function AccountSection({
       ) : (
         <p role="status">{t('確認しています…', 'Checking…')}</p>
       )}
+      <GitAuthorFields refresh={authorRead} />
     </section>
   );
 }
@@ -236,7 +384,8 @@ export function RestoreEnvironment({
   /** This device's vaults, workspaces and preferences changed. */
   onRestored: () => void | Promise<void>;
 }) {
-  const { state, error, load } = useEnvironment();
+  const { state, error, unavailable, load } = useEnvironment();
+  const [signedIn, setSignedIn] = useState('');
   const [selected, setSelected] = useState<string[]>(),
     [agent, setAgent] = useState(true),
     [routines, setRoutines] = useState<string[]>(),
@@ -451,6 +600,15 @@ export function RestoreEnvironment({
               </button>
             </div>
           </>
+        ) : error && unavailable ? (
+          <GitHubSignIn
+            state={unavailable}
+            onCheck={load}
+            onSignedIn={(result) => {
+              setSignedIn(signedInText(result));
+              load();
+            }}
+          />
         ) : error ? (
           <>
             <ErrorMessage text={error} />
@@ -461,6 +619,7 @@ export function RestoreEnvironment({
         ) : (
           <p role="status">{t('確認しています…', 'Checking…')}</p>
         )}
+        {signedIn && !result && <p className="account-hint">{signedIn}</p>}
         {issue && <ErrorMessage text={issue} />}
         {busy && !result && <p role="status">{t('復元しています…', 'Restoring…')}</p>}
         <div className="actions">

@@ -6,16 +6,29 @@ export function git(cwd: string, ...args: string[]) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
+/** The one-time code the stand-in's `gh auth login --web` shows. */
+export const fakeDeviceCode = 'WDJB-MJHT';
+
 /**
  * A stand-in for gh that answers the REST calls irori makes for the account
  * `octo` from a folder: a repository is a folder, its file a file beside a
  * `.private` marker, and a write is refused when its sha is not the file's.
+ * Started `signedOut`, it answers as gh does before `gh auth login`; its
+ * `auth login --web` shows a code and waits until `approve()` is called.
  */
-export async function fakeGh(base: string) {
+export async function fakeGh(
+  base: string,
+  { signedOut = false, profile = { name: 'Octo Cat', email: null as string | null } } = {},
+) {
   const github = path.join(base, 'github');
   await mkdir(github, { recursive: true });
   const gh = path.join(base, 'gh');
   const log = path.join(base, 'gh.log');
+  const signedIn = path.join(base, 'gh-signed-in');
+  const approved = path.join(base, 'gh-approved');
+  const pidFile = path.join(base, 'gh-login.pid');
+  if (!signedOut) await writeFile(signedIn, '');
+  const answer = JSON.stringify({ login: 'octo', id: 583231, ...profile });
   await writeFile(
     gh,
     `#!${process.execPath}
@@ -25,7 +38,20 @@ fs.appendFileSync(${JSON.stringify(log)}, args.join(' ') + '\\n');
 const fail = (text) => { process.stderr.write(text + '\\n'); process.exit(1); };
 const sha = (text) => crypto.createHash('sha1').update(text).digest('hex');
 const joined = args.join(' ');
+if (joined === 'auth login --web --hostname github.com') {
+  fs.writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));
+  process.stderr.write('\\n! First copy your one-time code: ${fakeDeviceCode}\\n');
+  process.stderr.write('Open this URL to continue in your web browser: https://github.com/login/device\\n');
+  const pause = new Int32Array(new SharedArrayBuffer(4));
+  while (!fs.existsSync(${JSON.stringify(approved)})) Atomics.wait(pause, 0, 0, 50);
+  fs.writeFileSync(${JSON.stringify(signedIn)}, '');
+  process.stderr.write('Authentication complete.\\n');
+  process.exit(0);
+}
+if (!fs.existsSync(${JSON.stringify(signedIn)}))
+  fail('To get started with GitHub CLI, please run:  gh auth login\\nAlternatively, populate the GH_TOKEN environment variable with a GitHub API authentication token.');
 if (joined === 'api user --jq .login') { console.log('octo'); process.exit(0); }
+if (joined === 'api user --jq {login: .login, id: .id, name: .name, email: .email}') { console.log(${JSON.stringify(answer)}); process.exit(0); }
 if (joined === 'config get git_protocol --host github.com') { console.log('https'); process.exit(0); }
 if (args[0] === 'api' && args[1] === '-X' && args[2] === 'POST' && args[3] === 'user/repos') {
   const name = args[args.indexOf('-f') + 1].slice('name='.length);
@@ -68,7 +94,11 @@ fail('unknown command ' + joined);
     (await readFile(log, 'utf8').catch(() => '')).split('\n').filter(Boolean);
   const stored = (file = 'environment.json') =>
     readFile(path.join(github, 'octo', 'irori-settings', file), 'utf8');
-  return { gh, github, calls, stored };
+  /** Approves the code shown, as the person would on GitHub's page. */
+  const approve = () => writeFile(approved, '');
+  /** The process id of the `auth login` that ran last. */
+  const loginPid = async () => Number(await readFile(pidFile, 'utf8'));
+  return { gh, github, calls, stored, approve, loginPid };
 }
 
 /** A bare repository standing in for github.com/octo/<name>, holding `files` in one commit. */

@@ -55,11 +55,15 @@ travels with the repository.
 routines, in `routines.json`, and the routine runtimes to what is kept.
 [ADR 059](059-the-window-shows-the-work.md) (0.2.63) adds which optional
 controls the person put on the window (`windowItems`).
+[ADR 062](062-signing-in-to-github-from-irori.md) (0.2.73) signs gh in from the
+window (`gh auth login --web`, the token still gh's) and sets the device's Git
+author from the account where it has none.
 
 ## Consequences
 
 - A new device needs Git, `gh auth login` and irori; one restore brings back
-  the hibachis, workspaces and preferences.
+  the hibachis, workspaces and preferences. Since ADR 062 the sign-in is done in
+  irori's window.
 - `gh auth login`'s default scopes (`repo`) cover the repository and its file.
 - A hibachi registered from a repository whose `.irori/scope.json` was never
   committed gets a new id on restore; its workspaces are mapped to that id.

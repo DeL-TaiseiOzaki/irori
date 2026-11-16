@@ -17,7 +17,7 @@ Open **Settings** in the app to see its parts listed at the left, in framed grou
 | Agents | vault agent | Turning vault agents on or off, and each vault's Schema |
 | Automation | Routines | The JavaScript and Python runtimes |
 | Where vaults live | SSH hosts | The SSH hosts that hold vaults ([vaults on SSH hosts](ssh-hosts.md)) |
-| Account and updates | Account, Updates | The environment saved on GitHub, and app updates |
+| Account and updates | Account, Updates | Signing in to GitHub, the Git author, the environment saved on GitHub, and app updates |
 
 A choice applies at once. The start screen's **Settings** leave out **Updates** (the start screen has **Check for updates** at its foot), and parts that need a workspace say "Set in a workspace".
 
@@ -64,9 +64,23 @@ Turn on the vault agent with the switch under **vault agent**. It is off by defa
 
 To use JavaScript or Python in [routines](routines.md), turn on **JavaScript** or **Python** under **Routines**. Turning Python on downloads uv, and "Downloading and preparing uv…" shows until it is done. Choose the AI CLI at the top of the [AI panel](agents.md), and the model, thinking level and access in the menu under the instruction box.
 
+## Sign in to GitHub
+
+**Account and updates → Account** shows the GitHub account the GitHub CLI `gh` is signed in to. irori has no sign-in of its own and uses `gh`'s. `gh` also keeps the token; irori never reads it.
+
+When `gh` is not signed in yet, choose **Sign in to GitHub**. irori runs `gh auth login --web` and shows an eight-character one-time code. **Copy the code and open GitHub** puts the code on the clipboard and opens GitHub's page in your browser. Paste the code and approve: the connection completes without anything more to choose in irori, and the account name appears. **Cancel** stops it, and the code expires after 15 minutes. Running `gh auth login` in a terminal does the same. When `gh` is not installed, the section says so, and **Get the GitHub CLI** opens its installation page. The same sign-in is offered by **Restore from GitHub** on the start screen and when you **Publish to GitHub** a vault.
+
+A user name and email alone cannot sign in to GitHub: GitHub takes your password and second factor only on its own page.
+
+### Git author
+
+**Git author** on the same page shows the name and email recorded on commits (Git's `user.name` and `user.email`). They are kept in Git's settings for the whole computer (`git config --global`), so commits that agents or a terminal make outside irori use them too. A repository's own settings take precedence.
+
+Signing in from irori fills in whichever of the two is not set yet from the account: the account's name, and its public profile email or, without one, GitHub's private address (`<ID>+<login>@users.noreply.github.com`), which still shows the commits as the account's on GitHub. What is already set stays. Change either and choose **Save author** to save.
+
 ## Save your environment on GitHub
 
-**Account and updates → Account** shows the GitHub account the GitHub CLI `gh` is signed in to. irori has no sign-in of its own and uses `gh`'s. **Save environment** saves this computer's environment to the private `irori-settings` repository of that account. It saves only when you choose it, as a new commit each time; nothing syncs by itself.
+**Save environment** saves this computer's environment to the private `irori-settings` repository of that account. It saves only when you choose it, as a new commit each time; nothing syncs by itself.
 
 | Saved | Not saved |
 | --- | --- |
@@ -79,4 +93,4 @@ A save replaces the saved environment with this computer's. When that drops vaul
 
 Routine secrets are saved only when you enter a passphrase of 12 characters or more. It encrypts only the secrets' values: secret names, routines, the irori agent's files and the names of vaults and workspaces are saved unencrypted. The passphrase is not stored anywhere; enter the same one to restore.
 
-On another computer, sign in with `gh`, then choose **Restore from GitHub** on the start screen, or **Restore** under **Account**. Choose what to bring in (vaults, the irori agent's files, routines, secrets), check **Clone into**, and choose **Restore**: irori clones the chosen vaults there and takes in the workspaces. The saved settings replace this computer's; everything else is only added. Vaults and routines already on this computer stay as they are, and an irori agent file changed here stays too, named in the result.
+On another computer, sign in to GitHub (**Sign in to GitHub** above), then choose **Restore from GitHub** on the start screen, or **Restore** under **Account**. Choose what to bring in (vaults, the irori agent's files, routines, secrets), check **Clone into**, and choose **Restore**: irori clones the chosen vaults there and takes in the workspaces. The saved settings replace this computer's; everything else is only added. Vaults and routines already on this computer stay as they are, and an irori agent file changed here stays too, named in the result.

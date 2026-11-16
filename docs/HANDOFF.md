@@ -1,5 +1,16 @@
 # irori continuation handoff
 
+**Signing in to GitHub from irori, 0.2.73** ([ADR 062](decisions/062-signing-in-to-github-from-irori.md)).
+irori runs `gh auth login --web` from the account section, the restore sheet
+and the publish sheet, and sets an unset Git author from the account. Still
+open:
+1. Run it once against github.com on Windows and macOS: the stand-in gh prints
+   what gh 2.89 prints (checked against its `internal/authflow/flow.go`), but a
+   real device flow, keychain and browser have not been exercised.
+2. Left out on purpose (ADR 062 D5): installing gh, signing out,
+   SSH, and `gh auth setup-git` (irori's own Git already falls back to gh's
+   credentials; an agent's `git push` in a terminal does not).
+
 **The guide follows the app again, 2026-11-15** ([#324](https://github.com/DeL-TaiseiOzaki/irori/pull/324)).
 `website/docs` had been written at 0.1.61 and fell about 55 features behind;
 it now matches 0.2.70, with a page for vaults on SSH hosts. To keep it from
