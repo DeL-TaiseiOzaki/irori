@@ -1,6 +1,8 @@
 # Implementation status — notes, native agents and connection onboarding
 
-What ssh asks is answered in the window, 2026-11-16 (**0.2.78**;
+What ssh asks is answered in the window, 2026-11-16 (**0.2.78**,
+[#340](https://github.com/DeL-TaiseiOzaki/irori/pull/340), published as
+`v0.2.78-preview.1`;
 [ADR 061](decisions/061-vaults-on-ssh-hosts.md) decision 3 amended, [SSH-HOSTS](SSH-HOSTS.md#what-ssh-asks)):
 the owner asked that a verification code and a password be typed in irori's
 window, as VS Code's Remote-SSH lets them.
@@ -35,6 +37,21 @@ window, as VS Code's Remote-SSH lets them.
   packaged app against the stand-in server on each system CI packages for.
   The Windows program was compiled here with Mono's C# 5 compiler and run under
   Mono against the same protocol; that is not Windows.
+- CI's packaged-app smoke passed on all three (run `43966425848`): the host's
+  key, the password and the code were answered in the window on Windows with
+  OpenSSH_for_Windows_9.5p2 and `irori-askpass.exe`, on macOS with its own
+  `ssh`, and on Linux. The first Windows run failed with `CreateProcessW failed
+  error:2`: `ssh.exe` did not start the program from the folder named in
+  Japanese that the smoke keeps the application in. `SSH_ASKPASS` is since the
+  program's name alone, found on the search path. On macOS the question showed
+  at once; its `ssh` words the fingerprint line with a colon, which the smoke
+  now takes.
+- `publish.yml` published
+  [v0.2.78-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.78-preview.1)
+  from `eb8e8ed` with the pull request's CI run `43966425848`. Anonymous
+  downloads matched `SHA256SUMS.txt`: Windows 179,410,432 bytes, Mac
+  145,725,849 bytes and `irori-0.2.78-full.nupkg` 178,579,919 bytes. The pull
+  request was renumbered once while open: 0.2.77 went to #339.
 
 Workspace tabs reordered by dragging, 2026-11-16 (**0.2.77**,
 [ADR 065](decisions/065-tabs-reordered-by-dragging.md)): the owner asked that a tab
