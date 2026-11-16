@@ -5,7 +5,7 @@ import path from 'node:path';
 import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
 import { SettingsService } from '../src/host/settings';
-import { fakeGh, git, remote } from '../tests/fixtures/github';
+import { fakeDeviceCode, fakeGh, git, remote } from '../tests/fixtures/github';
 import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // The environment kept on the GitHub account (ADR 026): one device saves its
@@ -13,7 +13,8 @@ import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 // the start screen's settings, before opening any workspace, and a new device
 // restores them from the start screen. A's routine secret goes along sealed with a
 // passphrase (ADR 047) and is sealed again with B's key.
-// gh is a stand-in answering from a folder.
+// gh is a stand-in answering from a folder. It starts signed out: device A signs
+// in from the settings, and its unset Git author is taken from the account (ADR 062).
 const base = await mkdtemp(path.join(tmpdir(), 'irori account UI '));
 const scope = {
   schemaVersion: 1,
@@ -28,12 +29,12 @@ const kb = await remote(base, 'kb', {
   'knowledge/note.md': '# Note\n',
 });
 const globalConfig = path.join(base, 'gitconfig');
+// No author yet: signing in gives it one.
 await writeFile(
   globalConfig,
-  `[user]\n\tname = Git fixture\n\temail = fixture@example.invalid\n[commit]\n\tgpgsign = false\n` +
-    `[url "${kb.bare}"]\n\tinsteadOf = ${kb.url}\n`,
+  `[commit]\n\tgpgsign = false\n[url "${kb.bare}"]\n\tinsteadOf = ${kb.url}\n`,
 );
-const fake = await fakeGh(base);
+const fake = await fakeGh(base, { signedOut: true });
 const bin = path.dirname(fake.gh);
 
 // Device A has the vault, a workspace and a dark theme.
@@ -104,7 +105,50 @@ try {
   await expect(page.locator('.settings-sheet')).toContainText('ワークスペースを開くと設定できます');
   await expect(page.getByRole('button', { name: '共通 Schema を開く' })).toHaveCount(0);
   await part('アカウント').click();
+  // Signed out, the section offers to sign in instead of naming `gh auth login`.
+  await expect(account).toContainText('GitHub にログインしていません');
+  await expect(account).not.toContainText('gh auth login');
+  const author = account.getByRole('form', { name: 'Git の作成者' });
+  await expect(author).toContainText('まだ設定されていません');
+  // The browser is the system's; the main process records what it would open.
+  await app.evaluate(({ shell }) => {
+    shell.openExternal = (async (url: string) => {
+      (globalThis as { opened?: string[] }).opened = [
+        ...((globalThis as { opened?: string[] }).opened ?? []),
+        url,
+      ];
+    }) as typeof shell.openExternal;
+  });
+  await account.getByRole('button', { name: 'GitHub にログイン' }).click();
+  await expect(account.getByLabel('ワンタイムコード')).toHaveText(fakeDeviceCode);
+  await expect(account).toContainText('GitHub での承認を待っています');
+  await page.screenshot({ path: 'test-results/irori-account-sign-in.png' });
+  await account.getByRole('button', { name: 'コードをコピーして GitHub を開く' }).click();
+  await expect
+    .poll(() => app.evaluate(() => (globalThis as { opened?: string[] }).opened ?? []))
+    .toEqual(['https://github.com/login/device']);
+  if ((await app.evaluate(({ clipboard }) => clipboard.readText())) !== fakeDeviceCode)
+    throw Error('The one-time code was not copied');
+  // The person approves on GitHub's page; the section follows by itself.
+  await fake.approve();
   await expect(account).toContainText('GitHub: octo');
+  await expect(account).toContainText(
+    'GitHub に octo としてログインしました。Git の作成者を「Octo Cat <583231+octo@users.noreply.github.com>」にしました。',
+  );
+  await expect(author.getByLabel('名前')).toHaveValue('Octo Cat');
+  await expect(author.getByLabel('メールアドレス')).toHaveValue(
+    '583231+octo@users.noreply.github.com',
+  );
+  const written = await readFile(globalConfig, 'utf8');
+  if (!written.includes('name = Octo Cat') || !written.includes('583231+octo@users.noreply'))
+    throw Error(`The Git author was not set: ${written}`);
+  // The author can be changed here too.
+  await author.getByLabel('名前').fill('Octo Writer');
+  await author.getByRole('button', { name: '作成者を保存' }).click();
+  await expect(author.getByRole('status')).toHaveText('作成者を保存しました。');
+  if (!(await readFile(globalConfig, 'utf8')).includes('name = Octo Writer'))
+    throw Error('The Git author was not saved');
+  await page.screenshot({ path: 'test-results/irori-account-signed-in.png' });
   await expect(account).toContainText('環境は保存されていません');
   await expect(account.getByRole('button', { name: '復元' })).toHaveCount(0);
   const phrase = account.getByLabel('シークレット 1 件も保存する合言葉');
@@ -112,7 +156,7 @@ try {
   await expect(account.getByRole('button', { name: '環境を保存' })).toBeDisabled();
   await phrase.fill(passphrase);
   await account.getByRole('button', { name: '環境を保存' }).click();
-  await expect(account.getByRole('status')).toHaveText('保存しました。');
+  await expect(account.getByText('保存しました。', { exact: true })).toBeVisible();
   await expect(phrase).toHaveValue('');
   await expect(account).toContainText('環境を保存：');
   await page.screenshot({ path: 'test-results/irori-account-settings.png' });

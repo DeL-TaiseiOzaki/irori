@@ -22,7 +22,7 @@ import { windowItemChoices } from './window-items';
 import { brainLook, categoryText } from './brains';
 import { remoteHostInput, remotePath } from './remote-hosts';
 import { knowledgeFolderName, layerLabelChanges } from './layers';
-import { githubOwnerPattern, validRepositoryName } from './git';
+import { githubOwnerPattern, validGitEmail, validGitName, validRepositoryName } from './git';
 import {
   routineRef,
   routineRuntimeList,
@@ -139,6 +139,20 @@ export const hostArguments = {
   gitOpenRepository: z.tuple([target]),
   gitInit: z.tuple([id]),
   githubAccount: z.tuple([]),
+  githubStatus: z.tuple([]),
+  startGitHubSignIn: z.tuple([]),
+  openGitHubSignIn: z.tuple([]),
+  finishGitHubSignIn: z.tuple([]),
+  cancelGitHubSignIn: z.tuple([]),
+  gitAuthor: z.tuple([]),
+  saveGitAuthor: z.tuple([
+    z
+      .object({
+        name: z.string().trim().refine(validGitName),
+        email: z.string().trim().refine(validGitEmail),
+      })
+      .strict(),
+  ]),
   environment: z.tuple([]),
   saveEnvironment: z.tuple([passphrase.optional()]),
   restoreEnvironment: z.tuple([

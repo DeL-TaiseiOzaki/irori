@@ -68,7 +68,7 @@ weighed and dropped:
    login lasts as long as the connection: Windows OpenSSH cannot share
    connections, so nothing is run per file or per run. The vault host listens on
    no network port. Nothing is forwarded from the host to this device.
-   *Amended 2026-11-16 (0.2.73), owner request.* The owner expects what VS
+   *Amended 2026-11-16 (0.2.74), owner request.* The owner expects what VS
    Code's Remote-SSH gives: a host written in `~/.ssh/config` is chosen, not
    typed again. irori now reads the person's ssh configuration
    (`src/host/ssh-config.ts`): `~/.ssh/config`, the files it includes and the

@@ -1,5 +1,16 @@
 # irori continuation handoff
 
+**Signing in to GitHub from irori, 0.2.73** ([ADR 062](decisions/062-signing-in-to-github-from-irori.md)).
+irori runs `gh auth login --web` from the account section, the restore sheet
+and the publish sheet, and sets an unset Git author from the account. Still
+open:
+1. Run it once against github.com on Windows and macOS: the stand-in gh prints
+   what gh 2.89 prints (checked against its `internal/authflow/flow.go`), but a
+   real device flow, keychain and browser have not been exercised.
+2. Left out on purpose (ADR 062 D5): installing gh, signing out,
+   SSH, and `gh auth setup-git` (irori's own Git already falls back to gh's
+   credentials; an agent's `git push` in a terminal does not).
+
 **The guide follows the app again, 2026-11-15** ([#324](https://github.com/DeL-TaiseiOzaki/irori/pull/324)).
 `website/docs` had been written at 0.1.61 and fell about 55 features behind;
 it now matches 0.2.70, with a page for vaults on SSH hosts. To keep it from
@@ -40,7 +51,7 @@ when the connection is cut. Next, in this order:
 4. The terminal as `ssh -t`, connected folders, path links in replies for files
    on a host, and SSH's prompts answered in the window.
 
-0.2.73 lists the hosts of the person's ssh configuration where a host is added
+0.2.74 lists the hosts of the person's ssh configuration where a host is added
 (`src/host/ssh-config.ts`; ADR 061 decision 3, amended), because the owner
 expects what VS Code's Remote-SSH gives. What still differs from Remote-SSH most
 is the prompts of item 4: irori connects in `BatchMode`, so a key with a

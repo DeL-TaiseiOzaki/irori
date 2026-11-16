@@ -2,9 +2,15 @@ import type { ChildProcess } from 'node:child_process';
 import { agentEnv, killTree, launch } from '../agents/process';
 import { t } from '../domain/i18n';
 import {
+  githubNoreplyEmail,
   githubOwnerPattern,
+  validGitEmail,
+  validGitName,
   validRepositoryName,
   type GitHubAccount,
+  type GitHubDeviceCode,
+  type GitHubStatus,
+  type GitIdentity,
   type PublishRepository,
 } from '../domain/git';
 import { findGitHubCli, gitDetail } from './process';
@@ -12,6 +18,14 @@ import { findGitHubCli, gitDetail } from './process';
 const signedOut = /gh auth login|not logged in|authentication required|HTTP 401|bad credentials/i;
 /** More than any answer irori asks for: a base64 file under GitHub's 1 MB contents limit. */
 const outputLimit = 4 * 1024 * 1024;
+/** GitHub's device codes last 15 minutes; gh gives up then, and irori a little later. */
+const signInTimeout = 16 * 60 * 1000;
+/**
+ * Where `gh auth login --web` sends the person, after the code when there is one;
+ * read once the line is complete, since stderr can arrive in pieces.
+ */
+const signInPage = /Open this URL to continue in your web browser:[ \t]*(\S+)[ \t]*\r?\n/;
+const signInCode = /one-time code:\s*([A-Z0-9]{4}-[A-Z0-9]{4})\b/i;
 
 /**
  * The GitHub CLI, run for the few account and repository calls irori makes on
@@ -26,7 +40,17 @@ export class GitHubCli {
       timeout = 30000,
       input,
       forbidden,
-    }: { timeout?: number; input?: string; forbidden?: string } = {},
+      onDiagnostic,
+      signal,
+    }: {
+      timeout?: number;
+      input?: string;
+      forbidden?: string;
+      /** What gh has written to stderr so far, each time it writes more. */
+      onDiagnostic?: (text: string) => void;
+      /** Stops gh, rejecting with the signal's reason. */
+      signal?: AbortSignal;
+    } = {},
   ) {
     const gh = await this.find();
     if (!gh)
@@ -58,6 +82,12 @@ export class GitHubCli {
         );
         stopping ??= killTree(child);
       }, timeout);
+      const abort = () => {
+        failure ??= signal?.reason instanceof Error ? signal.reason : Error('Stopped');
+        stopping ??= killTree(child);
+      };
+      if (signal?.aborted) abort();
+      else signal?.addEventListener('abort', abort, { once: true });
       child.stdout?.on('data', (bytes: Buffer) => {
         size += bytes.length;
         if (size <= outputLimit) output.push(bytes);
@@ -68,6 +98,7 @@ export class GitHubCli {
       });
       child.stderr?.on('data', (bytes: Buffer) => {
         diagnostic = (diagnostic + bytes.toString()).slice(-16000);
+        onDiagnostic?.(diagnostic);
       });
       child.stdin?.on('error', () => {});
       child.stdin?.end(input);
@@ -78,6 +109,7 @@ export class GitHubCli {
       });
       child.on('close', (code) => {
         clearTimeout(timer);
+        signal?.removeEventListener('abort', abort);
         void (async () => {
           await stopping?.catch(() => {});
           if (failure) throw failure;
@@ -98,6 +130,86 @@ export class GitHubCli {
         t('GitHub のアカウントを確認できません。', 'Could not determine the GitHub account.'),
       );
     return login;
+  }
+  /** Whether gh is installed and signed in, and to which account. */
+  async status(): Promise<GitHubStatus> {
+    if (!(await this.find())) return { state: 'missing' };
+    try {
+      return { state: 'signed-in', login: await this.login() };
+    } catch (error) {
+      if (error instanceof GitHubError && signedOut.test(error.diagnostic))
+        return { state: 'signed-out' };
+      throw error;
+    }
+  }
+  /**
+   * The signed-in account's name and an email that attributes commits to it:
+   * the public profile email, or else GitHub's private noreply address.
+   */
+  async profile(): Promise<GitIdentity & { login: string }> {
+    const answer = JSON.parse(
+      await this.run([
+        'api',
+        'user',
+        '--jq',
+        '{login: .login, id: .id, name: .name, email: .email}',
+      ]),
+    ) as { login?: unknown; id?: unknown; name?: unknown; email?: unknown };
+    const { login, id } = answer;
+    if (typeof login !== 'string' || !githubOwnerPattern.test(login) || !Number.isSafeInteger(id))
+      throw Error(
+        t('GitHub のアカウントを確認できません。', 'Could not determine the GitHub account.'),
+      );
+    const name = typeof answer.name === 'string' ? answer.name.trim() : '';
+    const email = typeof answer.email === 'string' ? answer.email.trim() : '';
+    return {
+      login,
+      name: validGitName(name) ? name : login,
+      email: validGitEmail(email) ? email : githubNoreplyEmail(id as number, login),
+    };
+  }
+  /**
+   * Signs gh in to github.com through GitHub's own page (`gh auth login --web`),
+   * as a terminal would: `onCode` receives the one-time code and the page to
+   * enter it on, and the promise settles once the person approved there, gh
+   * gave up, or `signal` stopped it. gh keeps the token; irori never reads it.
+   */
+  async signIn(onCode: (code: GitHubDeviceCode) => void, signal?: AbortSignal): Promise<string> {
+    let shown = false;
+    try {
+      await this.run(['auth', 'login', '--web', '--hostname', 'github.com'], {
+        timeout: signInTimeout,
+        signal,
+        onDiagnostic: (text) => {
+          const page = signInPage.exec(text)?.[1];
+          if (shown || !page) return;
+          let url: URL;
+          try {
+            url = new URL(page);
+          } catch {
+            return;
+          }
+          // Only GitHub's own page is offered to open.
+          if (url.protocol !== 'https:' || url.hostname !== 'github.com') return;
+          shown = true;
+          onCode({ code: signInCode.exec(text)?.[1]?.toUpperCase(), url: url.href });
+        },
+      });
+    } catch (error) {
+      if (signal?.aborted || !(error instanceof GitHubError)) throw error;
+      const detail = gitDetail(error.diagnostic);
+      const hint = /environment variable is being used/i.test(error.diagnostic)
+        ? t(
+            'GH_TOKEN などの環境変数のトークンが使われているため、gh にログインできません。環境変数を外してから irori を起動し直してください。',
+            'gh uses a token from an environment variable such as GH_TOKEN, so it cannot sign in. Remove the variable and start irori again.',
+          )
+        : t(
+            'GitHub へのログインが完了しませんでした。もう一度お試しください。',
+            'Signing in to GitHub did not finish. Try again.',
+          );
+      throw Error(detail ? `${hint}\n\n${detail}` : hint);
+    }
+    return this.login();
   }
   /** The signed-in account and the organizations it belongs to. */
   async account(): Promise<GitHubAccount> {

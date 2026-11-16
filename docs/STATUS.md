@@ -1,6 +1,6 @@
 # Implementation status — notes, native agents and connection onboarding
 
-SSH hosts from the person's ssh configuration, 2026-11-16 (**0.2.73**,
+SSH hosts from the person's ssh configuration, 2026-11-16 (**0.2.74**,
 [#333](https://github.com/DeL-TaiseiOzaki/irori/pull/333);
 [ADR 061](decisions/061-vaults-on-ssh-hosts.md) decision 3 amended, [SSH-HOSTS](SSH-HOSTS.md)):
 the owner expects what VS Code's Remote-SSH gives, a host written in
@@ -34,6 +34,27 @@ the owner expects what VS Code's Remote-SSH gives, a host written in
   with backslashes), macOS, and a real host chosen from a real configuration.
   A file with a UTF-8 byte-order mark is listed here, but OpenSSH 9.6 on Linux
   refuses it, so its hosts would fail to connect with ssh's own message.
+Signing in to GitHub from irori, 2026-11-16 (**0.2.73**, branch
+`claude/github-sign-in`, not yet merged; [ADR 062](decisions/062-signing-in-to-github-from-irori.md)):
+the owner could not sign in from **設定 → アカウント**, which named
+`gh auth login` and offered only **再確認**, and asked that the GitHub name and
+email be set in irori and connect by themselves.
+- `GitHubCli.signIn` runs `gh auth login --web --hostname github.com`, reads the
+  one-time code and GitHub's page from gh's stderr, and settles when gh exits;
+  `status()` tells missing, signed out and signed in; `profile()` gives the
+  account's name and its public or noreply email. gh keeps the token.
+- `GitHubSignInService` (`src/host/github-sign-in.ts`) holds one waiting sign-in
+  (start, open, finish, cancel) and fills in `user.name`/`user.email` that
+  `git config --global` lacks; `GitAuthorStore` (`src/git/author.ts`) reads and
+  writes them. Seven HostAPI methods: `githubStatus`, `startGitHubSignIn`,
+  `openGitHubSignIn`, `finishGitHubSignIn`, `cancelGitHubSignIn`, `gitAuthor`,
+  `saveGitAuthor`.
+- `GitHubSignIn` (`src/app/GitHubSignIn.tsx`) replaces the signed-out error in
+  the account section, the restore sheet and the publish sheet's account
+  picker. The account section adds **Git の作成者**.
+- Verified on Linux with a stand-in gh (`tests/github-sign-in.test.ts`,
+  `scripts/account-ui-smoke.ts`). A real `gh auth login --web` against
+  github.com, and Windows and macOS, were not run.
 
 irori-templete out of shipped code, 2026-11-16 (**0.2.72**,
 [#329](https://github.com/DeL-TaiseiOzaki/irori/pull/329), published as
