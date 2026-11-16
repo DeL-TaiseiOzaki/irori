@@ -1,13 +1,24 @@
 # irori continuation handoff
 
-**A workspace tab dragged out opens in a new window, 0.2.73**
-([ADR 062](decisions/062-tab-out-to-a-new-window.md)). Run on Linux under Xvfb
+**A workspace tab dragged out opens in a new window, 0.2.74**
+([ADR 063](decisions/063-tab-out-to-a-new-window.md)). Run on Linux under Xvfb
 only. Next:
 1. Try it by hand on Windows and macOS, with the pointer let go outside the
    window and on a second screen; Chromium keeps the drag's pointer events
    there, but irori has not been seen doing it on those systems.
 2. Not covered: dropping a tab onto another window's strip, reordering tabs,
    and a menu or keyboard way to move a tab out.
+
+**Signing in to GitHub from irori, 0.2.73** ([ADR 062](decisions/062-signing-in-to-github-from-irori.md)).
+irori runs `gh auth login --web` from the account section, the restore sheet
+and the publish sheet, and sets an unset Git author from the account. Still
+open:
+1. Run it once against github.com on Windows and macOS: the stand-in gh prints
+   what gh 2.89 prints (checked against its `internal/authflow/flow.go`), but a
+   real device flow, keychain and browser have not been exercised.
+2. Left out on purpose (ADR 062 D5): installing gh, signing out,
+   SSH, and `gh auth setup-git` (irori's own Git already falls back to gh's
+   credentials; an agent's `git push` in a terminal does not).
 
 **The guide follows the app again, 2026-11-15** ([#324](https://github.com/DeL-TaiseiOzaki/irori/pull/324)).
 `website/docs` had been written at 0.1.61 and fell about 55 features behind;

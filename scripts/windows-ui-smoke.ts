@@ -9,7 +9,7 @@ import { showEveryWindowItem } from '../tests/fixtures/window-items';
 
 // Several windows over one irori (ADR 051): each has its own tabs, what one has
 // open the others leave alone, and closing one leaves the rest running. A tab
-// dragged out of its window opens in a window of its own (ADR 062).
+// dragged out of its window opens in a window of its own (ADR 063).
 const base = await mkdtemp(path.join(tmpdir(), 'irori windows UI 日本語 '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
@@ -94,7 +94,7 @@ try {
   await expect(page.getByRole('button', { name: '次の作業 の登録を削除' })).toBeEnabled();
   await expect(page.getByRole('button', { name: '最初の作業 の登録を削除' })).toBeDisabled();
 
-  // A tab dragged below the strip opens in a window of its own (ADR 062), on the vault it
+  // A tab dragged below the strip opens in a window of its own (ADR 063), on the vault it
   // showed, and leaves this window once that one shows it. Nothing of it stops.
   await page.locator('.workspace-card').filter({ hasText: '次の作業' }).click();
   const strip = page.getByRole('navigation', { name: 'ワークスペース' });

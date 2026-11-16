@@ -1,6 +1,6 @@
-# 062 — A workspace tab dragged out opens in a window of its own
+# 063 — A workspace tab dragged out opens in a window of its own
 
-Date: 2026-11-16. Status: owner request; implemented for 0.2.73.
+Date: 2026-11-16. Status: owner request; implemented for 0.2.74.
 Builds on [ADR 037](037-workspace-tabs.md) (workspace tabs) and
 [ADR 051](051-multiple-windows.md) (several windows). Covers what ADR 051 and
 [ADR 054](054-window-title-bar.md) left out: moving a workspace tab out into
@@ -10,7 +10,7 @@ its own window.
 
 The owner asked that, with several workspaces open as tabs, dragging one of
 them out of the title bar makes it a window of its own, as a browser does with
-its tabs. Until 0.2.72 a second window opened only from the menu
+its tabs. Until 0.2.73 a second window opened only from the menu
 (**ファイル > 新しいウィンドウ**), at the start screen, and the workspace had
 to be closed in one window and opened in the other: closing it stopped what
 only its tab ran.

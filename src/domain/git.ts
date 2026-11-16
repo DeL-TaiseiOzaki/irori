@@ -98,6 +98,44 @@ export interface GitHubAccount {
   login: string;
   organizations: string[];
 }
+/** Whether the GitHub CLI is installed here and signed in to github.com (ADR 062). */
+export type GitHubStatus =
+  { state: 'signed-in'; login: string } | { state: 'signed-out' } | { state: 'missing' };
+/**
+ * What `gh auth login --web` shows before it waits: the one-time code to enter
+ * on GitHub, absent in the browser flow that needs none, and the page to open.
+ */
+export interface GitHubDeviceCode {
+  code?: string;
+  url: string;
+}
+/** The name and email Git records as the author of a commit. */
+export interface GitIdentity {
+  name: string;
+  email: string;
+}
+/** This device's Git author (`git config --global`), each part empty while unset. */
+export interface GitAuthor extends GitIdentity {
+  /** The signed-in GitHub account's name and email, offered while a part is unset. */
+  github?: GitIdentity;
+}
+export interface GitHubSignIn {
+  login: string;
+  author: GitAuthor;
+  /** The parts of the Git author irori took from the account because they were unset. */
+  filled: (keyof GitIdentity)[];
+}
+/** A Git author name: one line, without the brackets that delimit the email. */
+export function validGitName(name: string) {
+  return name.trim().length > 0 && name.length <= 200 && !/[<>\p{Cc}]/u.test(name);
+}
+/** A Git author email: one address, as Git writes it between brackets. */
+export function validGitEmail(email: string) {
+  return email.length <= 254 && /^[^\s<>@\p{Cc}]+@[^\s<>@\p{Cc}]+$/u.test(email);
+}
+/** GitHub's private address for an account, which attributes commits without showing an email. */
+export const githubNoreplyEmail = (id: number, login: string) =>
+  `${id}+${login}@users.noreply.github.com`;
 export type GitHubVisibility = 'private' | 'public';
 export interface PublishRepository {
   owner: string;

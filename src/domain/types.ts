@@ -595,6 +595,22 @@ export interface HostAPI {
   gitInit(scopeId: string): Promise<GitStatus>;
   /** The account the GitHub CLI is signed in to and its organizations. */
   githubAccount(): Promise<import('./git').GitHubAccount>;
+  /** Whether the GitHub CLI is installed and signed in (ADR 062). */
+  githubStatus(): Promise<import('./git').GitHubStatus>;
+  /**
+   * Signs the GitHub CLI in through GitHub's page (`gh auth login --web`);
+   * resolves with the one-time code once gh shows it. Replaces a waiting one.
+   */
+  startGitHubSignIn(): Promise<import('./git').GitHubDeviceCode>;
+  /** Copies the code shown and opens GitHub's page to enter it on. */
+  openGitHubSignIn(): Promise<void>;
+  /** Waits for the sign-in started, then fills in an unset Git author from the account. */
+  finishGitHubSignIn(): Promise<import('./git').GitHubSignIn>;
+  /** Stops a sign-in still waiting for the person. */
+  cancelGitHubSignIn(): Promise<void>;
+  /** This device's Git author (`git config --global`), with the account's offered while unset. */
+  gitAuthor(): Promise<import('./git').GitAuthor>;
+  saveGitAuthor(identity: import('./git').GitIdentity): Promise<import('./git').GitAuthor>;
   /** Creates a GitHub repository for a vault without a remote and pushes to it. */
   gitPublish(
     scopeId: string,
@@ -1011,7 +1027,7 @@ export interface HostAPI {
   otherWindows(): Promise<import('./workspace-tabs').OpenTab[]>;
   /**
    * Opens a tab dragged out of this window in a window of its own, its first tab at the
-   * screen point `at` (ADR 062). True once that window shows it: until then the tab stays
+   * screen point `at` (ADR 063). True once that window shows it: until then the tab stays
    * here, so nothing it runs is left without a window. False when it could not.
    */
   moveTab(

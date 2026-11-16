@@ -52,8 +52,10 @@ import { AgentPaths } from './agent-paths';
 import { WorkspaceService, inspectRepository } from './workspaces';
 import { GitService } from '../git/service';
 import { GitHubCli } from '../git/github';
+import { GitAuthorStore } from '../git/author';
 import { approveGitConfig, GitConfigApprovals } from '../git/config-approval';
 import { EnvironmentService } from './environment';
+import { GitHubSignInService } from './github-sign-in';
 import { gitScope } from '../domain/git';
 import { isAppDocument } from './trust';
 import { BundleService } from './bundle';
@@ -205,7 +207,7 @@ app
         if (!window.isDestroyed()) window.webContents.send('irori:event', event);
     };
     const tabs = new WindowTabs();
-    // Tabs dragged out of a window (ADR 062), by the window opened for each: it takes its
+    // Tabs dragged out of a window (ADR 063), by the window opened for each: it takes its
     // tab once it has loaded, and `done` tells the window it came from whether it shows it.
     const arriving = new Map<number, { tab: MovedTab; done: (shown: boolean) => void }>();
     // A terminal is its window's: its output goes there alone once the window is known.
@@ -589,6 +591,14 @@ app
       const address = webAddress(url);
       if (address) await shell.openExternal(address.href);
     };
+    // Signing gh in from the window, and the device's Git author (ADR 062).
+    const author = new GitAuthorStore(files.dataDir);
+    const githubSignIn = new GitHubSignInService({
+      github,
+      author,
+      open: (url) => shell.openExternal(url),
+      copy: (text) => clipboard.writeText(text),
+    });
     // The environment kept on the GitHub account (ADR 026).
     const environment = new EnvironmentService({
       files,
@@ -978,6 +988,13 @@ app
       gitClone: (input) => git.clone(input),
       gitInit: (id) => changed(id, () => git.init(id)),
       githubAccount: () => git.githubAccount(),
+      githubStatus: () => githubSignIn.status(),
+      startGitHubSignIn: () => githubSignIn.start(),
+      openGitHubSignIn: () => githubSignIn.open(),
+      finishGitHubSignIn: () => githubSignIn.finish(),
+      cancelGitHubSignIn: () => githubSignIn.cancel(),
+      gitAuthor: () => githubSignIn.author(),
+      saveGitAuthor: (identity) => githubSignIn.saveAuthor(identity),
       environment: () => environment.state(),
       saveEnvironment: (passphrase) => environment.save(passphrase),
       restoreEnvironment: async (input) => {
@@ -1530,6 +1547,8 @@ app
       await terminals.closeAll();
       // A vault host goes on by itself while an agent works there; only the connections end.
       remote.close();
+      await githubSignIn.cancel();
+      await author.close();
       await git.close();
       try {
         await cloud.close();
@@ -1696,7 +1715,7 @@ app
         : { width: 1440, height: 940 };
       const window = new BrowserWindow({
         // A new window steps down from the one it came from rather than covering it; one a
-        // tab was dragged out to has that tab under the pointer (ADR 062).
+        // tab was dragged out to has that tab under the pointer (ADR 063).
         ...(at
           ? droppedWindowBounds(at, size, screen.getDisplayNearestPoint(at).workArea)
           : { ...size, ...(bounds && { x: bounds.x + 28, y: bounds.y + 28 }) }),
@@ -1759,7 +1778,7 @@ app
       return { window, loaded: window.loadFile(entry) };
     }
     /**
-     * Opens a tab dragged out of a window in a window of its own (ADR 062), true once that
+     * Opens a tab dragged out of a window in a window of its own (ADR 063), true once that
      * window shows it. The tab stays in the window it left until then, so what it runs is
      * never in no window's tabs, and stays there when the new window cannot show it.
      */

@@ -601,7 +601,7 @@ function App() {
   // The workspaces open as tabs, and where each was left: its level, vault and note.
   const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceProfile[]>([]);
   const tabViews = useRef<Record<string, TabPlace>>({});
-  // Tabs dragged out to a window of their own (ADR 062): each stays here, and cannot be
+  // Tabs dragged out to a window of their own (ADR 063): each stays here, and cannot be
   // shown or closed, until that window shows it.
   const [movingTabs, setMovingTabs] = useState<string[]>([]);
   // A tab dragged out of another window, which this window was opened to show.
@@ -2903,7 +2903,7 @@ function App() {
     }
   }
   /**
-   * Moves a tab dragged out of the strip to a window of its own (ADR 062). Nothing of it
+   * Moves a tab dragged out of the strip to a window of its own (ADR 063). Nothing of it
    * stops; a terminal of the tab on show closes once the person agrees, as on leaving it.
    */
   function moveOut(profile: WorkspaceProfile, at: { x: number; y: number }) {

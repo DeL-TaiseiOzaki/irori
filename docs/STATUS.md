@@ -1,7 +1,7 @@
 # Implementation status — notes, native agents and connection onboarding
 
-A workspace tab dragged out opens in a new window, 2026-11-16 (**0.2.73**,
-[ADR 062](decisions/062-tab-out-to-a-new-window.md)): the owner asked that, with
+A workspace tab dragged out opens in a new window, 2026-11-16 (**0.2.74**,
+[ADR 063](decisions/063-tab-out-to-a-new-window.md)): the owner asked that, with
 several workspaces open, dragging one tab out makes it a window of its own.
 - `WorkspaceTabs` follows a held tab with the pointer; let go more than 24 px
   below the strip or off the window, it calls `moveOut`. Only with two tabs or
@@ -15,6 +15,28 @@ several workspaces open, dragging one tab out makes it a window of its own.
 - `scripts/windows-ui-smoke.ts` drags a tab out with the mouse;
   `tests/window-frame.test.ts` and `tests/workspace-tabs.test.ts` check the
   placement and the validated arguments. Linux under Xvfb only.
+
+Signing in to GitHub from irori, 2026-11-16 (**0.2.73**, branch
+`claude/github-sign-in`, not yet merged; [ADR 062](decisions/062-signing-in-to-github-from-irori.md)):
+the owner could not sign in from **設定 → アカウント**, which named
+`gh auth login` and offered only **再確認**, and asked that the GitHub name and
+email be set in irori and connect by themselves.
+- `GitHubCli.signIn` runs `gh auth login --web --hostname github.com`, reads the
+  one-time code and GitHub's page from gh's stderr, and settles when gh exits;
+  `status()` tells missing, signed out and signed in; `profile()` gives the
+  account's name and its public or noreply email. gh keeps the token.
+- `GitHubSignInService` (`src/host/github-sign-in.ts`) holds one waiting sign-in
+  (start, open, finish, cancel) and fills in `user.name`/`user.email` that
+  `git config --global` lacks; `GitAuthorStore` (`src/git/author.ts`) reads and
+  writes them. Seven HostAPI methods: `githubStatus`, `startGitHubSignIn`,
+  `openGitHubSignIn`, `finishGitHubSignIn`, `cancelGitHubSignIn`, `gitAuthor`,
+  `saveGitAuthor`.
+- `GitHubSignIn` (`src/app/GitHubSignIn.tsx`) replaces the signed-out error in
+  the account section, the restore sheet and the publish sheet's account
+  picker. The account section adds **Git の作成者**.
+- Verified on Linux with a stand-in gh (`tests/github-sign-in.test.ts`,
+  `scripts/account-ui-smoke.ts`). A real `gh auth login --web` against
+  github.com, and Windows and macOS, were not run.
 
 irori-templete out of shipped code, 2026-11-16 (**0.2.72**,
 [#329](https://github.com/DeL-TaiseiOzaki/irori/pull/329), published as

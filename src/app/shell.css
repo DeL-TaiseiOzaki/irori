@@ -169,7 +169,7 @@
   background: var(--raised-2);
   color: var(--tx);
 }
-/* A tab being dragged, or on its way to a window of its own (ADR 062), fades in its
+/* A tab being dragged, or on its way to a window of its own (ADR 063), fades in its
    place; the drag itself follows the pointer and, out of the strip, says where it goes. */
 .workspace-tab[data-moving] {
   opacity: 0.45;

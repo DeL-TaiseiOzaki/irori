@@ -14,7 +14,7 @@ const outBelow = 24;
  * The open workspaces along the window's top, as a browser keeps its pages:
  * one on show, the others still running. + shows the start screen to open another.
  * A tab dragged out of the strip, below it or off the window, opens in a window of
- * its own (ADR 062) while two or more are open.
+ * its own (ADR 063) while two or more are open.
  * Memoised: it re-renders for its own data, not for every keystroke in the editor.
  */
 export const WorkspaceTabs = memo(function WorkspaceTabs({

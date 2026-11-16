@@ -22,7 +22,7 @@ import { windowItemChoices } from './window-items';
 import { brainLook, categoryText } from './brains';
 import { remoteHostInput, remotePath } from './remote-hosts';
 import { knowledgeFolderName, layerLabelChanges } from './layers';
-import { githubOwnerPattern, validRepositoryName } from './git';
+import { githubOwnerPattern, validGitEmail, validGitName, validRepositoryName } from './git';
 import {
   routineRef,
   routineRuntimeList,
@@ -58,7 +58,7 @@ const repository = z
   );
 const passphrase = z.string().min(passphraseLength.min).max(passphraseLength.max);
 const target = z.union([id, z.object({ scopeId: id, repository }).strict()]);
-// A tab dragged out of its window (ADR 062): the workspace, where it was left, and the
+// A tab dragged out of its window (ADR 063): the workspace, where it was left, and the
 // screen point it was let go at, which may lie left of or above the main screen.
 const movedTab = z
   .object({
@@ -157,6 +157,20 @@ export const hostArguments = {
   gitOpenRepository: z.tuple([target]),
   gitInit: z.tuple([id]),
   githubAccount: z.tuple([]),
+  githubStatus: z.tuple([]),
+  startGitHubSignIn: z.tuple([]),
+  openGitHubSignIn: z.tuple([]),
+  finishGitHubSignIn: z.tuple([]),
+  cancelGitHubSignIn: z.tuple([]),
+  gitAuthor: z.tuple([]),
+  saveGitAuthor: z.tuple([
+    z
+      .object({
+        name: z.string().trim().refine(validGitName),
+        email: z.string().trim().refine(validGitEmail),
+      })
+      .strict(),
+  ]),
   environment: z.tuple([]),
   saveEnvironment: z.tuple([passphrase.optional()]),
   restoreEnvironment: z.tuple([

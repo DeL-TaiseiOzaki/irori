@@ -13,7 +13,7 @@ type Rectangle = Point & { width: number; height: number };
 const heldAt: Point = { x: 110, y: titleBarHeight / 2 };
 
 /**
- * Where a window opened by dragging a tab out of another stands (ADR 062): its first tab
+ * Where a window opened by dragging a tab out of another stands (ADR 063): its first tab
  * under the pointer that let go of it at `at`, and the whole window inside the work area
  * of that screen, shrunk to fit when it is larger.
  */

@@ -59,7 +59,7 @@ export type TabPlace = {
   /** The vault beside, when one was open (ADR 038). */
   side?: string;
 };
-/** A tab dragged out of its window, on its way to a window of its own (ADR 062). */
+/** A tab dragged out of its window, on its way to a window of its own (ADR 063). */
 export type MovedTab = { id: string; place?: TabPlace };
 
 /**
