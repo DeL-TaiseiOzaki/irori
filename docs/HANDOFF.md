@@ -1,5 +1,24 @@
 # irori continuation handoff
 
+**A vault on an SSH host has its own agent and terminal, 0.2.79**
+([ADR 061](decisions/061-vaults-on-ssh-hosts.md) decision 8, amended;
+[SSH-HOSTS](SSH-HOSTS.md)). The owner connected a vault on an SSH host and
+found its vault agent column and the terminal dimmed. The column now runs the
+vault's agent on the host through the vault host's `AgentService`, with its
+conversations kept there (`forwardedAgent`, `RemoteHosts.agent` and `relay`),
+and the terminal is `ssh -t` into the vault's folder there (`sshTerminalArgs`).
+Run on Linux only, with this machine standing in for the host and the
+protocol fixtures as the CLIs. Next:
+1. Try it on the owner's Windows 11 against a real host with a real CLI signed
+   in there: the column's run, a permission asked there, and the terminal,
+   which is `ssh.exe` in a ConPTY and asks for a password in the terminal.
+2. Not done: the vault agent's `irori` command on the host (it needs the write
+   guards of the editing step), opening a path a reply from the host names
+   (shown as text now), and an attached image shown in such a conversation
+   after this device's unsent copy is pruned a day later (`AttachmentStore.prune`).
+3. Fish and zsh as the host's login shell were not run: the terminal's command
+   is a POSIX script in single quotes without backslashes, as the starter's is.
+
 **Workspace tabs move between windows and along the strip, 0.2.74 to 0.2.77**
 ([ADR 063](decisions/063-tab-out-to-a-new-window.md),
 [ADR 064](decisions/064-tab-joins-another-window.md),
@@ -57,13 +76,13 @@ when the connection is cut. Next, in this order:
 1. Run it for real: from a Windows and a macOS client, across a real network,
    and with a real CLI signed in on the host. So far only Linux and the
    stand-in CLIs have run it.
-2. Conversations with the vault's own agent on the host, with its `irori`
-   command and the shared Schema there.
+2. Conversations with the vault's own agent on the host: done in 0.2.79,
+   without its `irori` command and the shared Schema there.
 3. Editing: the write operations move beside the reads with their guards
    (`src/host/vault-reads.ts` is where the main process and the vault host
    already share code).
-4. The terminal as `ssh -t`, connected folders, and path links in replies for
-   files on a host.
+4. Connected folders, and path links in replies for files on a host. (The
+   terminal as `ssh -t` is done in 0.2.79.)
 
 0.2.75 lists the hosts of the person's ssh configuration where a host is added
 (`src/host/ssh-config.ts`; ADR 061 decision 3, amended), because the owner

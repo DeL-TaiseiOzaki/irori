@@ -228,9 +228,9 @@ export function AgentColumn({
   const shown = useWindowItems();
   const irori = column.owner === 'irori';
   const scopeId = irori ? you?.id : space?.scopeId;
-  // A vault on an SSH host has its agent there, reached only through the irori agent (ADR 061).
+  // A vault on an SSH host has its agent there: its runs and conversations are its host's (ADR 061).
   const remote = !irori && !!space?.host;
-  const ready = irori ? you?.state === 'ready' : !!space && !remote;
+  const ready = irori ? you?.state === 'ready' : !!space;
   const {
     infos,
     spaces,
@@ -330,6 +330,8 @@ export function AgentColumn({
     },
   );
   const agentInfo = infos.find((info) => info.id === agent);
+  // The CLI that runs: this device's, or for a vault on an SSH host the one there, which its run reports on.
+  const cliReady = remote || agentInfo?.available === true;
   const noteKey = doc ? `${doc.scopeId}:${doc.path}` : '';
   // The open note of this vault goes with each instruction unless the person removed it.
   const noteInContext =
@@ -1047,7 +1049,7 @@ export function AgentColumn({
         />
       )}
       <div
-        hidden={historyOpen || remote}
+        hidden={historyOpen}
         className="conversation"
         role="log"
         aria-label={
@@ -1093,7 +1095,8 @@ export function AgentColumn({
             </span>
           </div>
         )}
-        <PathOpenerContext.Provider value={shared.paths}>
+        {/* A path in a reply from an SSH host names a file there, which nothing here opens yet. */}
+        <PathOpenerContext.Provider value={remote ? undefined : shared.paths}>
           <PathBase.Provider value={space?.scopeId ?? you?.id}>
             <AgentLog
               events={events}
@@ -1105,7 +1108,7 @@ export function AgentColumn({
           </PathBase.Provider>
         </PathOpenerContext.Provider>
       </div>
-      <div className="composer" hidden={remote}>
+      <div className="composer">
         {editing && (
           <div className="composer-editing" role="status">
             <Icon name="penLine" size={13} />
@@ -1134,11 +1137,7 @@ export function AgentColumn({
                 <button
                   className="queue-now"
                   disabled={
-                    sending ||
-                    gitBusy ||
-                    shared.external ||
-                    !conversationReady ||
-                    agentInfo?.available !== true
+                    sending || gitBusy || shared.external || !conversationReady || !cliReady
                   }
                   aria-label={t(`送信待ち ${item.id} を今すぐ送る`, `Send pending ${item.id} now`)}
                   title={
@@ -1404,7 +1403,7 @@ export function AgentColumn({
                   !sendable ||
                   attachments.pending ||
                   shared.external ||
-                  agentInfo?.available !== true
+                  !cliReady
                 }
                 onClick={() => void start()}
               >

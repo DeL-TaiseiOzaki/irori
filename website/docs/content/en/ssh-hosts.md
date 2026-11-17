@@ -7,7 +7,7 @@ description: Show a vault that lives on a Linux machine you reach with ssh, and 
 
 A vault does not have to be on this computer. A vault on a Linux machine you reach with `ssh` (an SSH host) shows in a workspace beside your other vaults.
 
-That vault's agent runs on the host, so code runs on the other machine while you talk to your notes here. For now a vault on an SSH host is **shown, not changed**: nothing in the window edits it.
+That vault's agent runs on the host, so code runs on the other machine while you talk to it and to your notes here. Its terminal opens on the host too. For now the window **shows such a vault without changing it**: nothing in the explorer or the editor edits it.
 
 ## Before you start
 
@@ -63,18 +63,30 @@ Its files, notes, search, backlinks, comments, properties, ontology, and Git sta
 
 The vault's panel names its host. When the host cannot be reached, **Connect** connects it again. **Take off the list** in the vault's menu takes it off this computer's list and leaves the folder on the host as it is.
 
-## Hand work to its agent
+## Talk with its agent
 
-In place of the vault agent's instruction box, a vault on an SSH host shows a note: ask the irori agent in [irori mode](irori-mode.md).
+The vault agent's column works for such a vault as for one on this computer. A line above the conversation names the host: the agent runs **on the host**, in the vault, on the CLI installed and signed in there.
 
-When the irori agent hands it work, the vault's agent runs **on the host**, in the vault. Its steps and permission requests show in the irori agent's conversation, and you answer them here. Stopping the irori agent stops the run there.
+- Its conversations are kept on the host. The history lists them, and renaming, pinning, archiving, deleting, editing a message and copying a conversation work there.
+- What its run asks, a permission or a question, is answered here.
+- A file you attach is sent to the host with the instruction.
+- If the connection is cut, the run goes on. While a run is going, irori reconnects by itself and shows what it missed.
+- A path a reply names is a path on the host, so it is shown as text rather than opened.
+
+## Hand work to its agent from irori mode
+
+In [irori mode](irori-mode.md), the irori agent can hand the vault work too. When the irori agent hands it work, the vault's agent runs **on the host**, in the vault. Its steps and permission requests show in the irori agent's conversation, and you answer them here. Stopping the irori agent stops the run there.
 
 The irori agent reads the vault when it needs to, with `irori ls`, `irori read` and `irori search`, and gives it a file with `irori send`, which puts it in the vault's work folder. A handed task holds 30,000 characters; longer material goes this way.
 
 If the connection is cut while an agent works, the run goes on. Its report waits on the host for a day, and irori collects it when the connection is back. With nothing running, no report waiting and no irori attached for fifteen minutes, what irori started on the host ends by itself.
 
+## Terminal
+
+The terminal of such a vault (``Ctrl+` ``, or **Terminal** where it is shown) runs `ssh -t` to the host and opens your login shell there in the vault's folder. It is a login of its own: if `ssh` asks for a password or a code, type it in the terminal.
+
 ## Things to know
 
-- Text the irori agent sends to a host, in a task or with `irori send`, stays on that machine and is readable by whoever administers it, as are the CLI's records there.
-- Not yet for a vault on a host: editing it, talking to its own agent directly, the terminal, connected folders and routines.
+- Text you or the irori agent send to a host, in an instruction, a task, an attached file or with `irori send`, stays on that machine and is readable by whoever administers it, as are the conversations and the CLI's records there.
+- Not yet for a vault on a host: editing it from the window, its agent's `irori` command, connected folders and routines.
 - On another computer where the environment is restored, such a vault shows as unavailable until its host is added there.

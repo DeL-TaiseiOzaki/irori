@@ -26,9 +26,12 @@ import { AgentService } from '../agents/service';
 import { readAgentDefinitions, vaultAgentDefinition } from '../agents/agent-definitions';
 import type { HandOffResult, RemoteBrief } from '../agents/remote-vaults';
 import {
+  forwardedAgent,
   forwardedReads,
   hostOperations,
+  isForwardedAgent,
   isForwardedRead,
+  type ForwardedAgent,
   type ForwardedRead,
   type HandOffState,
   type HostOperation,
@@ -146,10 +149,41 @@ export async function createVaultHost({ dataDir, emit, ask }: VaultHostOptions) 
     schemaSettings: (id) => schemaSettings.list(id),
     readSchemaFile: (...args) => schemaSettings.read(...args),
   } satisfies Pick<HostHandlers, ForwardedRead>;
-  // `dispatchHost` checks the arguments as the main process does; only the reads are here.
-  const forwarded = Object.fromEntries(
-    forwardedReads.map((method) => [method, reads[method]]),
-  ) as unknown as HostHandlers;
+  // A vault's own agent runs here, and its conversations are kept here (ADR 061,
+  // amended 0.2.79). The person's device names a vault, or a conversation of one;
+  // a workspace is the irori agent's alone and means nothing here.
+  const conversations = {
+    agentCommands: (scopeId, agent) => agents.commands(scopeId, agent),
+    agentConversations: (scopeId) => agents.conversationList(scopeId),
+    agentConversation: (scopeId, agent, conversationId) =>
+      agents.conversation(scopeId, agent, conversationId),
+    createConversation: (scopeId, agent) => agents.createConversation(scopeId, agent),
+    renameConversation: (conversationId, title) => agents.renameConversation(conversationId, title),
+    pinConversation: (conversationId, pinned) => agents.pinConversation(conversationId, pinned),
+    archiveConversation: (conversationId, archived) =>
+      agents.archiveConversation(conversationId, archived),
+    deleteConversation: (conversationId) => agents.deleteConversation(conversationId),
+    queueAgentMessage: (input) => agents.queueMessage(input),
+    removeQueuedMessage: (conversationId, queuedId) =>
+      agents.removeQueued(conversationId, queuedId),
+    startNextQueued: (scopeId, conversationId) => agents.startNextQueued(scopeId, conversationId),
+    sendQueuedNow: (scopeId, conversationId, queuedId) =>
+      agents.sendNow(scopeId, conversationId, queuedId),
+    rewindConversation: (scopeId, conversationId, eventId) =>
+      agents.rewind(scopeId, conversationId, eventId),
+    forkConversation: (scopeId, conversationId, eventId) =>
+      agents.fork(scopeId, conversationId, eventId),
+    start: (input) => agents.startAccepted(input),
+    // A vault's runs, or one conversation's; never every run here at once.
+    cancel: async (scopeId, conversationId) => {
+      if (scopeId) await agents.cancel(scopeId, conversationId);
+    },
+  } satisfies Pick<HostHandlers, ForwardedAgent>;
+  // `dispatchHost` checks the arguments as the main process does; only these are here.
+  const forwarded = Object.fromEntries([
+    ...forwardedReads.map((method) => [method, reads[method]]),
+    ...forwardedAgent.map((method) => [method, conversations[method]]),
+  ]) as unknown as HostHandlers;
 
   /** Hand-offs by their run: the events still unanswered, and how each ended. */
   const handOffs = new Map<
@@ -277,6 +311,7 @@ export async function createVaultHost({ dataDir, emit, ask }: VaultHostOptions) 
       await handOffs.get(runId)?.cancel();
     },
     forgetHandOff: (runId) => void forget(runId),
+    attach: (ref, bytes) => agents.attachments.keep(ref, bytes),
     respond: (...args) => agents.respond(...args),
     status: () => ({ running: agents.anyBusy }),
   };
@@ -304,7 +339,8 @@ export async function createVaultHost({ dataDir, emit, ask }: VaultHostOptions) 
     },
     /** Answers one operation; what it refuses, it refuses in the words the window shows. */
     async call(method: string, args: unknown[]): Promise<unknown> {
-      if (isForwardedRead(method)) return dispatchHost(forwarded, method, args);
+      if (isForwardedRead(method) || isForwardedAgent(method))
+        return dispatchHost(forwarded, method, args);
       if (!Object.hasOwn(hostOperations, method)) throw Error('Unknown vault host operation');
       const operation = method as HostOperation;
       const checked = hostOperations[operation].safeParse(args);

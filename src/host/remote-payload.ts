@@ -63,6 +63,33 @@ export const sshLauncher = (
 });
 
 /**
+ * The terminal of a vault on an SSH host (ADR 061): the arguments of `ssh -t` to
+ * the host, in the vault's folder there, in the person's login shell. It is a
+ * login of its own inside a terminal, so what `ssh` asks is asked there and
+ * answered by typing; nothing of irori's runs on the host for it.
+ *
+ * The command is one word for the host's login shell, whatever shell that is: a
+ * POSIX script in single quotes and free of them, as the vault host's starter is.
+ * The folder may hold any character but a line break, so it goes as base64.
+ */
+export function sshTerminalArgs(host: { destination: string; port?: number }, root: string) {
+  const folder = Buffer.from(root, 'utf8').toString('base64');
+  const script =
+    `d="$(echo ${folder} | base64 -d)" && cd -- "$d" && ` + 'exec "${SHELL:-/bin/sh}" -l';
+  return [
+    '-t',
+    '-o',
+    'ServerAliveInterval=15',
+    '-o',
+    'ServerAliveCountMax=4',
+    ...(host.port ? ['-p', String(host.port)] : []),
+    '--',
+    host.destination,
+    `sh -c '${script}'`,
+  ];
+}
+
+/**
  * The Node irori's vault host runs on, from nodejs.org. Each archive's size and
  * SHA-256 are pinned here as SHASUMS256.txt lists them for this release, so a
  * download that differs is refused before it is sent anywhere.

@@ -1,7 +1,7 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { cp, mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -22,6 +22,9 @@ import {
 } from '../src/domain/remote-hosts';
 import { brainsCommandPreamble } from '../prompts';
 import type { AgentEvent, HostEvent } from '../src/domain/types';
+import type { Conversation, ConversationSummary } from '../src/domain/conversation';
+import { AttachmentStore } from '../src/agents/attachments';
+import { sshTerminalArgs } from '../src/host/remote-payload';
 
 const posixOnly = {
   skip: process.platform === 'win32' && 'the stand-in for an SSH host is a POSIX shell',
@@ -792,6 +795,252 @@ test(
 // reaches without a prompt. The test leaves irori's own files (~/.irori-host) there
 // and removes the one folder it makes.
 const sshTarget = process.env.IRORI_TEST_SSH;
+test(
+  "a vault's own agent runs on its host: its conversations, events, requests and attached files are there (protocol fixture)",
+  posixOnly,
+  async (t) => {
+    const far = await farHost(t);
+    const { remote, host, events, dataDir } = await hub(t, far);
+    // The stand-in `claude` asks to write, as Claude Code asks before a Write.
+    await writeFile(
+      path.join(far.base, 'bin', 'claude'),
+      `#!/usr/bin/env node\nimport(${JSON.stringify(pathToFileURL(path.resolve('tests/fixtures/claude-your-ai.mjs')).href)}).then(m=>m.run());\n`,
+      { mode: 0o700 },
+    );
+    const vault = await remote.register(host.id, far.code, 'Code', 'team');
+    const of = (runId: string) =>
+      events.flatMap((event) =>
+        event.type === 'agent' && event.event.runId === runId ? [event.event] : [],
+      );
+    const finished = async (runId: string) => {
+      await until(() => of(runId).some((event) => event.type === 'done'));
+      return of(runId);
+    };
+    const id = await remote.agent<string>('createConversation', [vault.scopeId, 'pi']);
+    assert.ok(remote.keeps(id));
+    // A file attached on this device goes to the host first, under the same id.
+    const store = new AttachmentStore(dataDir);
+    const ref = await store.stage('brief.txt', new TextEncoder().encode('ibis-3\n'));
+    await remote.attach(vault.scopeId, ref, new Uint8Array(await readFile(await store.path(ref))));
+    const runId = await remote.agent<string>('start', [
+      {
+        scopeId: vault.scopeId,
+        agent: 'pi',
+        conversationId: id,
+        prompt: 'run: echo made-by-its-own > own.txt',
+        attachments: [ref],
+      },
+    ]);
+    const ran = await finished(runId);
+    assert.equal(ran.at(-1)?.outcome, 'completed', JSON.stringify(ran));
+    // Its events reached the windows as a run of this vault's, in that conversation.
+    assert.ok(ran.every((event) => event.scopeId === vault.scopeId && event.conversationId === id));
+    assert.equal(
+      (await readFile(path.join(far.code, 'own.txt'), 'utf8')).trim(),
+      'made-by-its-own',
+    );
+    // The agent there was given the attached file where the host keeps it.
+    const kept = path.join(far.home, '.irori-host/data/attachments', ref.id, 'brief.txt');
+    assert.equal(await readFile(kept, 'utf8'), 'ibis-3\n');
+    const requests = (await readFile(path.join(far.code, 'fixture-requests.jsonl'), 'utf8'))
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    const prompt = requests.find((call) => call.type === 'prompt').message as string;
+    assert.ok(prompt.includes(kept), prompt);
+    // The conversation is kept on the host, and listed, read and renamed there.
+    const rows = await remote.agent<ConversationSummary[]>('agentConversations', [vault.scopeId]);
+    assert.deepEqual(
+      rows.map((row) => row.id),
+      [id],
+    );
+    const read = await remote.agent<Conversation>('agentConversation', [vault.scopeId, 'pi', id]);
+    assert.ok(read.events.some((event) => event.role === 'user'));
+    // As the window asks: no conversation named, and the workspace open, which a
+    // vault's conversations are not kept by. Its latest with that CLI is on show.
+    const shown = await remote.agent<Conversation>('agentConversation', [
+      vault.scopeId,
+      'pi',
+      undefined,
+      randomUUID(),
+    ]);
+    assert.equal(shown.id, id);
+    assert.deepEqual(
+      (
+        await remote.agent<ConversationSummary[]>('agentConversations', [
+          vault.scopeId,
+          randomUUID(),
+        ])
+      ).map((row) => row.id),
+      [id],
+    );
+    await remote.agent('renameConversation', [id, 'Far work']);
+    assert.equal(
+      (await remote.agent<ConversationSummary[]>('agentConversations', [vault.scopeId]))[0].title,
+      'Far work',
+    );
+    assert.deepEqual(await readdir(path.join(dataDir, 'conversations')).catch(() => []), []);
+    // An instruction waits in the conversation's queue there until the window starts it.
+    await remote.agent('queueAgentMessage', [
+      {
+        scopeId: vault.scopeId,
+        agent: 'pi',
+        conversationId: id,
+        prompt: 'run: echo queued-there > queued.txt',
+      },
+    ]);
+    const next = await remote.agent<string>('startNextQueued', [vault.scopeId, id, randomUUID()]);
+    assert.equal((await finished(next)).at(-1)?.outcome, 'completed');
+    assert.equal(
+      (await readFile(path.join(far.code, 'queued.txt'), 'utf8')).trim(),
+      'queued-there',
+    );
+    // Copied from a message, and gone on from before one, there.
+    const message = (
+      await remote.agent<Conversation>('agentConversation', [vault.scopeId, 'pi', id])
+    ).events.find((event) => event.role === 'user' && event.runId === runId)!;
+    const copy = await remote.agent<string>('forkConversation', [vault.scopeId, id, message.id!]);
+    assert.ok(remote.keeps(copy));
+    assert.equal(
+      (await remote.agent<ConversationSummary[]>('agentConversations', [vault.scopeId])).length,
+      2,
+    );
+    const again = await remote.agent<{ prompt: string }>('rewindConversation', [
+      vault.scopeId,
+      id,
+      message.id!,
+    ]);
+    assert.equal(again.prompt, 'run: echo made-by-its-own > own.txt');
+    // Stopped from here, its run there stops.
+    const long = await remote.agent<string>('start', [
+      { scopeId: vault.scopeId, agent: 'pi', conversationId: copy, prompt: 'run: sleep 32' },
+    ]);
+    await until(() => of(long).length > 0);
+    await remote.agent('cancel', [vault.scopeId, copy]);
+    assert.equal((await finished(long)).at(-1)?.outcome, 'cancelled');
+    // What its run asks is answered on this device, and the answer reaches the run there.
+    const asking = await remote.agent<string>('start', [
+      {
+        scopeId: vault.scopeId,
+        agent: 'claude',
+        // The phrase the stand-in answers with a Write, which it asks for first.
+        prompt: 'irori: the irori agent handed you this task.',
+      },
+    ]);
+    const request = await until(() => of(asking).find((event) => event.type === 'permission'));
+    assert.ok(remote.asks(request.requestId));
+    await remote.respond(request.requestId!, true);
+    const answered = await finished(asking);
+    assert.equal(answered.at(-1)?.outcome, 'completed', JSON.stringify(answered));
+    assert.ok(answered.some((event) => event.resolved === request.requestId));
+    assert.equal(remote.asks(request.requestId), false);
+    assert.equal(
+      await readFile(path.join(far.code, 'Knowledge_Base', 'from-your-ai.md'), 'utf8'),
+      '# From your AI\n',
+    );
+    // Deleted there, the conversation is gone, and nothing here names it any more.
+    await remote.agent('deleteConversation', [id]);
+    assert.equal(remote.keeps(id), false);
+    await assert.rejects(
+      remote.agent('renameConversation', [id, 'gone']),
+      /conversation was not found|会話が見つかりません/,
+    );
+    // A vault agent is not handed other vaults, there as here.
+    await assert.rejects(
+      remote.agent('start', [
+        { scopeId: vault.scopeId, agent: 'pi', prompt: 'hi', brains: [vault.scopeId] },
+      ]),
+      /Only the irori agent takes vaults/,
+    );
+  },
+);
+
+test(
+  "a vault agent's run its host lost is ended in the window once the host answers again (protocol fixture)",
+  posixOnly,
+  async (t) => {
+    const far = await farHost(t);
+    const { remote, host, events } = await hub(t, far);
+    const { existsSync } = await import('node:fs');
+    const { execFileSync } = await import('node:child_process');
+    t.after(() => {
+      execFileSync('sh', ['-c', 'pkill -f "[s]leep 31" || true']);
+    });
+    const vault = await remote.register(host.id, far.code, 'Code', 'team');
+    const runId = await remote.agent<string>('start', [
+      { scopeId: vault.scopeId, agent: 'pi', prompt: 'run: touch began && sleep 31' },
+    ]);
+    await until(() => existsSync(path.join(far.code, 'began')));
+    // The vault host goes, and its run with it, as a restarted machine leaves them.
+    const pid = await readFile(path.join(far.home, '.irori-host/data/host.pid'), 'utf8');
+    process.kill(Number(pid), 'SIGKILL');
+    // This device comes back by itself for the run it shows, and closes it there.
+    const of = () =>
+      events.flatMap((event) =>
+        event.type === 'agent' && event.event.runId === runId ? [event.event] : [],
+      );
+    const done = await until(() => of().find((event) => event.type === 'done'), 30000);
+    assert.equal(done.outcome, 'failed');
+    assert.equal(done.conversationId, of()[0].conversationId);
+    assert.ok(of().some((event) => event.type === 'error' && /vault host/.test(event.text)));
+    assert.equal(remote.hosts()[0].state, 'connected');
+  },
+);
+
+test(
+  'the terminal of a vault on a host is ssh -t into its folder there, in the login shell',
+  posixOnly,
+  async (t) => {
+    const base = await mkdtemp(path.join(tmpdir(), 'irori terminal '));
+    t.after(() => rm(base, { recursive: true, force: true }));
+    // A folder a shell would misread: spaces, quotes, a dollar, a backslash, another script.
+    const folder = path.join(base, `it's "a" $HOME \\ 研究`);
+    await mkdir(folder);
+    const args = sshTerminalArgs({ destination: 'box', port: 2222 }, folder);
+    assert.deepEqual(args.slice(0, -2), [
+      '-t',
+      '-o',
+      'ServerAliveInterval=15',
+      '-o',
+      'ServerAliveCountMax=4',
+      '-p',
+      '2222',
+      '--',
+    ]);
+    assert.equal(args.at(-2), 'box');
+    assert.equal(sshTerminalArgs({ destination: 'box' }, folder).includes('-p'), false);
+    // sshd hands the command to the person's login shell, whichever it is; the shell
+    // then started is theirs, as a login.
+    const shell = path.join(base, 'their-shell');
+    await writeFile(shell, '#!/bin/sh\nprintf "%s|%s" "$(pwd)" "$*"\n', { mode: 0o700 });
+    let tried = 0;
+    for (const login of ['sh', 'bash', 'zsh', 'fish', 'dash']) {
+      const found = spawnSync('sh', ['-c', `command -v ${login}`], {
+        encoding: 'utf8',
+      }).stdout.trim();
+      if (!found) continue;
+      tried++;
+      const ran = spawnSync(found, ['-c', args.at(-1)!], {
+        encoding: 'utf8',
+        env: { ...process.env, SHELL: shell },
+      });
+      assert.equal(ran.stdout, `${folder}|-l`, `${login}: ${ran.stderr}`);
+    }
+    assert.ok(tried > 0);
+    // A folder that is gone is said so, and the terminal ends.
+    const gone = spawnSync(
+      'sh',
+      ['-c', sshTerminalArgs({ destination: 'box' }, path.join(base, 'gone')).at(-1)!],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, SHELL: shell },
+      },
+    );
+    assert.notEqual(gone.status, 0);
+    assert.equal(gone.stdout, '');
+  },
+);
+
 test(
   'over real ssh, the vault host is installed with the official Node, serves a vault and outlives the connection',
   {
