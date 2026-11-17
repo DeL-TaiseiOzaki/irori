@@ -191,6 +191,28 @@ Anonymous downloads of the Windows installer, the Mac image and
 and through CI's packaged-app smokes; not against github.com, and not by hand
 on Windows or macOS.
 
+Published 2026-11-16: **0.2.72** ([#329](https://github.com/DeL-TaiseiOzaki/irori/pull/329),
+shipped code no longer names irori-templete; irori behaves as in 0.2.71) as
+`8f717aa`, by `publish.yml` alone (push run `43779775681`, packages from app run
+`43734132905`). Merged at 00:20:20 UTC, the release out at 00:22:23 (2:03), the
+page deployed by 00:28:27 (8:07), and the run finished with the drift check at
+00:28:51. The release's check of what an installed irori sees took 5:00, against
+about a minute for 0.2.71, which is why the page came late. Anonymous downloads
+of the Windows installer, the Mac image and `irori-0.2.72-full.nupkg` matched
+`SHA256SUMS.txt`; STATUS has the sizes. STATUS recorded it with #330; this
+record was added on 2026-11-17.
+
+Published 2026-11-15: **0.2.71** ([#325](https://github.com/DeL-TaiseiOzaki/irori/pull/325),
+the Schema section's Rules and Hooks without their explanatory notes) as
+`aadb321`, by `publish.yml` alone (push run `43675920837`, packages from app run
+`43674971369`). Merged at 04:14:59 UTC, the release out at 04:16:35 (1:36), the
+page deployed by 04:18:45 (3:46), and the run finished with the drift check at
+04:19:02. Recorded late, on 2026-11-17: anonymous downloads of the Windows
+installer, the Mac image and `irori-0.2.71-full.nupkg` then matched
+`SHA256SUMS.txt`. The page has since moved on, so that it linked 0.2.71 is known
+from the drift check alone. Run on Linux under Xvfb; not tried on Windows or
+macOS.
+
 Published 2026-11-15: **0.2.70** ([#326](https://github.com/DeL-TaiseiOzaki/irori/pull/326),
 `irori call`'s help and refusal say it hands work on every CLI, and the shared
 Schema's description names rules and hooks) as `adcc2e0`, by `publish.yml`
@@ -257,15 +279,26 @@ platforms; not by hand on Windows or macOS, and not against a vault in real use.
 hook-trust test, `1 !== 2` at its second start), which that change does not
 touch; the next run passed. It is a test to watch.
 
+Published 2026-11-13: **0.2.65** ([#315](https://github.com/DeL-TaiseiOzaki/irori/pull/315),
+Ctrl/⌘+F finds words in the file on show in every main-stage view) as
+`0395d4f`, by `publish.yml` alone (push run `43382121971`, with the pull
+request's packages from app run `43379097307`): merge to release 1:19, to page
+3:22, drift in step. Anonymous downloads of the Windows installer, the Mac image
+and `irori-0.2.65-full.nupkg` matched `SHA256SUMS.txt`, and the live page linked
+the 0.2.65 installers until 0.2.66 replaced them. See STATUS. Not seen on
+Windows or macOS before publishing: the find bar was exercised on Linux under
+Xvfb only. Written on 2026-11-13 in #317, which stayed open; carried here on
+2026-11-17.
+
 Published 2026-11-11: **0.2.64** ([#313](https://github.com/DeL-TaiseiOzaki/irori/pull/313),
 a run in full access takes the configuration that runs without asking without
 the dialog and names it in its log, ADR 009) as `64e86f2`, by `publish.yml`
 alone (push run `42974838132`, with the pull request's packages from app run
 `42973426346`): merge to release 1:39, to page 3:17, drift in step. Anonymous
 downloads of the Windows installer, the Mac image and `irori-0.2.64-full.nupkg`
-matched `SHA256SUMS.txt`, and the live page links the 0.2.64 installers. See
-STATUS. Exercised through protocol fixtures only: not tried with real CLI
-accounts, on Windows or on macOS.
+matched `SHA256SUMS.txt`, and the live page linked the 0.2.64 installers until
+0.2.65 replaced them. See STATUS. Exercised through protocol fixtures only: not
+tried with real CLI accounts, on Windows or on macOS.
 
 Published 2026-11-10: **0.2.63** ([#311](https://github.com/DeL-TaiseiOzaki/irori/pull/311),
 the window showing the work: one menu for how a conversation runs, the rest in

@@ -230,14 +230,22 @@ ADR 050 and 0.2.70.
 - `tests/irori-command.test.ts` holds both refusals as `AgentSetup.run` gives
   them; `tests/vault-command.test.ts` names the vault agent name in its title.
 
-Schema's Rules and Hooks without explanatory notes, 2026-11-15 (**0.2.71**):
-the owner found the Schema section's notes under Rules and Hooks unneeded.
+Schema's Rules and Hooks without explanatory notes, 2026-11-15 (**0.2.71**,
+[#325](https://github.com/DeL-TaiseiOzaki/irori/pull/325), published as
+`v0.2.71-preview.1`): the owner found the Schema section's notes under Rules
+and Hooks unneeded.
 - `SchemaList` no longer shows the rules' and hooks' reach notes (ADR 058) or
   the hooks' note on other settings that run code; `hookReachNote` and its
   `schema-reach` import are gone. The reach table still drives the runs and
   the skill reach view. The instructions' limit note stays.
 - The guide's `schema.md` (en, ja) no longer says the settings show each
   CLI's reach; its own explanation stays.
+- `publish.yml` published
+  [v0.2.71-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.71-preview.1)
+  from `aadb321` with the pull request's CI run `43674971369`. Anonymous
+  downloads, checked on 2026-11-17 when this was recorded, matched
+  `SHA256SUMS.txt`: Windows 179,390,464 bytes, Mac 145,639,018 bytes and
+  `irori-0.2.71-full.nupkg` 178,558,925 bytes.
 
 Words that match what irori does, 2026-11-15 (**0.2.70**,
 [#326](https://github.com/DeL-TaiseiOzaki/irori/pull/326), published as
@@ -401,8 +409,9 @@ and nothing in irori read the relations a knowledge base declares.
   (ADR 015 stages 2 and 3); a list, on a page, of the pages that name it in a
   relation.
 Find in the file on show, 2026-11-13 (**0.2.65**,
-[#315](https://github.com/DeL-TaiseiOzaki/irori/pull/315)): the owner asked for a
-keyword search inside each file on the main stage.
+[#315](https://github.com/DeL-TaiseiOzaki/irori/pull/315), published as
+`v0.2.65-preview.1`): the owner asked for a keyword search inside each file on
+the main stage.
 - `src/app/FindBar.tsx` holds `FindScope`, the find bar above the focused
   column's `document-scroll`, and the `Finder` contract a view offers through
   `useFinder`: `find` returns the count and the occurrence to start from (the

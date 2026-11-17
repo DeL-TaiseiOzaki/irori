@@ -1,6 +1,8 @@
 # 063 — A workspace tab dragged out opens in a window of its own
 
-Date: 2026-11-16. Status: owner request; implemented for 0.2.74.
+Date: 2026-11-16. Status: owner request; implemented for 0.2.74. Decision 2 is
+changed by [ADR 064](064-tab-joins-another-window.md) (0.2.76), and the end of
+decision 1 by [ADR 065](065-tabs-reordered-by-dragging.md) (0.2.77).
 Builds on [ADR 037](037-workspace-tabs.md) (workspace tabs) and
 [ADR 051](051-multiple-windows.md) (several windows). Covers what ADR 051 and
 [ADR 054](054-window-title-bar.md) left out: moving a workspace tab out into
@@ -22,8 +24,12 @@ only its tab ran.
    outside the window, it says **新しいウィンドウで開く**; let go there, it opens
    in a new window. Let go within the strip, nothing happens: tabs are not
    reordered.
+   *Changed by ADR 065 (0.2.77):* let go along the strip, the tab takes that
+   place.
 2. **Only while two tabs or more are open.** A window's only tab stays; there
    would be nothing left to show. A tab already on its way out does not count.
+   *Changed by ADR 064 (0.2.76):* a window's only tab can be dragged too; it
+   only joins another window's tabs, and its emptied window closes.
 3. **The new window stands where the tab was let go**: its first tab under the
    pointer, the size of the window it came from, and inside that screen's work
    area (`droppedWindowBounds` in `src/domain/window-frame.ts`). It opens the
