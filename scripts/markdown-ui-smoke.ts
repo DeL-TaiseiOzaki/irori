@@ -150,8 +150,13 @@ try {
   ]);
   // A diagram's labels keep the size Mermaid measured them at, so none is cut off.
   expect(await labels()).toEqual(drawn);
-  const chosen = await page.evaluate(() => window.irori.deviceSettings());
-  expect([chosen.textSize, chosen.lineSpacing]).toEqual(['large', 'relaxed']);
+  // The window shows a choice before the device record has kept it.
+  await expect
+    .poll(async () => {
+      const chosen = await page.evaluate(() => window.irori.deviceSettings());
+      return [chosen.textSize, chosen.lineSpacing];
+    })
+    .toEqual(['large', 'relaxed']);
   await page.screenshot({ path: 'test-results/markdown-ui-smoke-large.png' });
   await choose('文字の大きさ', '標準');
   await choose('行間', '標準');

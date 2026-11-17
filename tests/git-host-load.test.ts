@@ -337,8 +337,11 @@ setInterval(() => {
       }
       throw Error('Children did not reach the expected state');
     };
+    // A child writes its `started-` file, then its `active-` one: both are waited for.
     const started = await waitFor(
-      (names) => names.filter((name) => name.startsWith('started-')).length === 4,
+      (names) =>
+        names.filter((name) => name.startsWith('started-')).length === 4 &&
+        names.filter((name) => name.startsWith('active-')).length >= 4,
     );
     assert.equal(started.filter((name) => name.startsWith('active-')).length, 4);
     await first.close();

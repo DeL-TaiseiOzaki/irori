@@ -207,7 +207,9 @@ export default function PdfView({ bytes, zoom, width, onInfo }: ViewProps) {
     [],
   );
   const changed = useFinder(finder);
-  useEffect(changed, [marks]);
+  // A PDF that has loaded is searched as a new word is (FindScope), since it draws a
+  // page only once the page is in view.
+  useEffect(() => changed(!!marks), [marks]);
   useEffect(() => () => paintHighlights([]), []);
   useEffect(() => {
     let live = true;

@@ -19,6 +19,7 @@ import type { HostEvent } from '../domain/types';
 import { createVaultHost, type HostQuestion } from './host';
 import { attachRequest, attachedLine, busyLine, replacingLine, type AttachReply } from './protocol';
 import { decode, readFrames, writeFrame } from './wire';
+import { connect, releasePlace, takePlace } from './host-place';
 
 /**
  * The version of this vault host: the digest of its one built file, which the
@@ -33,42 +34,6 @@ const vaultHostVersion = /\.cjs$/.test(process.argv[1] ?? '')
 const eventsKept = 2000;
 /** How long the vault host stays with nothing running, no report waiting and no device attached. */
 const idleDefault = 15 * 60_000;
-/** A host started this recently may not listen yet; it is not taken for a dead one. */
-const startingFor = 15_000;
-
-const connect = (socketPath: string) =>
-  new Promise<net.Socket>((resolve, reject) => {
-    const socket = net.connect(socketPath);
-    socket.once('connect', () => resolve(socket));
-    socket.once('error', reject);
-  });
-
-/** One vault host per folder: takes the folder's pid file, unless a host there lives or is starting. */
-async function takePlace(dataDir: string, socketPath: string) {
-  const file = path.join(dataDir, 'host.pid');
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      await fs.writeFile(file, String(process.pid), { flag: 'wx', mode: 0o600 });
-      return file;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-    }
-    const answering = await connect(socketPath).then(
-      (socket) => (socket.destroy(), true),
-      () => false,
-    );
-    if (answering) return undefined;
-    const written = await fs.stat(file).then(
-      (info) => info.mtimeMs,
-      () => 0,
-    );
-    if (Date.now() - written < startingFor) return undefined;
-    // Left by a host that ended without tidying up.
-    await fs.rm(file, { force: true });
-  }
-  return undefined;
-}
-
 async function serve(dataDir: string) {
   await fs.mkdir(dataDir, { recursive: true, mode: 0o700 });
   await fs.chmod(dataDir, 0o700);
@@ -108,10 +73,11 @@ async function serve(dataDir: string) {
   const stop = async () => {
     if (stopping) return;
     stopping = true;
+    // Closing the server also takes its socket file away.
     server.close();
     await host.close().catch(() => {});
-    await fs.rm(socketPath, { force: true }).catch(() => {});
-    await fs.rm(pidFile, { force: true }).catch(() => {});
+    // A host started meanwhile may hold this place now: what is its own stays.
+    await releasePlace(pidFile);
     // The device is let go last: once its connection ends, another vault host may take this place.
     device?.destroy();
     process.exit(0);

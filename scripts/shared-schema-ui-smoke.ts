@@ -47,6 +47,8 @@ try {
   page.on('pageerror', (error) => errors.push(String(error)));
   await page.getByRole('checkbox', { name: /Shared KB/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
+  // The start screen has settings of its own, which go with it as the workspace opens.
+  await expect(page.getByRole('navigation', { name: 'vault' })).toContainText('Shared KB');
 
   // The settings' shared part opens every Schema on the shared one.
   await page.getByRole('button', { name: /^設定（/ }).click();

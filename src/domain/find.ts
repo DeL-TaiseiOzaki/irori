@@ -36,3 +36,35 @@ export function findAll(text: string, query: string): number[] {
     found.push(at);
   return found;
 }
+
+/**
+ * The find bar's searches, one after another: only the newest one's answer is shown.
+ * A search that brings its occurrence into view, overtaken before it shows one by a
+ * search a redraw makes (which does not scroll), hands that on: the newer one still
+ * brings the occurrence into view. A PDF draws a page only once it is in view, so an
+ * occurrence on a page not drawn yet is otherwise never shown nor marked.
+ */
+export class FindTurns {
+  private last = 0;
+  private owed?: { keep?: number };
+  /** A search begins; what it shows with, which an overtaken search may change. */
+  begin(scroll: boolean, keep?: number) {
+    if (scroll) this.owed = { keep };
+    else if (this.owed) {
+      keep = this.owed.keep;
+      scroll = true;
+    }
+    return { turn: ++this.last, scroll, keep };
+  }
+  /** Whether a search's answer is the one to show; once one is, nothing is owed. */
+  current(turn: number) {
+    if (turn !== this.last) return false;
+    this.owed = undefined;
+    return true;
+  }
+  /** The bar closed or lost its finder: no answer on its way is shown. */
+  drop() {
+    this.last++;
+    this.owed = undefined;
+  }
+}

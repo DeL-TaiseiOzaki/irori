@@ -155,10 +155,13 @@ try {
   await expect(table.locator('.actions')).toContainText('101–150');
 
   // A PDF: every page's text is counted; the page with the occurrence is marked when drawn.
+  // The word is typed while the PDF still loads, and its occurrence is on the second page,
+  // which is drawn only once it is brought into view: the search the loaded document
+  // makes brings it there.
   await page.getByRole('button', { name: 'sample.pdf', exact: true }).click();
+  await field.fill('helvetica');
   const viewer = page.locator('.file-viewer');
   await expect(viewer.locator('.viewer-bar')).toContainText('2 ページ');
-  await field.fill('helvetica');
   await expect(count).toHaveText('1 / 1');
   await expect.poll(() => painted(page, 'irori-find-current')).toEqual(['Helvetica']);
   // The bar sits above the viewer's own bar, leaving its buttons free.
