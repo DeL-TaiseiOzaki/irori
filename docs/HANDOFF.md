@@ -142,6 +142,19 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-11-17: **0.2.79** ([#345](https://github.com/DeL-TaiseiOzaki/irori/pull/345),
+a vault on an SSH host has its own agent and terminal, ADR 061 decision 8
+amended) as `6d1d81e`, by `publish.yml` alone (push run `44049135383`, packages
+from the pull request's app run `44047685325`). Merged at 08:43:13 UTC, the
+release out at 08:45:26 (2:13), the page deployed by 08:51:33 (8:20), and the
+run finished with the drift check at 08:52:02. The step that checks what an
+installed irori sees took five minutes again, as for 0.2.78. The live page
+offered the 0.2.79 installers and the guide's SSH page its new sections. Anonymous
+downloads of the Windows installer, the Mac image and
+`irori-0.2.79-full.nupkg` matched `SHA256SUMS.txt`. Nothing of it has run on
+Windows or macOS beyond CI's packaged-app smokes, and no real host with a real
+CLI has run the vault agent's column or the terminal.
+
 Published 2026-11-16: **0.2.78** ([#340](https://github.com/DeL-TaiseiOzaki/irori/pull/340),
 what `ssh` asks while it signs in to an SSH host is answered in the window, and
 a connection is one login) as `eb8e8ed`, by `publish.yml` alone (push run
