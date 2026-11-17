@@ -1068,18 +1068,21 @@ export function RemoteVaultPlace({ space }: { space: Space }) {
   );
 }
 
-/** In place of a vault agent's instruction box, for a vault on an SSH host. */
+/**
+ * Above a vault agent's conversation, for a vault on an SSH host: the agent runs
+ * there, on the CLI installed and signed in there (ADR 061, amended 0.2.79).
+ */
 export function RemoteAgentNote({ space }: { space: Space }) {
+  const host = space.host?.name ?? '';
   return (
-    <div className="remote-agent-note" role="note">
-      <Icon name="server" size={18} />
-      <strong>{t(`${space.name} の vault agent`, `${space.name}'s vault agent`)}</strong>
-      <p>
+    <p className="remote-agent-note" role="note">
+      <Icon name="server" size={13} />
+      <span>
         {t(
-          `この vault のエージェントは SSH ホスト「${space.host?.name ?? ''}」で動きます。irori モードで irori agent に依頼してください。`,
-          `This vault's agent runs on its SSH host, ${space.host?.name ?? ''}. Ask the irori agent in irori mode.`,
+          `SSH ホスト「${host}」にインストールされた CLI で動きます。`,
+          `Runs on the CLI installed on the SSH host ${host}.`,
         )}
-      </p>
-    </div>
+      </span>
+    </p>
   );
 }

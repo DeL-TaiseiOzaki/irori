@@ -44,7 +44,7 @@ irori's window shows what a note and a conversation need. A conversation's model
 | Status bar | Terminal | Off | Ctrl+` opens and closes it. Its button shows while it is open |
 | Status bar | Version | Off | **Updates** names it |
 
-The terminal opens for what is on show. In a vault it is a shell that starts in the vault's folder. In irori mode, on the routines page and on the irori agent's screen, it is a drawer at the foot of the window that starts in the irori agent's folder; it keeps running while a vault is on show and is there again when you come back. A vault on an SSH host has no terminal yet.
+The terminal opens for what is on show. In a vault it is a shell that starts in the vault's folder. In irori mode, on the routines page and on the irori agent's screen, it is a drawer at the foot of the window that starts in the irori agent's folder; it keeps running while a vault is on show and is there again when you come back. For a vault on an SSH host it is `ssh` to that host, in the vault's folder there ([vaults on SSH hosts](ssh-hosts.md)).
 
 **Show all** puts every item on the window, and **Back to default** returns to the list above. The choice is part of the environment saved to GitHub.
 

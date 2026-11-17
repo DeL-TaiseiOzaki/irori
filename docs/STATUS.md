@@ -1,5 +1,35 @@
 # Implementation status — notes, native agents and connection onboarding
 
+A vault on an SSH host has its own agent and terminal, 2026-11-17 (**0.2.79**;
+[ADR 061](decisions/061-vaults-on-ssh-hosts.md) decision 8 amended,
+[SSH-HOSTS](SSH-HOSTS.md)): with a vault on a host connected, the owner found
+its vault agent column and the terminal dimmed and unusable.
+- The window's operations on a vault's agent and its conversations
+  (`forwardedAgent` in `src/remote/protocol.ts`) go to the vault host under
+  their own names and argument checks; the vault host answers them with its
+  `AgentService`, so the run is on the host on the CLI there and the
+  conversation is kept in its data. The irori agent's workspace argument is not
+  sent (`hostArity`): a protocol line is JSON, where an argument left out in
+  the middle arrives as null, which the first UI smoke run caught.
+- `RemoteHosts.relay` sends the host's events of its vaults' runs to the
+  windows, notes which host keeps each conversation and asks each request, and
+  keeps the runs in progress: while one is, a cut connection is retried
+  without asking, and one the host no longer has once it answers with nothing
+  running is ended in the window (`lost`). `main.ts` routes operations that
+  name a conversation by it, and `respond` to the host that asked.
+- An attached file is sent first (`attach`) and kept on the host under the id
+  it was staged with (`AttachmentStore.keep`).
+- The terminal is `ssh -t` started here (`TerminalService`'s `far`,
+  `sshTerminalArgs`): the vault's folder goes as base64 inside the POSIX
+  script, and the host's login shell starts there.
+- Verified on Linux: `tests/remote-hosts.test.ts` (a conversation created,
+  run, queued, copied, rewound, stopped, renamed and deleted on a stand-in host;
+  an attachment; a permission answered here; a run lost by a killed vault host;
+  the terminal's command under `sh`, `bash` and `dash`) and
+  `scripts/remote-hosts-ui-smoke.ts` (an instruction from the column made a
+  file there; a command typed in the terminal ran in the vault's folder there).
+  Not run: a real host with a real CLI, Windows and macOS clients, fish and zsh.
+
 What ssh asks is answered in the window, 2026-11-16 (**0.2.78**,
 [#340](https://github.com/DeL-TaiseiOzaki/irori/pull/340), published as
 `v0.2.78-preview.1`;

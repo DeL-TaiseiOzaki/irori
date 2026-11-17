@@ -11,6 +11,7 @@ import type {
   Entry,
   HostEvent,
   Space,
+  StartRun,
 } from '../domain/types';
 import type { KnowledgeSearch } from '../domain/search';
 import {
@@ -31,7 +32,15 @@ import type {
   RemoteVault,
   RemoteVaults,
 } from '../agents/remote-vaults';
-import type { ForwardedRead, HandOffState } from '../remote/protocol';
+import {
+  hostArity,
+  isByConversation,
+  type ForwardedAgent,
+  type ForwardedRead,
+  type HandOffState,
+} from '../remote/protocol';
+import type { AttachmentRef } from '../domain/attachments';
+import type { Conversation, ConversationRow } from '../domain/conversation';
 import { readLocalJson, writeLocalJson } from './local-json';
 import { SerialQueue } from './serial-queue';
 import {
@@ -77,6 +86,11 @@ type Live = {
   /** When the last attempt failed, and with what: asked again at once, the same answer is given. */
   failed?: { at: number; error: Error };
   handOffs: Map<string, Follow>;
+  /**
+   * Runs of its vaults' agents this device has seen begin there and not end, with
+   * what the window needs to close them should the host lose them.
+   */
+  runs: Map<string, Pick<AgentEvent, 'scopeId' | 'conversationId' | 'agent'>>;
   retry?: NodeJS.Timeout;
   retries: number;
   /** What `ssh` asks the person for this host's login, the first of them shown. */
@@ -137,6 +151,8 @@ export class RemoteHosts implements RemoteVaults {
   private live = new Map<string, Live>();
   /** Requests that runs on hosts wait on, by id, with the host each is on. */
   private asked = new Map<string, string>();
+  /** The conversations of vault agents on hosts this device has seen, with the host of each. */
+  private conversations = new Map<string, string>();
   private queue = new SerialQueue();
   private closing = false;
   constructor(private options: RemoteHostsOptions) {}
@@ -161,7 +177,13 @@ export class RemoteHosts implements RemoteVaults {
     if (!live)
       this.live.set(
         id,
-        (live = { state: 'offline', handOffs: new Map(), retries: 0, questions: [] }),
+        (live = {
+          state: 'offline',
+          handOffs: new Map(),
+          runs: new Map(),
+          retries: 0,
+          questions: [],
+        }),
       );
     return live;
   }
@@ -215,6 +237,18 @@ export class RemoteHosts implements RemoteVaults {
       typeof scopeId === 'string' &&
       this.records.some((record) => record.vaults.some((vault) => vault.scopeId === scopeId))
     );
+  }
+  /** Where a vault on a host is: the host as `ssh` reaches it, and the folder there. */
+  where(scopeId: string) {
+    if (!this.has(scopeId)) return undefined;
+    const record = this.hostOf(scopeId);
+    const vault = record.vaults.find((item) => item.scopeId === scopeId)!;
+    return {
+      name: record.name,
+      destination: record.destination,
+      ...(record.port && { port: record.port }),
+      root: vault.root,
+    };
   }
   private hostOf(scopeId: string) {
     const record = this.records.find((item) =>
@@ -357,6 +391,9 @@ export class RemoteHosts implements RemoteVaults {
           live.retries = 0;
           this.set(id, 'connected');
           await this.refresh(id, link).catch(() => {});
+          // The events missed while away came before the answer to that request; a run
+          // still open after them, on a host where nothing runs, ended unseen.
+          if (!reply.running) this.lost(id);
           return link;
         },
         (error: Error) => {
@@ -389,13 +426,20 @@ export class RemoteHosts implements RemoteVaults {
     if (live.link !== link) return;
     if (this.closing) return;
     this.set(id, 'offline');
-    // A hand-off goes on there; this device comes back for its report.
-    if (live.handOffs.size) this.retry(id);
+    // A run goes on there; this device comes back for its report, and for the rest of what it shows.
+    if (this.awaited(live)) this.retry(id);
   }
-  /** Tries a host again after a while, for the hand-offs waiting on it; one attempt is scheduled at a time. */
+  /** Whether this device waits on something running on a host: a hand-off, or a vault agent's run. */
+  private awaited(live: Live) {
+    return live.handOffs.size > 0 || live.runs.size > 0;
+  }
+  /**
+   * Tries a host again after a while, for the hand-offs and runs waiting on it;
+   * one attempt is scheduled at a time.
+   */
   private retry(id: string) {
     const live = this.state(id);
-    if (this.closing || !live.handOffs.size || live.retry) return;
+    if (this.closing || !this.awaited(live) || live.retry) return;
     const wait = Math.min(60_000, 2000 * 2 ** Math.min(live.retries++, 5));
     live.retry = setTimeout(() => {
       live.retry = undefined;
@@ -446,6 +490,54 @@ export class RemoteHosts implements RemoteVaults {
     } else if (event.type === 'agent') {
       const entry = this.state(id).handOffs.get(event.event.runId);
       if (entry) this.followed(id, entry, event.event);
+      this.relay(id, event.event);
+    }
+  }
+  /**
+   * A run of a vault's agent there is shown here as one of this device is (ADR 061,
+   * amended 0.2.79): its events go to the windows, and what it asks is answered here.
+   */
+  private relay(id: string, event: AgentEvent) {
+    if (!event.scopeId || !this.has(event.scopeId)) return;
+    if (event.conversationId) this.conversations.set(event.conversationId, id);
+    if ((event.type === 'permission' || event.type === 'question') && event.requestId)
+      this.asked.set(event.requestId, id);
+    else if (event.type === 'status' && event.resolved) this.asked.delete(event.resolved);
+    const runs = this.state(id).runs;
+    if (event.type === 'done') runs.delete(event.runId);
+    else if (!runs.has(event.runId))
+      runs.set(event.runId, {
+        scopeId: event.scopeId,
+        conversationId: event.conversationId,
+        agent: event.agent,
+      });
+    this.options.emit({ type: 'agent', event });
+  }
+  /**
+   * With nothing running on a host: ends, in the windows, the runs it no longer has
+   * (its vault host was restarted), and forgets what they asked.
+   */
+  private lost(id: string) {
+    for (const [requestId, host] of [...this.asked]) if (host === id) this.asked.delete(requestId);
+    const runs = this.state(id).runs;
+    for (const [runId, run] of [...runs]) {
+      runs.delete(runId);
+      const base = { ...run, runId };
+      this.options.emit({
+        type: 'agent',
+        event: {
+          ...base,
+          type: 'error',
+          text: t(
+            'SSH ホストでこの実行が見つからなくなりました（vault host が再起動されました）。',
+            'The SSH host no longer has this run; its vault host was restarted.',
+          ),
+        },
+      });
+      this.options.emit({
+        type: 'agent',
+        event: { ...base, type: 'done', text: '', outcome: 'failed' },
+      });
     }
   }
   private followed(id: string, entry: Follow, event: AgentEvent) {
@@ -509,7 +601,8 @@ export class RemoteHosts implements RemoteVaults {
    */
   async unregister(scopeId: string) {
     const host = this.hostOf(scopeId);
-    if (this.state(host.id).handOffs.size)
+    const live = this.state(host.id);
+    if (live.handOffs.size || [...live.runs.values()].some((run) => run.scopeId === scopeId))
       throw Error(
         t(
           'この SSH ホストでの実行が終わってから外してください。',
@@ -537,6 +630,58 @@ export class RemoteHosts implements RemoteVaults {
   }
   /** What a vault on a host refuses for now, in the words the window shows. */
   static notYet = notYet;
+
+  /** Whether a conversation is one of a vault agent's on a host. */
+  keeps(conversationId: unknown): conversationId is string {
+    return typeof conversationId === 'string' && this.conversations.has(conversationId);
+  }
+  /** Whether a request waiting for an answer was asked by a run on a host. */
+  asks(requestId: unknown): requestId is string {
+    return typeof requestId === 'string' && this.asked.has(requestId);
+  }
+  /**
+   * One of the HostAPI's operations on a vault's own agent, answered by its host
+   * (ADR 061, amended 0.2.79): the operations that name a vault go to its host, and
+   * those that name a conversation to the host it was seen on.
+   */
+  async agent<T>(method: ForwardedAgent, args: unknown[]): Promise<T> {
+    const [first] = args;
+    let id: string;
+    if (isByConversation(method)) {
+      const known = typeof first === 'string' && this.conversations.get(first);
+      if (!known) throw Error(t('会話が見つかりません。', 'The conversation was not found.'));
+      id = known;
+    } else {
+      const scopeId =
+        first && typeof first === 'object' && 'scopeId' in first ? first.scopeId : first;
+      id = this.hostOf(scopeId as string).id;
+    }
+    const sent = args.slice(0, hostArity[method] ?? args.length);
+    while (sent.length && sent.at(-1) === undefined) sent.pop();
+    const value = await (await this.link(id)).request<T>(method, sent);
+    this.learn(id, method, args, value);
+    return value;
+  }
+  /** Remembers which host keeps the conversations, and asks the requests, an answer names. */
+  private learn(id: string, method: ForwardedAgent, args: unknown[], value: unknown) {
+    if (method === 'agentConversations')
+      for (const row of value as ConversationRow[]) this.conversations.set(row.id, id);
+    else if (method === 'queueAgentMessage' || method === 'start') {
+      const { conversationId } = args[0] as StartRun;
+      if (conversationId) this.conversations.set(conversationId, id);
+    } else if (method === 'agentConversation') {
+      const conversation = value as Conversation;
+      if (conversation.id) this.conversations.set(conversation.id, id);
+      for (const request of conversation.requests ?? [])
+        if (request.requestId) this.asked.set(request.requestId, id);
+    } else if (method === 'createConversation' || method === 'forkConversation')
+      this.conversations.set(value as string, id);
+    else if (method === 'deleteConversation') this.conversations.delete(args[0] as string);
+  }
+  /** Puts a file the person attached here on a vault's host, under the same id. */
+  async attach(scopeId: string, ref: AttachmentRef, bytes: Uint8Array) {
+    await this.request(scopeId, 'attach', [ref, bytes]);
+  }
 
   brief(scopeId: string, agent: AgentId): Promise<RemoteBrief> {
     return this.request(scopeId, 'brief', [scopeId, agent]);

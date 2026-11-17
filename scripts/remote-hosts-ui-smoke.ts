@@ -1,6 +1,7 @@
 import { _electron as electron, expect, type Page } from '@playwright/test';
 import { chmod, mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
 import { FileService } from '../src/host/files';
 import { SettingsService } from '../src/host/settings';
@@ -64,6 +65,12 @@ await writeFile(
   ].join('\n'),
 );
 await chmod(path.join(bin, 'ssh'), 0o755);
+// The vault agent's CLI on the host: the `pi` protocol fixture, on the PATH its vault host inherits.
+await writeFile(
+  path.join(bin, 'pi'),
+  `#!/usr/bin/env node\nimport(${JSON.stringify(pathToFileURL(path.resolve('tests/fixtures/harnesses.mjs')).href)}).then(m=>m.run('pi'));\n`,
+  { mode: 0o700 },
+);
 
 const files = new FileService(path.join(base, 'device'));
 await files.init();
@@ -277,12 +284,51 @@ try {
   await expect(page.locator('.ProseMirror')).toContainText('This note lives on the SSH host.');
   await expect(page.locator('.stage-bar')).toContainText('読み取り専用');
 
-  // Its own agent column offers no instruction box: the irori agent hands it work.
+  // Its own agent runs on the host, in a conversation kept there (ADR 061, amended 0.2.79).
   await page.getByRole('button', { name: 'vault agent', exact: true }).click();
   const column = page.getByRole('complementary', { name: 'Remote notes agent' });
-  await expect(column).toContainText('irori モードで irori agent に依頼してください');
-  await expect(column.locator('.composer')).toBeHidden();
+  await expect(column.getByRole('note')).toContainText(
+    'SSH ホスト「Lab server」にインストールされた CLI で動きます',
+  );
+  await column.getByLabel('エージェント', { exact: true }).selectOption('pi');
+  await column
+    .getByLabel('エージェントへの指示')
+    .fill('run: echo from-the-column > made-there.txt');
+  await column.getByRole('button', { name: '送信', exact: true }).click();
+  await expect(column.locator('.message.user')).toHaveText([
+    'run: echo from-the-column > made-there.txt',
+  ]);
+  await expect
+    .poll(() => readFile(path.join(notes, 'made-there.txt'), 'utf8').catch(() => ''), {
+      timeout: 30_000,
+    })
+    .toContain('from-the-column');
+  await expect(column.getByRole('button', { name: '停止', exact: true })).toHaveCount(0, {
+    timeout: 30_000,
+  });
+  // The conversation is listed from its host.
+  await column.getByRole('button', { name: '履歴', exact: true }).click();
+  await expect(column.locator('.history-row')).toHaveCount(1);
+  await column.getByRole('button', { name: '履歴', exact: true }).click();
   await page.screenshot({ path: 'test-results/remote-hosts-vault.png' });
+
+  // Its terminal is the host's, reached by ssh, in the vault's folder there.
+  await page.keyboard.press('Control+Backquote');
+  const terminal = page.getByRole('region', { name: 'Remote notes のターミナル' });
+  await expect(terminal.locator('.terminal-remote')).toHaveText('ssh Lab server');
+  await expect(terminal.getByLabel('ターミナルのシェル')).toHaveCount(0);
+  await expect(terminal.locator('.terminal-state')).toHaveText('実行中');
+  await terminal.locator('.xterm-helper-textarea').focus();
+  await page.keyboard.insertText('pwd > from-the-terminal.txt');
+  await page.keyboard.press('Enter');
+  await expect
+    .poll(() => readFile(path.join(notes, 'from-the-terminal.txt'), 'utf8').catch(() => ''), {
+      timeout: 15_000,
+    })
+    .toBe(`${notes}\n`);
+  await page.screenshot({ path: 'test-results/remote-hosts-terminal.png' });
+  await terminal.getByRole('button', { name: '終了して閉じる' }).click();
+  await expect(terminal).toHaveCount(0);
   await expect(banner(page)).toHaveCount(0);
 } catch (error) {
   await (await app.firstWindow()).screenshot({ path: 'test-results/remote-hosts-failure.png' });

@@ -797,6 +797,18 @@ button.save-state > i {
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
   font-size: 12px;
 }
+/* A vault on an SSH host: the host's login shell, reached by ssh; nothing to choose. */
+.terminal-remote {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 7px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  font-size: 12px;
+  opacity: 0.85;
+}
 .terminal-toolbar button:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.12);
 }

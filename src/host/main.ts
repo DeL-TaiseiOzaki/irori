@@ -15,7 +15,7 @@ import {
 import { currentLanguage, setLanguage, t } from '../domain/i18n';
 import squirrelStartup from 'electron-squirrel-startup';
 import path from 'node:path';
-import { lstat, mkdir, realpath } from 'node:fs/promises';
+import { lstat, mkdir, readFile, realpath } from 'node:fs/promises';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { dispatchHost, type HostHandlers } from '../domain/host-requests';
 import { webAddress } from '../domain/links';
@@ -23,9 +23,9 @@ import { FileService, watcherIgnored, watchRegistrationChanges } from './files';
 import { vaultReads } from './vault-reads';
 import { RemoteHosts } from './remote-hosts';
 import { readSshConfigHosts } from './ssh-config';
-import { shippedPayload, sshLauncher } from './remote-payload';
+import { shippedPayload, sshLauncher, sshTerminalArgs } from './remote-payload';
 import { SshAskpass } from './ssh-askpass';
-import { isForwardedRead } from '../remote/protocol';
+import { isByConversation, isForwardedAgent, isForwardedRead } from '../remote/protocol';
 import { SettingsService } from './settings';
 import { SearchService } from './search';
 import { relink } from './relink';
@@ -87,6 +87,7 @@ import {
   type EntryMove,
   type HostEvent,
   type Space,
+  type StartRun,
 } from '../domain/types';
 import type { NoteRef } from '../domain/note-operations';
 import { isDamaged } from '../domain/conversation';
@@ -306,6 +307,18 @@ app
         emit({ type: 'terminal', event }, owner);
       },
       (scopeId) => you.rootOf(scopeId),
+      // A vault on an SSH host has its terminal there: `ssh -t` into its folder (ADR 061).
+      (scopeId) => {
+        const far = remote.where(scopeId);
+        return (
+          far && {
+            name: `ssh ${far.name}`,
+            program: 'ssh',
+            args: sshTerminalArgs(far, far.root),
+            cwd: far.root,
+          }
+        );
+      },
     );
     // Conversations kept per space, CLI and checkout become conversations (ADR 017 D8),
     // once and before any run; a failure leaves the old records to try again next start.
@@ -1364,7 +1377,9 @@ app
       setSecret: (name, value) => secrets.set(name, value),
       deleteSecret: (name) => secrets.delete(name),
       cancel: (scopeId, conversationId) => agents.cancel(scopeId, conversationId),
-      respond: (...args) => agents.respond(...args),
+      // What a run on an SSH host asks is answered there, whoever started it (ADR 061).
+      respond: (...args) =>
+        remote.asks(args[0]) ? remote.respond(...args) : agents.respond(...args),
       stageAttachment: (name, bytes) => agents.attachments.stage(name, bytes),
       discardAttachment: (id) => agents.attachments.discard(id),
       attachmentImage: (id) => agents.attachments.image(id),
@@ -1395,12 +1410,14 @@ app
       // Drafts are this device's, wherever the vault is.
       draftRead: handlers.draftRead,
       draftWrite: handlers.draftWrite,
-      // Connected folders and the vault's own conversations come later; the window shows none.
+      // Connected folders come later; the window shows none.
       cloudConnections: async () => [],
       contentsStrays: async () => [],
-      agentConversations: async () => [],
-      agentCommands: async () => [],
-      cancel: async () => {},
+      // Its own agent runs on its host (ADR 061, amended 0.2.79), and a file the person
+      // attached on this device goes there first, under the same id.
+      queueAgentMessage: async (input) =>
+        remote.agent('queueAgentMessage', [await carryAttachments(input)]),
+      start: async (input) => remote.agent('start', [await carryAttachments(input)]),
       // A path of such a vault is the one on its host, as an agent there or `ssh` would use it.
       copyEntryPath: async (scopeId, target, absolute) => {
         const parts = target.split('/').filter(Boolean);
@@ -1414,15 +1431,23 @@ app
       // Off this device's list and its workspaces; the folder on the host stays as it is.
       removeSpace: async (scopeId) => {
         await remote.unregister(scopeId);
+        await terminals.closeScope(scopeId);
         await workspaces.forget(scopeId);
       },
     };
-    const itsAgent = new Set([
-      'start',
-      'queueAgentMessage',
-      'createConversation',
-      'agentConversation',
-    ]);
+    /** Sends the files an instruction for a vault on an SSH host carries to that host. */
+    async function carryAttachments(input: StartRun) {
+      for (const ref of input.attachments ?? [])
+        await remote.attach(
+          input.scopeId,
+          ref,
+          new Uint8Array(await readFile(await agents.attachments.path(ref))),
+        );
+      return input;
+    }
+    // What this device serves for a vault on an SSH host through its own handler: its
+    // terminal is `ssh` started here (ADR 061).
+    const servedHere = new Set(['openTerminal']);
     /** `local` with each operation that names a vault on an SSH host answered for that vault. */
     function onHosts(local: HostHandlers): HostHandlers {
       const route = (method: string, handler: (...args: unknown[]) => unknown) => {
@@ -1430,19 +1455,15 @@ app
           const [first] = args;
           const scopeId =
             first && typeof first === 'object' && 'scopeId' in first ? first.scopeId : first;
-          if (!remote.has(scopeId)) return handler(...args);
+          // A conversation of a vault agent on an SSH host is kept, and changed, there.
+          if (isByConversation(method) && remote.keeps(first)) return remote.agent(method, args);
+          if (!remote.has(scopeId) || servedHere.has(method)) return handler(...args);
           const own = hosted[method as keyof HostHandlers] as
             ((...args: unknown[]) => unknown) | undefined;
           if (own) return own(...args);
           if (isForwardedRead(method)) return remote.forward(scopeId, method, args);
-          throw Error(
-            itsAgent.has(method)
-              ? t(
-                  'この vault のエージェントは SSH ホストで動きます。irori モードで irori agent に依頼してください。',
-                  "This vault's agent runs on its SSH host. Ask the irori agent in irori mode.",
-                )
-              : RemoteHosts.notYet(),
-          );
+          if (isForwardedAgent(method)) return remote.agent(method, args);
+          throw Error(RemoteHosts.notYet());
         };
       };
       return Object.fromEntries(

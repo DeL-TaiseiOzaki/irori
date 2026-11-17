@@ -14,8 +14,10 @@ part. The decisions and their reasons are in
 | What is sent       | `src/host/remote-payload.ts`                                                             | The `ssh` command line, the built vault host and the pinned Node.                                                                             |
 | The person's hosts | `src/host/ssh-config.ts`                                                                 | Reads `~/.ssh/config`, what it includes and the system's file, and lists the names on `Host` lines for the window to offer. Read only.        |
 | Hosts and vaults   | `src/host/remote-hosts.ts`                                                               | This device's list (`remote-hosts.json`), connections on demand, the duplicate check, and the `RemoteVaults` port for agent runs.             |
-| Routing            | `src/host/main.ts` (`hosted`, `onHosts`)                                                 | An operation that names a vault on a host goes there when it is a read, is answered here, or is refused.                                      |
+| Routing            | `src/host/main.ts` (`hosted`, `onHosts`)                                                 | An operation that names a vault on a host goes there when it is a read or its agent's, is answered here, or is refused.                       |
 | Agent runs         | `src/agents/service.ts` (`startHanded`, `handOff`), `vault-reach.ts`, `remote-vaults.ts` | A hand-off starts where its vault is; `irori ls`, `read`, `search` and `send`.                                                                |
+| The vault's agent  | `forwardedAgent` (`protocol.ts`), `RemoteHosts.agent`, `relay`                           | Its column's runs and conversations are the vault host's; their events reach the windows and what they ask is answered here.                  |
+| Terminal           | `sshTerminalArgs` (`remote-payload.ts`), `TerminalService`'s `far`                       | `ssh -t` started here into the vault's folder there, in the login shell: a login of its own, which asks in the terminal.                      |
 | The window         | `src/app/RemoteHosts.tsx`, and `Space.host` where a vault is shown                       | The settings part, the dialog that walks a host's folders, and a vault on a host shown without anything that edits it.                        |
 | Shared reads       | `src/host/vault-reads.ts`                                                                | The reads both the main process and the vault host answer.                                                                                    |
 
@@ -78,6 +80,11 @@ host's key are asked in a window (`RemoteHost.asking`, the dialog `SshQuestions`
   and the vault host answer it the same way, and to `forwardedReads`.
 - Something only a vault host does: add it to `hostOperations` with its
   argument check, and to `own` in `host.ts`.
+- An operation on a vault's agent or its conversations: add it to
+  `forwardedAgent`, and its handler to `conversations` in `host.ts`. One whose
+  first argument is a conversation goes in `byConversation` too, and one whose
+  last is the irori agent's workspace gets its `hostArity`: a protocol line is
+  JSON, where an argument left out in the middle arrives as null.
 - Something this device answers for such a vault without asking the host: add
   it to `hosted` in `main.ts`.
 
