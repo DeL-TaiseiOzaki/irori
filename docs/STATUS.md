@@ -1,6 +1,8 @@
 # Implementation status — notes, native agents and connection onboarding
 
-A vault on an SSH host has its own agent and terminal, 2026-11-17 (**0.2.79**;
+A vault on an SSH host has its own agent and terminal, 2026-11-17 (**0.2.79**,
+[#345](https://github.com/DeL-TaiseiOzaki/irori/pull/345), published as
+`v0.2.79-preview.1`;
 [ADR 061](decisions/061-vaults-on-ssh-hosts.md) decision 8 amended,
 [SSH-HOSTS](SSH-HOSTS.md)): with a vault on a host connected, the owner found
 its vault agent column and the terminal dimmed and unusable.
@@ -29,6 +31,11 @@ its vault agent column and the terminal dimmed and unusable.
   `scripts/remote-hosts-ui-smoke.ts` (an instruction from the column made a
   file there; a command typed in the terminal ran in the vault's folder there).
   Not run: a real host with a real CLI, Windows and macOS clients, fish and zsh.
+- `publish.yml` published
+  [v0.2.79-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.79-preview.1)
+  from `6d1d81e` with the pull request's CI run `44047685325`. Anonymous
+  downloads matched `SHA256SUMS.txt`: Windows 179,412,992 bytes, Mac
+  145,742,749 bytes and `irori-0.2.79-full.nupkg` 178,583,109 bytes.
 
 What ssh asks is answered in the window, 2026-11-16 (**0.2.78**,
 [#340](https://github.com/DeL-TaiseiOzaki/irori/pull/340), published as
