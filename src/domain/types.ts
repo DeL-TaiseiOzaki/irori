@@ -354,6 +354,11 @@ export interface ConnectionState {
   detail?: string;
   /** Linked so that files can be changed. */
   writable?: boolean;
+  /**
+   * Its folder is linked, or was and its link no longer checks out: runs of the vault
+   * may have been given it, so taking it out or changing its access waits for them.
+   */
+  linked?: boolean;
 }
 /**
  * A GitHub repository to show in contents: `folder` is an existing clone of it

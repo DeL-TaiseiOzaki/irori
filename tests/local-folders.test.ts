@@ -294,11 +294,11 @@ test('A folder not there yet is waited for, and linked once it appears', async (
   await cloud.close();
 });
 
-test('A waiting folder is looked for again by itself, not during a run in its vault', async (t) => {
+test('A waiting folder is looked for again by itself, not during a Git operation in its vault', async (t) => {
   const { files, space, folder } = await local(t);
   const { cloud, linked } = waiting(files, { first: 20, longest: 40 });
-  let running = true;
-  cloud.mayLink = () => !running;
+  let gitBusy = true;
+  cloud.mayLink = () => !gitBusy;
   const { mountId } = await cloud.addLocal({
     scopeId: space.scopeId,
     path: folder,
@@ -310,14 +310,21 @@ test('A waiting folder is looked for again by itself, not during a run in its va
   await cloud.connect(space.scopeId, mountId);
   await rename(away, folder);
   await new Promise((resolve) => setTimeout(resolve, 150));
-  // A run works in the vault: the folder is linked after it, not under it.
+  // A Git operation works in the vault: the folder is linked after it, not under it.
   assert.deepEqual(cloud.linkedPaths(space.scopeId), []);
-  running = false;
+  assert.equal(cloud.isLinked(space.scopeId, mountId), false);
+  gitBusy = false;
   const deadline = Date.now() + 2_000;
   while (!cloud.linkedPaths(space.scopeId).length && Date.now() < deadline)
     await new Promise((resolve) => setTimeout(resolve, 20));
   assert.deepEqual(cloud.linkedPaths(space.scopeId), ['contents/Research']);
   assert.deepEqual(linked, [space.scopeId]);
+  // Linked now: runs may be given it, so taking it out waits for them.
+  assert.equal(cloud.isLinked(space.scopeId, mountId), true);
+  assert.equal((await cloud.connections(space.scopeId))[0].linked, true);
+  await cloud.disconnect(space.scopeId, mountId);
+  assert.equal(cloud.isLinked(space.scopeId, mountId), false);
+  assert.equal((await cloud.connections(space.scopeId))[0].linked, undefined);
   await cloud.close();
 });
 

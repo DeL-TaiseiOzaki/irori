@@ -361,9 +361,9 @@ app
       undefined,
       github,
     );
-    // A folder waited for or lost is linked again by itself only while no run or
-    // Git operation works in the vault.
-    cloud.mayLink = (scopeId) => !agents.busy(scopeId) && !git.busy;
+    // A folder waited for or lost is linked again by itself, during runs too, but not
+    // under a Git operation (ADR 042 D2).
+    cloud.mayLink = () => !git.busy;
     cloud.onLinked = (scopeId) => emit({ type: 'files', scopeId });
     // Some places have no system trash, such as Google Drive for desktop's drive on
     // Windows. Deleting there cannot be undone on this device, so the person decides.
@@ -901,7 +901,12 @@ app
         );
       return changed(scopeId, operation);
     }
-    /** A new connection only adds to the vault's contents, so it does not wait for its runs. */
+    /**
+     * A change that leaves the vault's connected folders as its runs were given them:
+     * a folder connected, connected again or chosen only adds to contents, and a
+     * connection not connected is only a record. It does not wait for the runs
+     * (ADR 042 D2); the service refuses one that would change a connected folder.
+     */
     function addCloud<T>(scopeId: string, operation: () => Promise<T>) {
       if (git.busy)
         throw Error(
@@ -911,6 +916,20 @@ app
           ),
         );
       return changed(scopeId, operation);
+    }
+    /**
+     * Takes a folder out of the vault, or changes what may be done in it: waits for the
+     * vault's runs when the folder is connected, since they may have been given it.
+     */
+    function takeCloud<T>(scopeId: string, mountId: string, operation: () => Promise<T>) {
+      if (agents.busy(scopeId) && cloud.isLinked(scopeId, mountId))
+        throw Error(
+          t(
+            '実行中のエージェントが使っている接続です。実行が終わってから解除・変更してください。',
+            'A running agent uses this connection. Disconnect or change it after the run ends.',
+          ),
+        );
+      return addCloud(scopeId, operation);
     }
     async function openFile(filename: string) {
       // A program, script or shortcut would run, not open: irori shows where it is instead.
@@ -1089,13 +1108,13 @@ app
       moveSkill: (id, name, to) => changeSchema(id, () => schemaSettings.moveSkill(id, name, to)),
       cloudConnections: (id) => cloud.connections(id),
       connectCloud: (...args) => addCloud(args[0], () => cloud.connect(...args)),
-      disconnectCloud: (...args) => changeCloud(args[0], () => cloud.disconnect(...args)),
-      renameCloud: (...args) => changeCloud(args[0], () => cloud.edit(...args)),
-      removeCloud: (...args) => changeCloud(args[0], () => cloud.edit(...args)),
+      disconnectCloud: (...args) => takeCloud(args[0], args[1], () => cloud.disconnect(...args)),
+      renameCloud: (...args) => addCloud(args[0], () => cloud.edit(...args)),
+      removeCloud: (...args) => addCloud(args[0], () => cloud.edit(...args)),
       contentsStrays: (id) => cloud.strays(id),
       adoptStray: (...args) => addCloud(args[0], () => cloud.adoptStray(...args)),
       removeStray: (...args) => changeCloud(args[0], () => cloud.removeStray(...args)),
-      setCloudAccess: (...args) => changeCloud(args[0], () => cloud.setAccess(...args)),
+      setCloudAccess: (...args) => takeCloud(args[0], args[1], () => cloud.setAccess(...args)),
       openCloudFolder: async (...args) => {
         const error = await shell.openPath(await cloud.folder(...args));
         if (error) throw Error(error);
@@ -1156,10 +1175,10 @@ app
         ),
       addLocalFolder: (input) => addCloud(input.scopeId, () => cloud.addLocal(input)),
       addRepository: (input) => addCloud(input.scopeId, () => cloud.addRepository(input)),
-      cloneRepository: (...args) => changeCloud(args[0], () => cloud.cloneRepository(...args)),
+      cloneRepository: (...args) => addCloud(args[0], () => cloud.cloneRepository(...args)),
       updateRepository: (...args) => changeCloud(args[0], () => cloud.updateRepository(...args)),
-      bindLocalFolder: (...args) => changeCloud(args[0], () => cloud.bindLocal(...args)),
-      switchCloudToLocal: (...args) => changeCloud(args[0], () => cloud.switchToLocal(...args)),
+      bindLocalFolder: (...args) => addCloud(args[0], () => cloud.bindLocal(...args)),
+      switchCloudToLocal: (...args) => addCloud(args[0], () => cloud.switchToLocal(...args)),
       spaces: () => [...files.list(), ...remote.list()],
       remoteHosts: () => remote.hosts(),
       answerRemoteHost: (hostId, questionId, answer) => remote.answer(hostId, questionId, answer),

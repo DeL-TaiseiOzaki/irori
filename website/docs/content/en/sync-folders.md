@@ -49,4 +49,4 @@ An item in a Contents folder that no connection names shows as **Unregistered** 
 - A link can be registered again. **Register as connection** connects it to the folder it leads to; when that folder is gone (**Link target missing**), **Choose folder and connect** connects it to a folder you choose. **Remove link** deletes only the link, never the folder it leads to.
 - Anything else can go to the system trash with **Move to trash**.
 
-While an agent runs in that vault, connections cannot be changed or removed, nor unregistered items removed, and the connection sheet says why. A new connection can still be added. Everything is available again once the run ends.
+While an agent runs in that vault, you can still add a connection, connect again, choose a folder or clone again, and rename, change the access of or remove a connection that is not connected. Disconnecting a connected folder or changing its access, which the running agent may use, **Update** for a repository and removing unregistered items wait until the run ends, and the connection sheet says why.

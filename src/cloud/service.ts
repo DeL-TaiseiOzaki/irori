@@ -150,7 +150,10 @@ export class CloudService {
   private waiting = new Map<string, Waiting>();
   private timer?: ReturnType<typeof setTimeout>;
   private stopping = false;
-  /** Whether a vault's folders may be linked now; no run or Git operation works in it. */
+  /**
+   * Whether a vault's folders may be linked by themselves now: no Git operation works
+   * in it. A run does not stop them: it keeps the folders it was given (ADR 042 D2).
+   */
   mayLink?: (scopeId: string) => boolean;
   /** A waiting or lost folder was linked again without anyone asking. */
   onLinked?: (scopeId: string) => void;
@@ -272,7 +275,7 @@ export class CloudService {
             ...(known && (binding || known.state !== 'disconnected')
               ? known
               : { state: binding ? ('disconnected' as const) : ('unconfigured' as const) }),
-            ...(current ? { writable: current.writable } : {}),
+            ...(current ? { writable: current.writable, linked: true } : {}),
           };
         }),
       )),
@@ -390,7 +393,7 @@ export class CloudService {
       const item = this.waiting.get(key);
       if (!item || this.stopping) break;
       if (this.mayLink?.(item.scopeId) === false) {
-        // A run or Git operation works in the vault: looked for after it, at the same pace.
+        // A Git operation works in the vault: looked for after it, at the same pace.
         this.waiting.set(key, { ...item, due: now + item.delay });
         continue;
       }
@@ -1149,6 +1152,13 @@ export class CloudService {
   }
   connect(scopeId: string, mountId: string) {
     return this.mutate(() => this.mount(scopeId, mountId));
+  }
+  /**
+   * Whether a connection's folder is linked now, or was and its link no longer checks
+   * out: the folder runs of its vault may have been given.
+   */
+  isLinked(scopeId: string, mountId: string) {
+    return this.mounted.has(this.key(scopeId, mountId));
   }
   private async mount(scopeId: string, mountId: string) {
     const local = (await this.localDeclarations(scopeId)).find((item) => item.mountId === mountId);

@@ -35,6 +35,19 @@ In the same request the owner asked where agents work. An agent had made
    cloud queue, so waiting never makes irori busy, and a folder is linked only
    when no run or Git operation works in its vault, as a person's 再接続 would be.
    A folder linked this way announces the vault's files as changed.
+   *(Amended 2026-11-18, 0.2.81, owner request: "a reconnect can surely happen
+   while an agent runs".)* A run keeps what it was given when it started: the
+   folders it is told about, Claude Code's additional directories and deny rules,
+   and Codex's writable roots (5). A folder linked during the run is outside
+   those, so linking it takes nothing from the run. irori now links a waiting or
+   lost folder during runs too, and only a Git operation in the vault holds it
+   back. In the connection sheet, and for `irori connect`, connecting, connecting
+   again, choosing a folder or a clone, and renaming, changing the access of or
+   unregistering a connection that is not linked go on during the vault's runs.
+   What may change a folder a run was given still waits for the runs: taking a
+   linked folder out, changing its access, **最新にする** on a repository and
+   removing unregistered data in contents. The host refuses the first two while a
+   run works in the vault and the folder is linked (`CloudService.isLinked`).
 3. **A changed identity is linked again.** When a mounted connection's link or
    folder no longer checks out, `connections()` links it again to the folder now
    at the binding's path. irori's own link, unchanged since irori made it, is

@@ -471,8 +471,14 @@ test('connect links a folder into the named vault’s contents', async (t) => {
   assert.equal(path.resolve(path.dirname(link), await readlink(link)), drive);
   assert.equal(announced.at(-1)?.scopeId, notes.scopeId);
   await assert.rejects(setup.run(['connect', 'Research', drive], base), /No vault is named/);
+  // The vault's own run does not hold a new connection back: it keeps what it was
+  // given, and a folder connected only adds to contents (ADR 042 D2).
   const busy = new AgentSetup({ ...deps, running: () => true });
-  await assert.rejects(busy.run(['connect', 'Notes', drive], base), /own agent running/);
+  assert.match(
+    await busy.run(['connect', 'Notes', drive, '--name', 'during run'], base),
+    /as contents\/during run/,
+  );
+  assert.ok((await lstat(path.join(root, 'contents', 'during run'))).isSymbolicLink());
 });
 
 test('an agent’s connect, work, add, remove and run wait for the person to allow them', async (t) => {

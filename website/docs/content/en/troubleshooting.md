@@ -21,7 +21,7 @@ For a save conflict, check whether another app or agent changed the same file. C
 
 For a connected folder, check its state and that the original folder still exists, then use **Reconnect** or **Choose folder again**. **Waiting for the folder** means the folder is not there yet; the connection follows by itself once it appears, for example when the sync app has started. Check syncing in the service's own app. See [synced folders](sync-folders.md).
 
-An item marked **Unregistered** in Contents belongs to no connection. Register it as a connection or remove it from the vault's **Connect** ([unregistered items](sync-folders.md#section-5)). While an agent runs in that vault, connections cannot be changed or removed, and the connection sheet says so.
+An item marked **Unregistered** in Contents belongs to no connection. Register it as a connection or remove it from the vault's **Connect** ([unregistered items](sync-folders.md#section-5)). While an agent runs in that vault, unregistered items cannot be removed nor connected folders disconnected, and the connection sheet says so. Connecting again still works.
 
 ## Report a problem
 

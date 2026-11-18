@@ -510,11 +510,8 @@ export class AgentSetup {
     cwd: string,
     context: SetupContext,
   ) {
+    // A folder connected only adds to contents, so it goes on during the vault's run (ADR 042 D2).
     const space = this.vault(command.vault, cwd, context.vault);
-    if (this.host.running?.(space.scopeId))
-      throw Error(
-        `The vault "${space.name}" has its own agent running. Connect the folder after that run finishes.`,
-      );
     if (command.repository) return this.connectRepository(space, command, cwd);
     const folder = this.folder(cwd, command.folder);
     const contentsRoot = space.contents[0];
