@@ -1,5 +1,28 @@
 # Implementation status — notes, native agents and connection onboarding
 
+CI's intermittent failures traced, 2026-11-17 (**0.2.80**): the owner asked why CI
+failed now and then. Of 14 failed runs since Nov 6, two were the change's own,
+two a GitHub download outage, and ten intermittent; four of those were races
+already fixed (7bb425e, f50ade7). The rest:
+- **Find in a PDF** (`find-in-file-ui-smoke.ts:163`, 2 runs): a race in the app.
+  `PdfView` draws a page only in view, and `FindScope`'s refresh search, which does
+  not scroll, could overtake the typed search or follow one that found nothing
+  while the PDF loaded, so the occurrence on page 2 was counted but never shown.
+  `FindTurns` (`src/domain/find.ts`) hands an overtaken search's scroll on, and the
+  search a PDF makes once it has loaded starts as a new one (`changed(true)`); an
+  edit's search still stays where the person is. The smoke now types while the PDF
+  loads; it failed 3 of 3 before the change.
+- **Vault host place** (`remote-hosts-ui-smoke.ts`, local): an ending vault host
+  removed `host.sock` and `host.pid` after its slow close, which by then could be
+  those of a host that had taken its place. The socket goes with `server.close()`;
+  the pid file goes only while it names this host (`src/remote/host-place.ts`,
+  `tests/vault-host-place.test.ts`).
+- Test races: `markdown-ui-smoke.ts` read a saved setting once before the save
+  ended, `explorer-ui-smoke.ts` read a pasted file before its bytes,
+  `shared-schema-ui-smoke.ts` opened the start screen's settings while the
+  workspace opened, and `tests/git-host-load.test.ts` counted between a child's
+  two files. Each now waits for what it reads.
+
 A vault on an SSH host has its own agent and terminal, 2026-11-17 (**0.2.79**,
 [#345](https://github.com/DeL-TaiseiOzaki/irori/pull/345), published as
 `v0.2.79-preview.1`;

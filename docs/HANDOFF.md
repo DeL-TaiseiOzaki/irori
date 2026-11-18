@@ -1,5 +1,12 @@
 # irori continuation handoff
 
+**CI's intermittent failures, 0.2.80** (see STATUS). Two were app races (find in a
+PDF, the vault host's place) and four were tests reading before a write ended;
+all are fixed. A GitHub download timeout (504) on Nov 9 failed packaging twice
+and is not a code issue. If `verify` fails again on code the change does not
+touch, read the failing smoke's log before re-running: each of these failures
+was a race that showed only on a loaded runner.
+
 **A vault on an SSH host has its own agent and terminal, 0.2.79**
 ([ADR 061](decisions/061-vaults-on-ssh-hosts.md) decision 8, amended;
 [SSH-HOSTS](SSH-HOSTS.md)). The owner connected a vault on an SSH host and

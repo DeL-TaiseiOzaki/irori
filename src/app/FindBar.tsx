@@ -10,7 +10,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
-import { findAll } from '../domain/find';
+import { findAll, FindTurns } from '../domain/find';
 import { t } from '../domain/i18n';
 import { Icon } from './Icon';
 
@@ -39,19 +39,23 @@ export interface Finder {
 
 interface Registry {
   register(finder: Finder): () => void;
-  changed(finder: Finder): void;
+  /** The finder's text changed; `loaded`, it is a document's that was not there before. */
+  changed(finder: Finder, loaded?: boolean): void;
 }
 const FindContext = createContext<Registry | null>(null);
 
 /**
  * Offers a view's finder to the find bar around it, if there is one; a preview in
  * another stage column has none. Returns what the view calls when its content
- * changed, so the bar searches again.
+ * changed, so the bar searches again; `loaded` when a document has just loaded.
  */
 export function useFinder(finder: Finder) {
   const registry = useContext(FindContext);
   useEffect(() => registry?.register(finder), [registry, finder]);
-  return useCallback(() => registry?.changed(finder), [registry, finder]);
+  return useCallback(
+    (loaded?: boolean) => registry?.changed(finder, loaded === true),
+    [registry, finder],
+  );
 }
 
 export interface FindScopeHandle {
@@ -84,13 +88,13 @@ export function FindScope({
   const bar = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const opener = useRef<HTMLElement | null>(null);
-  const ticket = useRef(0);
+  const [turns] = useState(() => new FindTurns());
   const refresh = useRef<ReturnType<typeof setTimeout>>(undefined);
   const live = useRef({ open, query, finder, found, hidden });
   live.current = { open, query, finder, found, hidden };
 
   async function search(target: Finder, text: string, keep: number | undefined, scroll: boolean) {
-    const mine = ++ticket.current;
+    const mine = turns.begin(scroll, keep);
     setSearching(true);
     let result: FindCount;
     try {
@@ -98,14 +102,14 @@ export function FindScope({
     } catch {
       result = { count: 0, start: 0 };
     }
-    if (mine !== ticket.current) return;
+    if (!turns.current(mine.turn)) return;
     setSearching(false);
     if (!result.count) {
       setFound(text ? { count: 0, index: -1 } : undefined);
       return;
     }
-    const index = Math.min(keep ?? result.start, result.count - 1);
-    target.show(index, scroll);
+    const index = Math.min(mine.keep ?? result.start, result.count - 1);
+    target.show(index, mine.scroll);
     setFound({ count: result.count, index });
   }
 
@@ -115,13 +119,15 @@ export function FindScope({
         setFinder(next);
         return () => setFinder((current) => (current === next ? undefined : current));
       },
-      // An edit or a redraw searches again where the person is, without scrolling.
-      changed(which) {
+      // An edit or a redraw searches again where the person is, without scrolling. A
+      // document that has just loaded is searched as a new word is: from where the view is,
+      // its first occurrence brought into view, so one on a PDF page not drawn yet shows.
+      changed(which, loaded = false) {
         clearTimeout(refresh.current);
         refresh.current = setTimeout(() => {
           const { open: shown, query: text, finder: current, found: last } = live.current;
-          if (shown && text && which === current)
-            void search(current, text, last && last.index >= 0 ? last.index : undefined, false);
+          const at = !loaded && last && last.index >= 0 ? last.index : undefined;
+          if (shown && text && which === current) void search(current, text, at, loaded);
         }, 150);
       },
     }),
@@ -131,7 +137,7 @@ export function FindScope({
 
   useEffect(() => {
     if (!open || !finder) {
-      ticket.current++;
+      turns.drop();
       setSearching(false);
       setFound(undefined);
       return;
@@ -174,7 +180,7 @@ export function FindScope({
 
   function close() {
     const { finder: current, found: last } = live.current;
-    ticket.current++;
+    turns.drop();
     const focused = current?.clear(!!last?.count) ?? false;
     const hadFocus = bar.current?.contains(document.activeElement);
     setOpen(false);

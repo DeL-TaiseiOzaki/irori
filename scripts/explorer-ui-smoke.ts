@@ -333,7 +333,10 @@ try {
     );
   });
   await expect.poll(() => disk('Knowledge_Base/topics')).toContain('clip.txt');
-  expect(await readFile(path.join(root, 'Knowledge_Base/topics/clip.txt'), 'utf8')).toBe('pasted');
+  // The file is there before its bytes are.
+  await expect
+    .poll(() => readFile(path.join(root, 'Knowledge_Base/topics/clip.txt'), 'utf8'))
+    .toBe('pasted');
 
   expect(errors).toEqual([]);
   await writeFile(
