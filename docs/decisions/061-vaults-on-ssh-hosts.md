@@ -165,6 +165,37 @@ weighed and dropped:
      path of it is given as an additional directory, checked for configuration
      or counted in the write boundary.
    A vault agent, here or there, still reaches its own vault alone.
+   *Amended 2026-11-17 (0.2.79), owner request: the vault's own agent and a
+   terminal.* With a vault on a host connected, its vault agent column and the
+   terminal were shown dimmed, and the owner could not use either. Both were the
+   next steps the handoff named.
+   - The vault agent column takes instructions for such a vault as for one here.
+     The run is the vault host's `AgentService`, as a hand-off's is, so the
+     agent runs on the host, in the vault, on the CLI installed and signed in
+     there, and its conversations are kept in the host's data. The window's
+     operations on a vault's agent and its conversations go there under their
+     own names and argument checks (`forwardedAgent` in `src/remote/protocol.ts`);
+     the irori agent's workspace, which a vault's conversations are not kept by,
+     is not sent. An operation that names a conversation goes to the host it
+     was seen on.
+   - The host's events of its vaults' runs reach the windows as a local run's
+     do, and what a run asks is answered from the window it shows in. While a
+     run is in progress this device reconnects by itself, without asking, as for
+     a hand-off; a run the host no longer has once it answers with nothing
+     running (its vault host was restarted) is ended in the window with a note.
+   - A file attached to an instruction is sent first and kept on the host under
+     the id it was staged with here, so the instruction names it unchanged.
+   - Not yet: the vault agent's `irori` command there (its writes need the guards
+     of decision 7's later step), and opening a path a reply from the host
+     names: such a reply's paths are shown as text.
+   - The terminal of such a vault is `ssh -t` to the host, run by this device
+     in a terminal of its own (`sshTerminalArgs`), with the same destination
+     and port as the connection. On the host it changes to the vault's folder
+     and starts the person's login shell (`$SHELL -l`). The command is a POSIX
+     script in single quotes, as the starter is, and the folder goes in it as
+     base64, so a folder with any character but a line break is reached. It is
+     a login of its own: what `ssh` asks is asked in the terminal, not in
+     irori's dialog, and nothing of irori's runs on the host for it.
 9. **What a vault host asks, the person answers here.** Configuration that runs
    without asking (hooks, MCP servers, plugins) and a Git repository's programs
    are approved in a dialog on this device, which names the host, before a CLI
@@ -180,10 +211,10 @@ weighed and dropped:
   environment saved on GitHub, and a workspace restored on another device shows
   such a vault as unavailable until the host is added there.
 - Not in this step: editing, creating, moving and deleting in a vault on a
-  host; conversations with its own agent and its `irori` command; the terminal;
-  connected folders; routines; the shared Schema for runs there; hosts other
-  than Linux on x64 and arm64. (SSH's prompts are answered in the window since
-  0.2.78.)
+  host; its agent's `irori` command; connected folders; routines; the shared
+  Schema for runs there; hosts other than Linux on x64 and arm64. (SSH's
+  prompts are answered in the window since 0.2.78; conversations with its own
+  agent and the terminal since 0.2.79.)
 - A host with glibc older than 2.28 cannot run the Node that is sent.
 - Where `systemd-logind` kills a user's processes at logout
   (`KillUserProcesses=yes`), the vault host ends with the login; the common

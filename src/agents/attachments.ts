@@ -48,6 +48,26 @@ export class AttachmentStore {
     await writeFileAtomic(path.join(this.dir(id), safe), Buffer.from(bytes));
     return { id, name: safe, size: bytes.length };
   }
+  /**
+   * Keeps a file another device staged, under the id and name it was given there,
+   * so that an instruction sent from that device names it here (ADR 061). One
+   * already kept is left as it is.
+   */
+  async keep(ref: AttachmentRef, bytes: Uint8Array) {
+    if (bytes.length !== ref.size || bytes.length > attachmentByteLimit) throw Error(missing());
+    if (
+      await this.path(ref).then(
+        () => true,
+        () => false,
+      )
+    )
+      return;
+    await fs.mkdir(this.dir(ref.id), { recursive: true });
+    await writeFileAtomic(
+      path.join(this.dir(ref.id), attachmentName(ref.name)),
+      Buffer.from(bytes),
+    );
+  }
   /** The file's absolute path, after checking it is the one referenced. */
   async path(ref: Pick<AttachmentRef, 'id' | 'name'>) {
     const file = path.join(this.dir(ref.id), attachmentName(ref.name));

@@ -1623,9 +1623,8 @@ function App() {
   const iroriShown = level !== 'brain';
   function toggleTerminal() {
     if (!iroriShown) {
-      // A vault on an SSH host has no terminal here yet (ADR 061).
-      if (terminalSpace || (active && !active.host))
-        setTerminalSpace((value) => (value ? undefined : active));
+      // A vault on an SSH host has its terminal there, through `ssh` (ADR 061).
+      if (terminalSpace || active) setTerminalSpace((value) => (value ? undefined : active));
     } else if (iroriTerminal || you?.state === 'ready') setIroriTerminal((value) => !value);
   }
   // The shortcuts read the latest render's state; the listener itself is added once.
@@ -4141,9 +4140,7 @@ function App() {
         status={status}
         terminalOpen={iroriShown ? iroriTerminal : !!terminalSpace}
         terminalDisabled={
-          iroriShown
-            ? !iroriTerminal && you?.state !== 'ready'
-            : (!active || !!active.host) && !terminalSpace
+          iroriShown ? !iroriTerminal && you?.state !== 'ready' : !active && !terminalSpace
         }
         onAi={act.showAi}
         onTerminal={act.toggleTerminal}

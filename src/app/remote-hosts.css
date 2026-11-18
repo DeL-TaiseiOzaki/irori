@@ -327,29 +327,23 @@
   overflow-wrap: anywhere;
 }
 
-/* In place of the instruction box of a vault agent whose vault is on a host. */
+/* Above the conversation of a vault agent whose vault is on a host: where it runs. */
 .remote-agent-note {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  margin: auto 16px;
-  padding: 18px 16px;
-  text-align: center;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 10px 12px 0;
+  padding: 7px 11px;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--hair);
+  background: var(--surface-sunken);
   color: var(--tx-2);
-  font-size: 12.5px;
-  line-height: 1.6;
+  font-size: 12px;
+  line-height: 1.5;
 }
-.remote-agent-note strong {
-  color: var(--tx);
-  font-size: 13px;
-}
-.remote-agent-note p {
-  margin: 0;
-  max-width: 34ch;
-}
-.composer[hidden] {
-  display: none;
+.remote-agent-note svg {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 /* What ssh asks while it signs in: its own words, kept as it wrote them, and the answer. */

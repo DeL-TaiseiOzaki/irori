@@ -1,11 +1,30 @@
 # irori continuation handoff
 
-**CI's intermittent failures, 0.2.79** (see STATUS). Two were app races (find in a
+**CI's intermittent failures, 0.2.80** (see STATUS). Two were app races (find in a
 PDF, the vault host's place) and four were tests reading before a write ended;
 all are fixed. A GitHub download timeout (504) on Nov 9 failed packaging twice
 and is not a code issue. If `verify` fails again on code the change does not
 touch, read the failing smoke's log before re-running: each of these failures
 was a race that showed only on a loaded runner.
+
+**A vault on an SSH host has its own agent and terminal, 0.2.79**
+([ADR 061](decisions/061-vaults-on-ssh-hosts.md) decision 8, amended;
+[SSH-HOSTS](SSH-HOSTS.md)). The owner connected a vault on an SSH host and
+found its vault agent column and the terminal dimmed. The column now runs the
+vault's agent on the host through the vault host's `AgentService`, with its
+conversations kept there (`forwardedAgent`, `RemoteHosts.agent` and `relay`),
+and the terminal is `ssh -t` into the vault's folder there (`sshTerminalArgs`).
+Run on Linux only, with this machine standing in for the host and the
+protocol fixtures as the CLIs. Next:
+1. Try it on the owner's Windows 11 against a real host with a real CLI signed
+   in there: the column's run, a permission asked there, and the terminal,
+   which is `ssh.exe` in a ConPTY and asks for a password in the terminal.
+2. Not done: the vault agent's `irori` command on the host (it needs the write
+   guards of the editing step), opening a path a reply from the host names
+   (shown as text now), and an attached image shown in such a conversation
+   after this device's unsent copy is pruned a day later (`AttachmentStore.prune`).
+3. Fish and zsh as the host's login shell were not run: the terminal's command
+   is a POSIX script in single quotes without backslashes, as the starter's is.
 
 **Workspace tabs move between windows and along the strip, 0.2.74 to 0.2.77**
 ([ADR 063](decisions/063-tab-out-to-a-new-window.md),
@@ -64,13 +83,13 @@ when the connection is cut. Next, in this order:
 1. Run it for real: from a Windows and a macOS client, across a real network,
    and with a real CLI signed in on the host. So far only Linux and the
    stand-in CLIs have run it.
-2. Conversations with the vault's own agent on the host, with its `irori`
-   command and the shared Schema there.
+2. Conversations with the vault's own agent on the host: done in 0.2.79,
+   without its `irori` command and the shared Schema there.
 3. Editing: the write operations move beside the reads with their guards
    (`src/host/vault-reads.ts` is where the main process and the vault host
    already share code).
-4. The terminal as `ssh -t`, connected folders, and path links in replies for
-   files on a host.
+4. Connected folders, and path links in replies for files on a host. (The
+   terminal as `ssh -t` is done in 0.2.79.)
 
 0.2.75 lists the hosts of the person's ssh configuration where a host is added
 (`src/host/ssh-config.ts`; ADR 061 decision 3, amended), because the owner
@@ -129,6 +148,19 @@ If a run fails, read its log, fix the cause, and publish by hand:
 published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
+
+Published 2026-11-17: **0.2.79** ([#345](https://github.com/DeL-TaiseiOzaki/irori/pull/345),
+a vault on an SSH host has its own agent and terminal, ADR 061 decision 8
+amended) as `6d1d81e`, by `publish.yml` alone (push run `44049135383`, packages
+from the pull request's app run `44047685325`). Merged at 08:43:13 UTC, the
+release out at 08:45:26 (2:13), the page deployed by 08:51:33 (8:20), and the
+run finished with the drift check at 08:52:02. The step that checks what an
+installed irori sees took five minutes again, as for 0.2.78. The live page
+offered the 0.2.79 installers and the guide's SSH page its new sections. Anonymous
+downloads of the Windows installer, the Mac image and
+`irori-0.2.79-full.nupkg` matched `SHA256SUMS.txt`. Nothing of it has run on
+Windows or macOS beyond CI's packaged-app smokes, and no real host with a real
+CLI has run the vault agent's column or the terminal.
 
 Published 2026-11-16: **0.2.78** ([#340](https://github.com/DeL-TaiseiOzaki/irori/pull/340),
 what `ssh` asks while it signs in to an SSH host is answered in the window, and

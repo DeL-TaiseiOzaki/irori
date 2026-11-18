@@ -263,7 +263,8 @@ export function BrainHome({
               {t('ノートを作成', 'Create note')}
             </button>
           )}
-          {shown.terminal && !remote && (
+          {/* On an SSH host the terminal is the host's, through ssh (ADR 061). */}
+          {shown.terminal && (
             <button className="stage-text-button" onClick={onTerminal}>
               <Icon name="terminal" size={15} />
               {t('ターミナル', 'Terminal')}

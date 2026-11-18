@@ -1,15 +1,30 @@
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import treeKill from 'tree-kill';
 import type { IPty } from 'node-pty';
 import type { FileService } from '../host/files';
 import type { TerminalEvent, TerminalSession, TerminalShell } from '../domain/types';
 import { agentEnv } from '../agents/process';
 import { detectShells } from './shells';
+import { findExecutable } from '../host/executables';
 import { SerialQueue } from '../host/serial-queue';
 import { t } from '../domain/i18n';
 
 type Running = { info: TerminalSession; pty: IPty; pending: number };
+/**
+ * A terminal that is a program of this device reaching another machine: for a
+ * vault on an SSH host, `ssh` into its folder there (ADR 061).
+ */
+export interface FarTerminal {
+  /** What the terminal shows as its shell. */
+  name: string;
+  /** The program, found on the search path, and its arguments. */
+  program: string;
+  args: string[];
+  /** The folder the shell starts in, as that machine names it. */
+  cwd: string;
+}
 const highWater = 100000,
   lowWater = 50000;
 
@@ -22,6 +37,8 @@ export class TerminalService {
     private emit: (event: TerminalEvent) => void,
     /** The irori agent's folder when `scopeId` is its id; a vault's id resolves through the files. */
     private agentRoot: (scopeId: string) => string | undefined = () => undefined,
+    /** The terminal of a vault on an SSH host, when `scopeId` names one. */
+    private far: (scopeId: string) => FarTerminal | undefined = () => undefined,
   ) {}
   get busy() {
     return this.running.size > 0 || this.queue.busy;
@@ -39,31 +56,59 @@ export class TerminalService {
         throw Error(
           t('ターミナルは同時に4つまで開けます。', 'Up to 4 terminals can be open at once.'),
         );
-      const shell = (await this.available()).find((item) => item.id === shellId);
-      if (!shell) throw Error(t('シェルが見つかりません。', 'Shell not found.'));
-      const own = this.agentRoot(scopeId);
-      const cwd = own
-        ? await fs.realpath(own).catch(() => {
-            throw Error(
-              t(
-                'irori agent のフォルダがまだありません。',
-                "The irori agent's folder doesn't exist yet.",
-              ),
-            );
-          })
-        : await this.files.resolve(scopeId, '', true);
       const env = agentEnv();
       delete env.ELECTRON_RUN_AS_NODE;
       delete env.NODE_OPTIONS;
+      const far = this.far(scopeId);
+      let start: { file: string; args: string[]; cwd: string; shell: TerminalShell; shown: string };
+      if (far) {
+        // The shell is the host's; this device runs only the program that reaches it.
+        const file = await findExecutable(far.program, env);
+        if (!file)
+          throw Error(
+            t(
+              `${far.program} が見つかりません。OpenSSH クライアントをインストールしてください。`,
+              `${far.program} was not found. Install the OpenSSH client.`,
+            ),
+          );
+        start = {
+          file,
+          args: far.args,
+          cwd: os.homedir(),
+          shell: { id: far.program, name: far.name },
+          shown: far.cwd,
+        };
+      } else {
+        const shell = (await this.available()).find((item) => item.id === shellId);
+        if (!shell) throw Error(t('シェルが見つかりません。', 'Shell not found.'));
+        const own = this.agentRoot(scopeId);
+        const cwd = own
+          ? await fs.realpath(own).catch(() => {
+              throw Error(
+                t(
+                  'irori agent のフォルダがまだありません。',
+                  "The irori agent's folder doesn't exist yet.",
+                ),
+              );
+            })
+          : await this.files.resolve(scopeId, '', true);
+        start = {
+          file: shell.id,
+          args: process.platform === 'win32' ? [] : ['-l'],
+          cwd,
+          shell,
+          shown: cwd,
+        };
+      }
       const { spawn } = await import('node-pty');
-      const pty = spawn(shell.id, process.platform === 'win32' ? [] : ['-l'], {
-        cwd,
+      const pty = spawn(start.file, start.args, {
+        cwd: start.cwd,
         cols,
         rows,
         name: 'xterm-256color',
         env: env as Record<string, string>,
       });
-      const info = { id: randomUUID(), scopeId, shell, cwd };
+      const info = { id: randomUUID(), scopeId, shell: start.shell, cwd: start.shown };
       const session: Running = { info, pty, pending: 0 };
       this.running.set(info.id, session);
       pty.onData((data) => {

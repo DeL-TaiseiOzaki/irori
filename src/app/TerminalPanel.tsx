@@ -28,8 +28,11 @@ export default function TerminalPanel({
   space,
   onClose,
 }: {
-  /** The vault, or the irori agent, whose folder the shell starts in. */
-  space: Pick<Space, 'scopeId' | 'name'>;
+  /**
+   * The vault, or the irori agent, whose folder the shell starts in. For a vault on
+   * an SSH host the shell is the host's, reached by `ssh` (ADR 061).
+   */
+  space: Pick<Space, 'scopeId' | 'name' | 'host'>;
   onClose: () => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
@@ -99,7 +102,10 @@ export default function TerminalPanel({
     setError('');
     setStarting(true);
     void (async () => {
-      const options = await host.terminalShells();
+      // On an SSH host the host's own login shell starts; there is nothing to choose here.
+      const options = space.host
+        ? [{ id: 'ssh', name: `ssh ${space.host.name}` }]
+        : await host.terminalShells();
       if (disposed) return;
       setShells(options);
       const shell = options.find((item) => item.id === selected) ?? options[0];
@@ -151,18 +157,30 @@ export default function TerminalPanel({
         <strong>
           <Icon name="terminal" /> {space.name}
         </strong>
-        <select
-          aria-label={t('ターミナルのシェル', 'Terminal shell')}
-          value={selected}
-          disabled={running || starting}
-          onChange={(event) => setSelected(event.target.value)}
-        >
-          {shells.map((shell) => (
-            <option key={shell.id} value={shell.id}>
-              {shell.name}
-            </option>
-          ))}
-        </select>
+        {space.host ? (
+          <span
+            className="terminal-remote"
+            title={t(
+              `SSH ホスト「${space.host.name}」のログインシェル`,
+              `The login shell of the SSH host ${space.host.name}`,
+            )}
+          >
+            <Icon name="server" size={12} /> ssh {space.host.name}
+          </span>
+        ) : (
+          <select
+            aria-label={t('ターミナルのシェル', 'Terminal shell')}
+            value={selected}
+            disabled={running || starting}
+            onChange={(event) => setSelected(event.target.value)}
+          >
+            {shells.map((shell) => (
+              <option key={shell.id} value={shell.id}>
+                {shell.name}
+              </option>
+            ))}
+          </select>
+        )}
         <span
           className="terminal-state"
           data-state={starting ? 'starting' : running ? 'running' : 'exited'}

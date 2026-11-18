@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { hostArguments } from '../domain/host-requests';
+import { hostArguments, type HostHandlers } from '../domain/host-requests';
+import { attachmentByteLimit, attachmentRef } from '../domain/attachments';
 import { agentAccessModes, agentIds, type AgentEvent } from '../domain/types';
 import { categoryText } from '../domain/brains';
 import { languages } from '../domain/i18n';
@@ -44,6 +45,58 @@ export type ForwardedRead = (typeof forwardedReads)[number];
 export const isForwardedRead = (method: string): method is ForwardedRead =>
   (forwardedReads as readonly string[]).includes(method);
 
+/**
+ * The operations of the HostAPI on a vault's own agent and its conversations,
+ * which a vault host answers for the vaults on its SSH host: the agent runs and
+ * its conversations are kept there (ADR 061, amended 0.2.79).
+ */
+export const forwardedAgent = [
+  'agentCommands',
+  'agentConversations',
+  'agentConversation',
+  'createConversation',
+  'renameConversation',
+  'pinConversation',
+  'archiveConversation',
+  'deleteConversation',
+  'queueAgentMessage',
+  'removeQueuedMessage',
+  'startNextQueued',
+  'sendQueuedNow',
+  'rewindConversation',
+  'forkConversation',
+  'start',
+  'cancel',
+] as const satisfies readonly (keyof HostHandlers)[];
+export type ForwardedAgent = (typeof forwardedAgent)[number];
+export const isForwardedAgent = (method: string): method is ForwardedAgent =>
+  (forwardedAgent as readonly string[]).includes(method);
+/**
+ * How many of an operation's arguments a vault host takes, for those whose last
+ * names the irori agent's workspace, which a vault's conversations are not kept by.
+ * The rest are sent as they are, less any left out at the end: a line of the
+ * protocol is JSON, where an argument left out in the middle would arrive as null.
+ */
+export const hostArity: Partial<Record<ForwardedAgent, number>> = {
+  agentConversations: 1,
+  agentConversation: 3,
+  createConversation: 2,
+  startNextQueued: 2,
+  sendQueuedNow: 3,
+  rewindConversation: 3,
+  forkConversation: 3,
+};
+/** Those of them that name a conversation first rather than a vault. */
+export const byConversation = [
+  'renameConversation',
+  'pinConversation',
+  'archiveConversation',
+  'deleteConversation',
+  'removeQueuedMessage',
+] as const satisfies readonly ForwardedAgent[];
+export const isByConversation = (method: string): method is (typeof byConversation)[number] =>
+  (byConversation as readonly string[]).includes(method);
+
 const id = z.uuid();
 const name = z.string().trim().min(1).max(120);
 /** The largest file sent into a work folder: what `irori send` takes. */
@@ -76,6 +129,11 @@ export const hostOperations = {
   awaitHandOff: z.tuple([id]),
   cancelHandOff: z.tuple([id]),
   forgetHandOff: z.tuple([id]),
+  /** A file the person attached on their device, kept under its id for an instruction there. */
+  attach: z.tuple([
+    attachmentRef,
+    z.instanceof(Uint8Array).refine((bytes) => bytes.byteLength <= attachmentByteLimit),
+  ]),
   respond: hostArguments.respond,
   status: z.tuple([]),
 } as const;
