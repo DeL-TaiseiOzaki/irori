@@ -699,10 +699,17 @@ test('set, layer, workspace, disconnect and remove change what irori holds, neve
   assert.equal(await readFile(path.join(drive, 'x.txt'), 'utf8'), 'x');
   await assert.rejects(setup.run(['disconnect', 'Research', 'drive'], base), /no connected folder/);
 
-  // A vault whose own agent works waits.
+  // A vault whose own agent works keeps its folders and its place: removing it waits,
+  // while its name and look change during the run (ADR 020 D5).
   const busy = new AgentSetup({ ...deps, running: () => true });
-  await assert.rejects(busy.run(['set', 'Research', '--name', 'X'], base), /own agent running/);
   await assert.rejects(busy.run(['remove', 'Research'], base), /own agent running/);
+  await assert.rejects(
+    busy.run(['layer', 'Research', 'contents', 'other'], base),
+    /own agent running/,
+  );
+  const before = files.get(id).name;
+  assert.match(await busy.run(['set', 'Research', '--name', 'Research X'], base), /Research X/);
+  await busy.run(['set', 'Research X', '--name', before], base);
 
   // Removing keeps the folder and leaves every workspace; adding brings it back.
   const removed = await setup.run(['remove', 'Notes'], base, context);

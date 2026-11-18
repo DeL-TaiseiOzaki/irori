@@ -60,6 +60,17 @@ In the same request the owner asked where agents work. An agent had made
    are unchanged. irori makes, moves or removes nothing in the person's folder.
    Disconnecting a waiting connection stops the wait and removes only irori's
    own link if one was left.
+   *(Amended 2026-11-18, 0.2.81, owner report: a GitHub connection showing
+   フォルダ未選択 could be neither connected again nor cloned.)* When this
+   device no longer knows a connection's folder, its link from a stop without
+   disconnecting can stay at `contents/<name>`; the old rule then refused every
+   new folder, and **取得** found that out only after minutes of cloning. Now a
+   link there that leads nowhere is removed when the connection is linked,
+   since nothing is behind it. A link to an existing folder still stays, and the
+   refusal names where it leads, for the person to choose that folder
+   (手元のクローンを選ぶ, フォルダを選び直す) or remove the link. **取得** checks
+   `contents/<name>` before it clones, and the sheet says while a clone runs that
+   it may take minutes. A folder or file at that place is never touched.
 5. **Agents are told about a folder once it is linked.** `linkedPaths()` and
    `localFolders()` list mounted connections only, so a run that starts after a
    folder came back is told about it and may change it; one that started before

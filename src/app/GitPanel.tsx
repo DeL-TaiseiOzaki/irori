@@ -177,6 +177,7 @@ export function GitPanel({
   onBusyChange,
   revision,
   beforeAction,
+  held = false,
 }: {
   space: Space;
   onChanged: () => void;
@@ -185,6 +186,11 @@ export function GitPanel({
   onBusyChange: (busy: boolean) => void;
   revision: number;
   beforeAction: () => Promise<boolean>;
+  /**
+   * A run works in the vault: a pull or merge, which would change its files under
+   * it, waits; staging, commits, pushes and fetches go on (ADR 020 D5).
+   */
+  held?: boolean;
 }) {
   const [submodules, setSubmodules] = useState<GitSubmodule[]>([]),
     [repository, setRepository] = useState(''),
@@ -270,6 +276,7 @@ export function GitPanel({
           onReviewChange={onReviewChange}
           externalRevision={revision}
           beforeAction={beforeAction}
+          held={held}
         />
       )}
       {adding && (
@@ -305,6 +312,7 @@ function RepositoryPanel({
   onReviewChange,
   externalRevision,
   beforeAction,
+  held,
 }: {
   space: Space;
   /** A submodule's folder, or empty for the vault's own repository. */
@@ -316,8 +324,15 @@ function RepositoryPanel({
   onReviewChange: (reviewing: boolean) => void;
   externalRevision: number;
   beforeAction: () => Promise<boolean>;
+  held: boolean;
 }) {
   const menuHost = useRef<HTMLDivElement>(null);
+  const heldNote = held
+    ? t(
+        'この vault でエージェントが実行中です。ファイルを書き換える Pull と統合は、実行が終わってからできます。',
+        'An agent runs in this vault. Pull and merge, which change its files, can be done once the run ends.',
+      )
+    : undefined;
   // A vault on an SSH host shows its status and diffs; nothing here changes it (ADR 061).
   const shownOnly = !!space.host;
   const target: GitTarget = repository ? { scopeId: space.scopeId, repository } : space.scopeId;
@@ -717,8 +732,13 @@ function RepositoryPanel({
                     </Menu.Item>
                     <Menu.Item
                       disabled={
-                        busy || !canSync || !!status.changes.length || status.operation !== 'none'
+                        busy ||
+                        held ||
+                        !canSync ||
+                        !!status.changes.length ||
+                        status.operation !== 'none'
                       }
+                      title={heldNote}
                       onClick={() => confirm('merge')}
                     >
                       {t('履歴を統合', 'Merge history')}
@@ -751,11 +771,13 @@ function RepositoryPanel({
               className="panel-button git-pull"
               disabled={
                 busy ||
+                held ||
                 conflictDirty ||
                 !canSync ||
                 !!status.changes.length ||
                 status.operation !== 'none'
               }
+              title={heldNote}
               onClick={() => confirm('pull')}
             >
               <Icon name="down" size={14} />

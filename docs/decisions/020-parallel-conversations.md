@@ -71,6 +71,31 @@ Git operations, note and material reorganization, hibachi settings and Drive
 changes still wait while any run works in the hibachi, as do routine steps
 ([ROUTINES](../ROUTINES.md)). These are irori's own changes, not a conversation's.
 
+*(Amended 2026-11-18, 0.2.81, owner request: "too much cannot be done while an
+agent runs".)* What waits is what would move or rewrite files a run works on, and
+it waits only for runs in that vault. A run keeps what it was given when it
+started, and an edit or an addition, like a save, goes on beside it:
+
+- **Git.** Staging, commits, pushes, fetches, publishing and new vaults go on
+  during runs; Git's index and history are not files the run works on, and
+  irori's authorship note names only the person's lines. A pull or merge, a
+  conflict resolution and a submodule checkout change the vault's files and
+  wait for runs in that vault, not in others. Every Git operation still waits
+  for a routine, whose change record compares Git's status before and after,
+  and for saves and connection setup. Before this, any run anywhere held every
+  Git operation in every vault.
+- **Vaults.** A vault is registered, created or cloned during runs: it is out of
+  every run's reach, as the irori agent's own `irori add` already was. Its name,
+  category, look and layer names change during its runs (`irori set` too); its
+  layer folders, its removal and `irori layer` still wait.
+- **Notes and Schema.** Restoring a deleted note only writes where nothing
+  stands, and Schema files are the person's instructions, edited as a note is,
+  so both go on; the irori agent's Schema too, while it runs. A save that the
+  agent's own write overtook is refused by the expected-content check, not lost. The ontology and materials views open during runs; rewriting
+  the indexes waits, since the agent may be writing them. Moving, renaming and
+  deleting notes and files still wait, as before.
+- **Connections** follow ADR 042 D2 as amended.
+
 ## Consequences
 
 - Scripts irori hands to CLIs (the person-lines hook, the `hibachi` command) are

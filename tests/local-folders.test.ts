@@ -149,12 +149,15 @@ test('A replaced link or folder is refused, and links inside the folder are not 
   await symlink(outside, entry);
   const [replaced] = await cloud.connections(space.scopeId);
   assert.equal(replaced.state, 'error');
-  assert.match(replaced.detail!, /同じ名前/);
+  // The refusal names where the link at its place leads (ADR 042 D4).
+  assert.match(replaced.detail!, /へのリンクがあります/);
+  assert.ok(replaced.detail!.includes(outside));
   assert.deepEqual(cloud.localFolders(space.scopeId), []);
   assert.equal(await readlink(entry), outside);
   await cloud.disconnect(space.scopeId, mountId);
   assert.equal(await readlink(entry), outside);
-  await assert.rejects(cloud.connect(space.scopeId, mountId), /同じ名前/);
+  await assert.rejects(cloud.connect(space.scopeId, mountId), /へのリンクがあります/);
+  assert.equal(await readlink(entry), outside);
 });
 
 test('A link left by a stop without disconnecting is used again or cleared', async (t) => {

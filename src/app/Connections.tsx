@@ -40,6 +40,18 @@ function accessNote(access: CloudConnection['access']) {
       );
 }
 
+/** What a clone in progress holds up, and for how long it may. */
+function CloningNote() {
+  return (
+    <p className="connect-hint" role="status">
+      {t(
+        'リポジトリを取得しています。大きなリポジトリでは数分かかります。GitHub のログイン画面が開いたら、そちらで続けてください。終わるまで、この画面の操作は待ちます。',
+        'Cloning the repository. A large one takes minutes. If a GitHub sign-in window opens, continue there. This sheet waits until it finishes.',
+      )}
+    </p>
+  );
+}
+
 /** One numbered step of the connection, joined to the next by a guide line. */
 function Step({
   n,
@@ -134,6 +146,8 @@ export function Connections({
     [contentsRoot, setContentsRoot] = useState(space.contents[0]),
     [localPath, setLocalPath] = useState('');
   const [updated, setUpdated] = useState<{ mountId: string; text: string }>();
+  // A repository being cloned: its card, or the new connection's form (`''`).
+  const [cloning, setCloning] = useState<string>();
   const [revision, setRevision] = useState(0);
   const { busy, error, run: perform } = useAction({ after: () => setRevision((v) => v + 1) });
   const [editing, setEditing] = useState<string>(),
@@ -187,6 +201,15 @@ export function Connections({
     if (stray.missing && !folder) return;
     const connection = await host.adoptStray(space.scopeId, stray.contentsRoot, stray.name, folder);
     await host.connectCloud(space.scopeId, connection.mountId);
+  }
+  /** Runs a clone, saying while it lasts that it may take minutes. */
+  async function clone<T>(where: string, operation: () => Promise<T>) {
+    setCloning(where);
+    try {
+      return await operation();
+    } finally {
+      setCloning(undefined);
+    }
   }
   function chooseSource(value: 'local' | 'github') {
     setSource(value);
@@ -341,16 +364,18 @@ export function Connections({
                       const access = editable ? 'read-write' : 'read-only';
                       const connection =
                         source === 'github'
-                          ? await host.addRepository({
-                              scopeId: space.scopeId,
-                              url: url.trim(),
-                              ...(branch.trim() && !existing && { branch: branch.trim() }),
-                              folder: localPath,
-                              existing,
-                              contentsRoot,
-                              name,
-                              access,
-                            })
+                          ? await clone('', () =>
+                              host.addRepository({
+                                scopeId: space.scopeId,
+                                url: url.trim(),
+                                ...(branch.trim() && !existing && { branch: branch.trim() }),
+                                folder: localPath,
+                                existing,
+                                contentsRoot,
+                                name,
+                                access,
+                              }),
+                            )
                           : await host.addLocalFolder({
                               scopeId: space.scopeId,
                               path: localPath,
@@ -433,6 +458,7 @@ export function Connections({
                         : t('登録して接続', 'Register and connect')}
                     </button>
                   </div>
+                  {cloning === '' && !existing && <CloningNote />}
                 </form>
               ) : null}
             </Step>
@@ -496,6 +522,7 @@ export function Connections({
                     </span>
                   </div>
                   {connection.detail && <p className="connect-hint">{connection.detail}</p>}
+                  {cloning === connection.mountId && <CloningNote />}
                   {updated?.mountId === connection.mountId && (
                     <p className="connect-hint" role="status">
                       {updated.text}
@@ -542,7 +569,9 @@ export function Connections({
                             void perform(async () => {
                               const folder = await host.chooseFolder();
                               if (!folder) return;
-                              await host.cloneRepository(space.scopeId, connection.mountId, folder);
+                              await clone(connection.mountId, () =>
+                                host.cloneRepository(space.scopeId, connection.mountId, folder),
+                              );
                               await host.connectCloud(space.scopeId, connection.mountId);
                             })
                           }

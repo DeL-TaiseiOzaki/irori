@@ -456,15 +456,10 @@ export function SchemaEditor({
       <div className="schema-form">
         {locked && (
           <p className="hint" role="status">
-            {space
-              ? t(
-                  '実行・Git 操作・接続中は変更できません。',
-                  'Cannot change during a run, a Git operation or a connection.',
-                )
-              : t(
-                  'irori agent の実行中は変更できません。',
-                  'Cannot change while the irori agent runs.',
-                )}
+            {t(
+              'Git 操作・接続の準備中は変更できません。',
+              'Cannot change during a Git operation or a connection.',
+            )}
           </p>
         )}
         {!data.data ? (

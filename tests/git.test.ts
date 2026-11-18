@@ -141,6 +141,32 @@ test('stale diff and commit reviews are rejected; operations cannot overlap agen
   assert.equal(git(root, 'log', '-1', '--format=%s'), 'Initial notes');
 });
 
+test('A run in a vault holds only the Git operations that change its files', async (t) => {
+  const { files, space, root } = await fixture(t);
+  // The host's rule (ADR 020 D5): a run holds what would change its vault's files.
+  const asked: [string | undefined, boolean][] = [];
+  const service = new GitService(files, (scopeId, tree) => {
+    asked.push([scopeId, tree]);
+    return !(tree && scopeId === space.scopeId);
+  });
+  t.after(() => service.close());
+  await writeFile(path.join(root, 'other.md'), 'Written during the run\n');
+  await stage(service, space.scopeId, 'other.md');
+  const state = await service.status(space.scopeId);
+  await service.commit(space.scopeId, 'Committed during a run', state.version);
+  assert.equal(git(root, 'log', '-1', '--format=%s'), 'Committed during a run');
+  // A pull or merge would change the files under the run: it waits for it.
+  const now = await service.status(space.scopeId);
+  await assert.rejects(
+    service.sync(space.scopeId, 'pull', now.version),
+    /ファイルを書き換える Git 操作/,
+  );
+  assert.deepEqual(
+    [...new Set(asked.map(([scopeId, tree]) => `${scopeId === space.scopeId}:${tree}`))].sort(),
+    ['true:false', 'true:true'],
+  );
+});
+
 test('Git protects contents, nested scopes, aliases and pre-staged foreign files', async (t) => {
   const { service, space, root, files, base } = await fixture(t);
   await mkdir(path.join(root, 'contents'));

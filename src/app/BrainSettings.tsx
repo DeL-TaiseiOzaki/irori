@@ -247,6 +247,7 @@ export function BrainSettings({
   onClose,
   beforeRename,
   onRemoved,
+  running = false,
 }: {
   space: Space;
   /** The workspace's brains, for the rail preview. */
@@ -258,6 +259,11 @@ export function BrainSettings({
   beforeRename?: () => Promise<boolean>;
   /** The vault left irori; without it, the sheet offers no removal. */
   onRemoved?: () => void;
+  /**
+   * A run works in the vault: its name, look and layer names change, but its layer
+   * folders and the vault itself stay where the run finds them (ADR 020 D5).
+   */
+  running?: boolean;
 }) {
   const current = brainAppearance(space);
   const [name, setName] = useState(space.name);
@@ -471,6 +477,14 @@ export function BrainSettings({
           </section>
           <section className="brain-sheet-layers">
             <h3>{t('層', 'Layers')}</h3>
+            {running && (
+              <p className="brain-sheet-note" role="status">
+                {t(
+                  'エージェントの実行中は、フォルダの変更と vault の削除はできません。名前・見た目・表示名は変えられます。',
+                  'While an agent runs, the folders cannot change and the vault cannot be removed. Its name, look and shown names can.',
+                )}
+              </p>
+            )}
             <div className="brain-sheet-layer-grid">
               <span />
               <span className="brain-sheet-layer-head">{t('表示名', 'Shown as')}</span>
@@ -502,7 +516,7 @@ export function BrainSettings({
                         ? rootKnowledgeFolder
                         : folders[layer]
                     }
-                    disabled={layer === 'Knowledge_Base' && knowledgeAtRoot}
+                    disabled={running || (layer === 'Knowledge_Base' && knowledgeAtRoot)}
                     maxLength={64}
                     aria-label={t(
                       `${defaultLayerLabel(layer)} のフォルダ`,
@@ -518,6 +532,7 @@ export function BrainSettings({
                       <input
                         type="checkbox"
                         checked={knowledgeAtRoot}
+                        disabled={running}
                         onChange={(event) => setKnowledgeAtRoot(event.target.checked)}
                       />{' '}
                       {t('vault のルート', "The vault's root")}
@@ -633,7 +648,7 @@ export function BrainSettings({
             <button
               type="button"
               className="stage-text-button danger"
-              disabled={saving}
+              disabled={saving || running}
               onClick={() => setRemoving(true)}
             >
               <Icon name="trash" size={14} />

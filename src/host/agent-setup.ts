@@ -629,8 +629,9 @@ export class AgentSetup {
     cwd: string,
     context: SetupContext,
   ) {
+    // A vault's name, category, look and layer names: its run keeps what it was told,
+    // so they change during it as in the vault's settings (ADR 020 D5).
     const space = this.vault(command.vault, cwd, context.vault);
-    this.idle(space, "Change the vault's settings", context.vault);
     const change: SpaceChange = {
       ...(command.name && { name: command.name }),
       ...(command.category && { category: command.category }),

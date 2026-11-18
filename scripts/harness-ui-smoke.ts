@@ -187,6 +187,32 @@ try {
         'draggable',
         'false',
       );
+      // Views and edits stay open during the run; what would move its files waits
+      // (ADR 020 D5).
+      await page.getByRole('button', { name: 'vault のメニュー', exact: true }).click();
+      for (const item of ['資料と成果物', 'オントロジー', '削除したノートを復元'])
+        await expect(page.getByRole('menuitem', { name: item, exact: true })).toBeEnabled();
+      await page.getByRole('menuitem', { name: 'vault の設定', exact: true }).click();
+      const settings = page.getByRole('dialog', { name: 'vault の設定' });
+      await expect(settings.getByRole('status')).toContainText('フォルダの変更と vault の削除');
+      await expect(settings.getByRole('textbox', { name: 'Contents のフォルダ' })).toBeDisabled();
+      await expect(
+        settings.getByRole('button', { name: 'vault を削除', exact: true }),
+      ).toBeDisabled();
+      await settings.getByRole('textbox', { name: '名前' }).fill('ハーネス検証 実行中');
+      await settings.getByRole('button', { name: '保存', exact: true }).click();
+      await expect(settings).toHaveCount(0);
+      expect(
+        (await page.evaluate(() => window.irori.spaces())).find(
+          (item) => item.scopeId === space.scopeId,
+        )?.name,
+      ).toBe('ハーネス検証 実行中');
+      await page.getByRole('button', { name: 'vault のメニュー', exact: true }).click();
+      await page.getByRole('menuitem', { name: 'vault の設定', exact: true }).click();
+      await settings.getByRole('textbox', { name: '名前' }).fill('ハーネス検証');
+      await settings.getByRole('button', { name: '保存', exact: true }).click();
+      await expect(settings).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'ハーネス検証 のクラウド接続' })).toBeVisible();
       // Connecting goes on during the run (ADR 042 D2): a folder is connected and another
       // registered; a connected folder the run may have been given is not taken out.
       const kept = path.join(base, 'Kept folder');

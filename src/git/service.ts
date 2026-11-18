@@ -83,7 +83,13 @@ export class GitService {
   private notedCache = new Map<string, { revision: string; keys: Set<string> }>();
   constructor(
     private files: FileService,
-    private canMutate: () => boolean = () => true,
+    /**
+     * Whether a Git operation may start now in the vault `scopeId` (none for a new
+     * vault's folder). `tree`: it changes the vault's files (a pull or merge, a
+     * resolved conflict, submodule checkouts), which a run working there would find
+     * changed under it; the others only change what Git records (ADR 020 D5).
+     */
+    private canMutate: (scopeId: string | undefined, tree: boolean) => boolean = () => true,
     private authorship?: Pick<AuthorshipStore, 'view'>,
     private process = new GitProcess(),
     private github = new GitHubCli(),
@@ -212,23 +218,35 @@ export class GitService {
   private async submodulePaths(s: Repo) {
     return new Set((await this.recorded(s)).map((m) => m.path));
   }
+  /** A Git operation that changes the vault's files when `tree` is true: see `canMutate`. */
+  private mutateFiles<T>(tree: boolean, id: GitTarget, fn: (s: Repo) => Promise<T>) {
+    return this.mutate(id, fn, undefined, false, tree);
+  }
   /**
    * `fresh`: the repository is a vault just made in a new folder, which no
    * run, save or connection can be working in, so it waits for none of them.
+   * `tree`: the operation changes the vault's files, so a run there holds it.
    */
   private mutate<T>(
     id: GitTarget,
     fn: (s: Repo) => Promise<T>,
     resolve: (id: GitTarget) => Promise<Repo> = (id) => this.repo(id),
     fresh = false,
+    tree = false,
   ): Promise<T> {
-    if (!fresh && !this.canMutate())
+    const may = () => fresh || this.canMutate(gitScope(id), tree);
+    if (!may())
       return Promise.reject(
         Error(
-          t(
-            '保存・エージェント・ルーティン・接続処理の完了後に Git 操作ができます。',
-            'Git operations are available after saving, agent, routine and connection work finishes.',
-          ),
+          tree
+            ? t(
+                '保存・この vault のエージェント・ルーティン・接続処理の完了後に、ファイルを書き換える Git 操作ができます。',
+                "Git operations that change the vault's files are available after saving, this vault's agent, routine and connection work finishes.",
+              )
+            : t(
+                '保存・ルーティン・接続処理の完了後に Git 操作ができます。',
+                'Git operations are available after saving, routine and connection work finishes.',
+              ),
         ),
       );
     // A vault's submodules queue with it: committing one moves what the vault records.
@@ -238,8 +256,7 @@ export class GitService {
     const next = (this.queues.get(key) ?? Promise.resolve())
       .catch(() => {})
       .then(async () => {
-        if (!fresh && !this.canMutate())
-          throw Error(t('別の処理が実行中です。', 'Another operation is running.'));
+        if (!may()) throw Error(t('別の処理が実行中です。', 'Another operation is running.'));
         return fn(await resolve(id));
       });
     this.queues.set(key, next);
@@ -1156,7 +1173,8 @@ export class GitService {
       }
   }
   async sync(id: GitTarget, action: GitSyncAction, version: string) {
-    return this.mutate(id, async (s) => {
+    // A push or fetch leaves the files as they are; a pull or merge changes them.
+    return this.mutateFiles(action !== 'push' && action !== 'fetch', id, async (s) => {
       const state = await this.checked(s, version),
         remote = this.requireRemote(state);
       if (state.operation !== 'none' && action !== 'fetch')
@@ -1311,7 +1329,7 @@ export class GitService {
     };
   }
   async resolve(id: GitTarget, p: string, text: string | null, version: string) {
-    return this.mutate(id, async (s) => {
+    return this.mutateFiles(true, id, async (s) => {
       const conflict = await this.conflict(id, p);
       if (conflict.version !== version) throw stale();
       if (!conflict.editable) throw Error(conflict.detail);
@@ -1439,7 +1457,7 @@ export class GitService {
   }
   /** Fetches the files of the submodule at `only`, or of every submodule not yet here. */
   async initSubmodules(id: string, only?: string): Promise<GitSubmodules> {
-    return this.mutate(id, async (s) => {
+    return this.mutateFiles(true, id, async (s) => {
       if (only && !(await this.submodulePaths(s)).has(only))
         throw Error(
           t('この vault の submodule ではありません。', 'This is not a submodule of the vault.'),
@@ -1613,7 +1631,7 @@ export class GitService {
    * and a new folder is out of every run's reach, so runs do not stop it.
    */
   async clone(input: CloneRepository, duringRuns = false): Promise<CloneResult> {
-    if ((!duringRuns && !this.canMutate()) || this.busy)
+    if ((!duringRuns && !this.canMutate(undefined, false)) || this.busy)
       throw Error(t('別の処理が実行中です。', 'Another operation is running.'));
     if (!githubCloneURL(input.url)) throw cloneURLRequired();
     this.pending++;
@@ -1666,7 +1684,7 @@ export class GitService {
    * `main`, ready for registration. Nothing is committed yet.
    */
   async create(input: Pick<CreateSpace, 'parent' | 'folder'>, duringRuns = false): Promise<string> {
-    if ((!duringRuns && !this.canMutate()) || this.busy)
+    if ((!duringRuns && !this.canMutate(undefined, false)) || this.busy)
       throw Error(t('別の処理が実行中です。', 'Another operation is running.'));
     this.pending++;
     try {
