@@ -1,6 +1,7 @@
 # Implementation status — notes, native agents and connection onboarding
 
-CI's intermittent failures traced, 2026-11-17 (**0.2.80**): the owner asked why CI
+CI's intermittent failures traced, 2026-11-17 (**0.2.80**,
+[#344](https://github.com/DeL-TaiseiOzaki/irori/pull/344), published as `v0.2.80-preview.1`): the owner asked why CI
 failed now and then. Of 14 failed runs since Nov 6, two were the change's own,
 two a GitHub download outage, and ten intermittent; four of those were races
 already fixed (7bb425e, f50ade7). The rest:
@@ -22,6 +23,11 @@ already fixed (7bb425e, f50ade7). The rest:
   `shared-schema-ui-smoke.ts` opened the start screen's settings while the
   workspace opened, and `tests/git-host-load.test.ts` counted between a child's
   two files. Each now waits for what it reads.
+- `publish.yml` published
+  [v0.2.80-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.80-preview.1)
+  from `10406b8` (push run `44256724659`). Anonymous downloads matched
+  `SHA256SUMS.txt`: Windows 179,411,968 bytes, Mac 145,743,050 bytes and
+  `irori-0.2.80-full.nupkg` 178,581,086 bytes.
 
 A vault on an SSH host has its own agent and terminal, 2026-11-17 (**0.2.79**,
 [#345](https://github.com/DeL-TaiseiOzaki/irori/pull/345), published as
