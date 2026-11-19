@@ -186,6 +186,18 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-11-19: **0.2.85** ([#354](https://github.com/DeL-TaiseiOzaki/irori/pull/354),
+a workspace tab's right-click menu and one workspace in several tabs; ADR 067) as
+`33997d5`. #357 was merged after the pull request's last run, so the push run
+(`44511502953`) found no packaged run for main's tree and left it to main's own
+run: `44511502958` passed, and publish run `44513052378` published it. Merged at
+11:04:40 UTC, the release out at 11:16:47, the page deployed by 11:22:50, and the
+drift check passed at 11:23:12. Anonymous downloads of the Windows installer, the
+Mac image and `irori-0.2.85-full.nupkg` matched `SHA256SUMS.txt`, the live page
+links the 0.2.85 installers, and the live guide (ja and en) lists the tab menu.
+CI passed on the head (run `44509578354`). Seen on Linux under Xvfb and in CI's
+packaged-app smokes only; not tried by hand on macOS or Windows.
+
 Published 2026-11-19: **0.2.84** ([#356](https://github.com/DeL-TaiseiOzaki/irori/pull/356),
 the shared Schema's skills given to Codex, OpenCode and the Antigravity CLI as
 their own skills; ADR 066) as `ae7b88a`, by `publish.yml` alone (push run
