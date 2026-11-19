@@ -9,8 +9,13 @@ Schema setting now reaches every CLI as the vault's own does. Next:
    Antigravity CLI reads `.agents/skills` in an `--add-dir` folder is read from
    its documentation, as its hooks folder was.
 2. Not covered, for every CLI alike: a vault on an SSH host gets no shared
-   Schema (ADR 061), and a CLI's own sub-agents do not see irori's words, so
-   shared instructions and rules reach them only when the agent passes them on.
+   Schema at all (ADR 061). Giving it there means carrying the shared Schema to
+   the vault host per run and deciding whether shared hooks may run on the host;
+   that is the owner's decision. A CLI's own sub-agents do not see irori's
+   words, so shared instructions and rules reach them only when the agent passes
+   them on.
+3. Hermes Agent still hears skills listed, and the hook events each CLI cannot
+   run stay as ADR 058 D5 lists them.
 
 **Keep working while an agent runs, 0.2.81** (see STATUS;
 [ADR 020](decisions/020-parallel-conversations.md) D5,

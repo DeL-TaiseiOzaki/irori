@@ -468,6 +468,13 @@ export function run(kind) {
                     .filter((name) => fs.existsSync(path.join(dir, name, 'SKILL.md')))
                 : [],
             ),
+            links: config.skills.paths.flatMap((dir) =>
+              fs.existsSync(dir)
+                ? fs
+                    .readdirSync(dir)
+                    .filter((name) => fs.lstatSync(path.join(dir, name)).isSymbolicLink())
+                : [],
+            ),
           });
         }
       }

@@ -64,26 +64,37 @@ both the folder's and the shared skills listed.
    CLI takes skills (`sharedSkillReach` in `src/domain/schema-reach.ts`):
    - Claude Code: links in an added folder (ADR 049, unchanged).
    - Pi: `--skill` per folder (ADR 058, unchanged).
-   - **Codex:** a folder of links, `given-skills/<run>/.agents/skills` in irori's
-     data directory, set with `skills/extraRoots/set` before the thread starts or
-     resumes.
-   - **OpenCode:** the same folder, added to the person's own `skills.paths` by
-     irori's plugin (`IroriSkillPaths`, from irori's data directory), whose
-     `config` hook appends it.
-   - **The Antigravity CLI:** copies of the skill folders in
-     `given-skills/<run>/.agents/skills`, with `given-skills/<run>` added as a
-     workspace folder. Copies, not links: its standard mode (`accept-edits`)
-     changes a workspace folder's files without asking, and through a link it
-     would change the shared Schema.
+   - **Codex:** a folder of links,
+     `given-skills/<conversation>/.agents/skills` in irori's data directory, set
+     with `skills/extraRoots/set` before the thread starts, resumes or forks, and
+     again when Codex is started once more for its hooks' trust. Links serve:
+     Codex names a skill by its real path, which its `workspace-write` sandbox
+     does not let it change.
+   - **OpenCode:** copies of the skill folders in the same place, added to the
+     person's own `skills.paths` by irori's plugin (`IroriSkillPaths`, from
+     irori's data directory), whose `config` hook appends the folder.
+   - **The Antigravity CLI:** copies in the same place, with
+     `given-skills/<conversation>` added as a workspace folder.
+   - Copies, not links, for OpenCode and the Antigravity CLI: OpenCode allows any
+     change in a skill's folder (`external_directory` allows every skill folder,
+     `packages/opencode/src/agent/agent.ts`), and the Antigravity CLI's standard
+     mode (`accept-edits`) changes a workspace folder's files without asking.
+     Through a link either would change the shared Schema. A link inside a skill
+     is copied as what it leads to; one that leads nowhere is left out.
    - Hermes Agent: listed, as before.
-2. **The folder's own skill wins.** A shared skill is not given where the folder
-   has a skill of its name or retired that name; for OpenCode, also where its
+2. **The folder's own skill wins.** A shared skill is not given where the
+   folder's `.agents/skills` has a folder of its name, a malformed, retired or
+   unlisted one too, as the CLI may still load it. For OpenCode, nor where its
    `.claude/skills` or `.opencode/skills` has that name, as OpenCode reads those
    too and keeps one skill of a name.
-3. **Nothing is written into a vault or the irori agent's folder.** The folder
+3. **One place per conversation.** The folder is named by the conversation, not
+   the run, so a skill's place is the same on every run of it: OpenCode writes
+   each skill's place into its system prompt (`Skill.fmt`). It is made afresh
+   for each run.
+4. **Nothing is written into a vault or the irori agent's folder.** The folder
    is removed when the run ends; those of runs that did not end are removed when
    irori starts.
-4. **A CLI that does not take them still hears them.** A Codex that refuses
+5. **A CLI that does not take them still hears them.** A Codex that refuses
    `skills/extraRoots/set`, or a folder irori cannot make, leaves the skills to
    the words, and the run says so in a status line.
 
@@ -92,14 +103,35 @@ both the folder's and the shared skills listed.
 - Every shared Schema setting now reaches every CLI the same way a vault's own
   does: instructions, rules and hooks as before, and skills as each CLI's own
   skills, except on Hermes Agent, where the vault's skills are listed too.
-- Codex also offers a shared skill as a skill item when the request names it
+- Codex also takes a shared skill as a skill item when the request names it
   (`$name`, `/name`), and its sub-agents in the same app server see the skills.
-- An Antigravity workspace gains one more folder; a skill changed there during a
-  run is a change to the copy, gone when the run ends.
+  The composer's skill menu already offers the shared skills on every CLI
+  (ADR 027 D8); Codex's own `/` list, read from an app server started without
+  the extra root, does not repeat them.
+- A skill changed during a run on OpenCode or the Antigravity CLI is a change to
+  the copy, gone when the run ends.
+- An independent review of the first version found that OpenCode could change
+  the shared Schema through the links, that a malformed vault skill did not keep
+  its name from the shared one, that a per-run place changed OpenCode's system
+  prompt on every run, and that a link inside a copied skill stayed a link. All
+  four are fixed as decided above, each with a test that fails without the fix.
 - Not verified with real CLIs: the stand-ins in `tests/schema-reach.test.ts`
   follow each CLI's source as read above. Installing Codex or OpenCode was not
   possible in this session, and the Antigravity CLI needs a signed-in account.
-- Still not covered: a vault on an SSH host gets no shared Schema at all on any
-  CLI (ADR 061, "the shared Schema for runs there"). A CLI's own sub-agents
-  (Claude Code's agents, OpenCode's `task`) do not see irori's words, so they
-  get the shared instructions and rules only when the agent passes them on.
+  That the Antigravity CLI reads `.agents/skills` in an `--add-dir` folder is
+  from its documentation only.
+- Still uneven or not covered:
+  - A vault on an SSH host gets no shared Schema at all on any CLI: neither its
+    instructions, rules, skills nor hooks (ADR 061, "the shared Schema for runs
+    there"). The guide now says so.
+  - Hermes Agent hears skills listed, a vault's and the shared ones alike.
+  - Hook events a CLI cannot run stay as ADR 058 D5 says: Hermes runs PostToolUse
+    only after the call, and the Antigravity CLI has no compaction or sub-agent
+    events.
+  - A CLI's own sub-agents (Claude Code's agents, OpenCode's `task`) do not see
+    irori's words, so they get the shared instructions and rules only when the
+    agent passes them on.
+  - A shared skill of the same name in the person's own skill folders
+    (`~/.agents/skills`, `~/.claude/skills`, …), in a folder above the vault, or
+    named otherwise in a malformed skill's front matter is not looked for; the
+    skill reach view covers the person's folders for a vault's skills only.

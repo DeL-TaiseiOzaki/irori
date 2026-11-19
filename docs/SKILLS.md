@@ -176,12 +176,14 @@ shared skills as skills of its own (`sharedSkillReach` in
 `src/domain/schema-reach.ts`): Claude Code links in an added folder
 ([ADR 049](decisions/049-skills-for-claude-code.md)), Pi `--skill` folders
 ([ADR 058](decisions/058-every-schema-setting-reaches-every-cli.md)), and since
-0.2.83 ([ADR 066](decisions/066-shared-skills-are-every-clis-own.md)) Codex an
-extra skill root (`skills/extraRoots/set`), OpenCode a skill path its
-configuration gains through irori's plugin, and the Antigravity CLI copies in an
-added workspace folder. These are `given-skills/<run>/.agents/skills` in irori's
-data directory, removed when the run ends. A name the folder's own skills have
-or retired is not given. Hermes Agent hears them listed only.
+0.2.83 ([ADR 066](decisions/066-shared-skills-are-every-clis-own.md)) Codex a
+folder of links as an extra skill root (`skills/extraRoots/set`), OpenCode a
+folder of copies its skill paths gain through irori's plugin, and the
+Antigravity CLI copies in an added workspace folder. These are
+`given-skills/<conversation>/.agents/skills` in irori's data directory, removed
+when the run ends. A name that is a folder in the vault's own `.agents/skills`
+is not given. Hermes Agent hears them listed only. A vault on an SSH host gets
+no shared Schema yet.
 
 ## Roles and projects
 

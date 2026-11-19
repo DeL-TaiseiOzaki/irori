@@ -156,20 +156,23 @@ names in the shared Schema's words (`sharedSkillReach`):
 | CLI | Shared Schema skills |
 | --- | --- |
 | Claude Code | Links in a folder given as an additional directory (ADR 049) |
-| Codex | A folder of links set with the app server's `skills/extraRoots/set` before `thread/start` or `thread/resume`; a refusal leaves them to the words |
-| OpenCode | The same folder appended to its `skills.paths` by irori's plugin's `config` hook, so the person's own paths stay |
+| Codex | A folder of links set with the app server's `skills/extraRoots/set` before `thread/start`, `thread/resume` or `thread/fork`; a refusal leaves them to the words |
+| OpenCode | A folder of copies appended to its `skills.paths` by irori's plugin's `config` hook, so the person's own paths stay; copies because it allows any change in a skill's folder |
 | Pi | `--skill` per folder (ADR 058) |
 | Hermes Agent | Listed in the request only |
 | Antigravity CLI | Copies in a folder added with `--add-dir`, whose `.agents/skills` it reads; copies because its standard mode edits workspace files without asking |
 
-A shared skill whose name the folder's own skills have or retired is not given;
-for OpenCode, nor one named in the folder's `.claude/skills` or
-`.opencode/skills`. Sources: `openai/codex` rust-v0.170.0
+The folder is `given-skills/<conversation>/.agents/skills` in irori's data
+directory, the same place on every run of a conversation (OpenCode writes each
+skill's place into its system prompt). A shared skill whose name is a folder in
+the vault's `.agents/skills` (a malformed or retired one too) is not given; for
+OpenCode, nor one named in the folder's `.claude/skills` or `.opencode/skills`.
+Sources: `openai/codex` rust-v0.170.0
 (`app-server/src/request_processors/catalog_processor.rs`,
 `ext/skills/src/{host_roots.rs,host_service.rs,loader/host.rs}`,
 `app-server/tests/suite/v2/host_skills.rs`; the method is also in rust-v0.156.0
 to 0.167.0), `anomalyco/opencode` v1.19.6 and v1.18.30
-(`packages/opencode/src/{skill/index.ts,config/config.ts,plugin/index.ts,project/bootstrap.ts}`)
+(`packages/opencode/src/{skill/index.ts,config/config.ts,plugin/index.ts,project/bootstrap.ts,agent/agent.ts,session/system.ts}`)
 and the Antigravity CLI's customization discovery page.
 
 Hook events irori runs for a CLI other than Claude Code:

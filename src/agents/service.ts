@@ -118,7 +118,7 @@ import {
   type BridgeEvent,
 } from './hook-bridge';
 import { commentsCount, readNoteComments } from '../host/comments';
-import { findSkill, noSkill, readFolderSkills } from '../host/skills';
+import { findSkill, noSkill, readFolderSkills, skillFolderNames } from '../host/skills';
 import {
   claudeSkillNames,
   linkClaudeSkills,
@@ -567,7 +567,9 @@ export class AgentService {
     this.attachments = new AttachmentStore(files.dataDir);
     void this.attachments.prune().catch(() => {});
     void pruneClaudeSkills(files.dataDir, (id) => this.runs.has(id)).catch(() => {});
-    void pruneGivenSkills(files.dataDir, (id) => this.runs.has(id)).catch(() => {});
+    void pruneGivenSkills(files.dataDir, (id) =>
+      [...this.runs.values()].some((run) => run.conversationId === id),
+    ).catch(() => {});
     // Folders of hooks a run that did not end left for the Antigravity CLI (ADR 058).
     void pruneAntigravityHookFolders(files.dataDir, (id) => this.runs.has(id)).catch(() => {});
     void pruneCodexRoles(files.dataDir, (id) => this.runs.has(id)).catch(() => {});
@@ -1419,10 +1421,11 @@ export class AgentService {
   /**
    * Gives Codex, OpenCode and the Antigravity CLI the shared Schema's skills as
    * their own (ADR 066). Each finds the folder's `.agents/skills` itself, so a
-   * shared skill goes only where the folder has no skill of its name and has not
-   * retired it, nor, for OpenCode, one in its `.claude/skills` or
-   * `.opencode/skills`. A failure leaves the skills to the words, as before, and
-   * says so.
+   * shared skill goes only where the folder has no skill folder of its name
+   * (a malformed or retired one too), nor, for OpenCode, one in its
+   * `.claude/skills` or `.opencode/skills`. OpenCode and the Antigravity CLI get
+   * copies, as either would change the shared Schema through a link. A failure
+   * leaves the skills to the words, as before, and says so.
    */
   private async giveSharedSkills(
     run: Run,
@@ -1442,14 +1445,15 @@ export class AgentService {
       const skip = new Set([
         ...own.skills.map((skill) => skill.name),
         ...own.retired.map((skill) => skill.name),
+        ...(await skillFolderNames(folder)),
         ...(reach === 'config-path' ? await openCodeSkillNames(root) : []),
       ]);
       run.givenSkills = await giveSkills(
         this.files.dataDir,
-        run.id,
+        run.conversationId!,
         shared.skills.map((skill) => ({ name: skill.name, folder: path.dirname(skill.path) })),
         skip,
-        reach === 'workspace-copy',
+        reach !== 'extra-root',
       );
     } catch (error) {
       this.event(
@@ -2563,7 +2567,8 @@ export class AgentService {
       // What the session heard, once the CLI is done with it.
       await this.rememberHeard(run).catch(() => {});
       if (run.claudeSkills) await unlinkClaudeSkills(this.files.dataDir, run.id).catch(() => {});
-      if (run.givenSkills) await removeGivenSkills(this.files.dataDir, run.id).catch(() => {});
+      if (run.givenSkills)
+        await removeGivenSkills(this.files.dataDir, run.conversationId!).catch(() => {});
       if (run.codexRoles) await removeCodexRoles(this.files.dataDir, run.id).catch(() => {});
       run.rpc?.fail(Error('Run finished'));
       // Words the CLI wrote while being stopped arrived after the flush above; with

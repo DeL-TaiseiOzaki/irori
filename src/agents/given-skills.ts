@@ -7,31 +7,37 @@ import type { LinkedSkill } from './claude-skills';
  * The shared Schema's skills as skills of Codex, OpenCode and the Antigravity
  * CLI (ADR 066). Each finds the `.agents/skills` of the folder it works in by
  * itself, but not the shared Schema's, which is in the irori agent's folder.
- * For each run irori makes `given-skills/<run>/.agents/skills/<name>` in its
- * data directory and gives that folder the way each CLI takes more skills:
+ * For each run irori makes `given-skills/<conversation>/.agents/skills/<name>`
+ * in its data directory and gives that folder the way each CLI takes more skills:
  *
  * - Codex: an extra skill root of its app server (`skills/extraRoots/set`).
  * - OpenCode: a skill path irori's plugin adds to its configuration.
  * - The Antigravity CLI: a workspace folder (`--add-dir`), whose `.agents/skills`
  *   it reads.
  *
- * Codex and OpenCode get links to the skill folders, as Claude Code does
- * (ADR 049). The Antigravity CLI gets copies: its standard mode changes a
- * workspace folder's files without asking, and through a link it would change
- * the shared Schema. Nothing is written into a vault or the irori agent's folder.
+ * Codex gets links to the skill folders, as Claude Code does (ADR 049): it names
+ * a skill by its real path, outside the roots its sandbox lets it write. OpenCode
+ * and the Antigravity CLI get copies: OpenCode allows any change in a skill's
+ * folder (its `external_directory` defaults), the Antigravity CLI's standard mode
+ * changes a workspace folder's files without asking, and through a link either
+ * would change the shared Schema. The folder is named by the conversation, so a
+ * skill's place is the same on every run of it: OpenCode writes each skill's
+ * place into its system prompt. Nothing is written into a vault or the irori
+ * agent's folder.
  */
 const givenRoot = (dataDir: string) => path.join(dataDir, 'given-skills');
 
-/** A run's given skills: the folder to add as a workspace, the skills folder inside it, and their names. */
+/** A conversation's given skills: the folder to add as a workspace, the skills folder inside it, and their names. */
 export type GivenSkills = { root: string; skills: string; names: string[] };
 
 /**
  * Gives each skill once, the first of a name winning, leaving out the names in
- * `skip` (those the CLI already finds). Returns undefined when nothing is left.
+ * `skip` (those the CLI already finds), in place of what the conversation was
+ * given before. Returns undefined when nothing is left.
  */
 export async function giveSkills(
   dataDir: string,
-  runId: string,
+  conversationId: string,
   skills: LinkedSkill[],
   skip: ReadonlySet<string>,
   copy: boolean,
@@ -39,13 +45,25 @@ export async function giveSkills(
   const chosen = new Map<string, string>();
   for (const skill of skills)
     if (!skip.has(skill.name) && !chosen.has(skill.name)) chosen.set(skill.name, skill.folder);
+  await removeGivenSkills(dataDir, conversationId);
   if (!chosen.size) return undefined;
-  const root = path.join(givenRoot(dataDir), runId);
+  const root = path.join(givenRoot(dataDir), conversationId);
   const folder = path.join(root, '.agents', 'skills');
   await fs.mkdir(folder, { recursive: true });
   try {
     for (const [name, source] of chosen)
-      if (copy) await fs.cp(source, path.join(folder, name), { recursive: true });
+      // A copy holds what a link inside the skill leads to, not the link, which
+      // would lead back into the shared Schema; a link that leads nowhere is left out.
+      if (copy)
+        await fs.cp(source, path.join(folder, name), {
+          recursive: true,
+          dereference: true,
+          filter: (from) =>
+            fs.stat(from).then(
+              () => true,
+              () => false,
+            ),
+        });
       // A junction on Windows needs no developer mode or elevation.
       else
         await fs.symlink(
@@ -54,21 +72,21 @@ export async function giveSkills(
           process.platform === 'win32' ? 'junction' : 'dir',
         );
   } catch (error) {
-    await removeGivenSkills(dataDir, runId);
+    await removeGivenSkills(dataDir, conversationId);
     throw error;
   }
   return { root, skills: folder, names: [...chosen.keys()] };
 }
 
-/** Removes a run's given skills; the skill folders the links point at stay as they are. */
-export async function removeGivenSkills(dataDir: string, runId: string) {
-  await fs.rm(path.join(givenRoot(dataDir), runId), { recursive: true, force: true });
+/** Removes a conversation's given skills; the skill folders the links point at stay as they are. */
+export async function removeGivenSkills(dataDir: string, conversationId: string) {
+  await fs.rm(path.join(givenRoot(dataDir), conversationId), { recursive: true, force: true });
 }
 
-/** Removes the given skills of runs that ended without removing them, keeping `live`. */
-export async function pruneGivenSkills(dataDir: string, live: (runId: string) => boolean) {
-  for (const runId of await fs.readdir(givenRoot(dataDir)).catch(() => [] as string[]))
-    if (!live(runId)) await removeGivenSkills(dataDir, runId);
+/** Removes the given skills of runs that ended without removing them, keeping `live` conversations'. */
+export async function pruneGivenSkills(dataDir: string, live: (conversationId: string) => boolean) {
+  for (const name of await fs.readdir(givenRoot(dataDir)).catch(() => [] as string[]))
+    if (!live(name)) await removeGivenSkills(dataDir, name);
 }
 
 /**
