@@ -1,6 +1,7 @@
 # Implementation status — notes, native agents and connection onboarding
 
 A tab's right click, and one workspace in several tabs, 2026-11-19 (**0.2.85**,
+[#354](https://github.com/DeL-TaiseiOzaki/irori/pull/354), published as `v0.2.85-preview.1`;
 [ADR 067](decisions/067-tab-menu-and-duplicate-tabs.md)): the owner asked to open
 the same workspace more than once in a window, with a browser's tab menu.
 - The renderer knows a tab by a key (`WorkspaceTab` in
@@ -15,6 +16,11 @@ the same workspace more than once in a window, with a browser's tab menu.
   the host's `WindowTabs.onlyTab` counts tabs, not workspaces.
 - `scripts/tab-menu-ui-smoke.ts` (added to `test:ui`) and
   `tests/workspace-tabs.test.ts` cover it. Linux under Xvfb only.
+- `publish.yml` published
+  [v0.2.85-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.85-preview.1)
+  from `33997d5` (main's run `44511502958`, then publish run `44513052378`).
+  Anonymous downloads matched `SHA256SUMS.txt`: Windows 179,418,624 bytes, Mac
+  145,730,297 bytes and `irori-0.2.85-full.nupkg` 178,587,914 bytes.
 
 Shared skills are every CLI's own skills, 2026-11-19 (**0.2.84**,
 [#356](https://github.com/DeL-TaiseiOzaki/irori/pull/356), published as `v0.2.84-preview.1`;
