@@ -554,6 +554,7 @@ const DockColumnView = memo(function DockColumnView({
   );
 });
 const noTabs: Tab[] = [];
+const firstColumns: DockColumn[] = [{ id: 'main', owner: 'vault' }];
 const firstYourColumns: DockColumn[] = [{ id: yourFirst, owner: 'irori' }];
 function App() {
   // Interface text is chosen while rendering, so a language change re-renders
@@ -741,10 +742,20 @@ function App() {
     chooseAgentAccess,
     (error) => report(error),
   );
-  // The agent dock's columns (ADR 021). The first stays while the dock is open; a
-  // vault column follows the vault on show, and shows the irori agent while the
-  // vault agent is off.
-  const [columns, setColumns] = useState<DockColumn[]>([{ id: 'main', owner: 'vault' }]);
+  // The agent dock's columns (ADR 021), kept per workspace while irori runs as irori
+  // mode's are (ADR 034 D2): another workspace shows its own. The first stays while
+  // the dock is open; a vault column follows the vault on show, and shows the irori
+  // agent while the vault agent is off.
+  const [columnSets, setColumnSets] = useState<Record<string, DockColumn[]>>({});
+  const columns = columnSets[workspace?.id ?? ''] ?? firstColumns;
+  /** Changes the dock's columns of the workspace on show. */
+  function setColumns(update: SetStateAction<DockColumn[]>) {
+    const key = workspace?.id ?? '';
+    setColumnSets((all) => {
+      const before = all[key] ?? firstColumns;
+      return { ...all, [key]: typeof update === 'function' ? update(before) : update };
+    });
+  }
   const ownerOf = (column: DockColumn): ColumnOwner => (vaultAgent ? column.owner : 'irori');
   // The conversation each column shows per owner, with its CLI (ADR 017 D4). An owner
   // not in it shows the host's pick: the one running, queued longest, or its latest.

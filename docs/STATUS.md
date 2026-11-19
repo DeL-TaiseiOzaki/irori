@@ -1,5 +1,16 @@
 # Implementation status — notes, native agents and connection onboarding
 
+The agent dock's columns kept per workspace, 2026-11-19 (**0.2.81**,
+[ADR 021](decisions/021-optional-hibachi-agent-and-agent-dock.md) D2, amended): the
+owner reported that splitting the dock in one workspace or vault showed the same split
+in every other workspace. `main.tsx` held the dock's `columns` as one window-wide
+state; it now keeps a set per workspace id (`columnSets`), as irori mode's
+`yourColumnSets` already did, and `setColumns` changes only the set of the workspace
+on show. Column ids, drafts (per vault and column number), tab slots and the dock's
+open state and width are unchanged. `scripts/dock-ui-smoke.ts` splits the dock in one
+workspace, opens a second from the tab strip and returns; it fails before the change
+with two columns in the second workspace.
+
 CI's intermittent failures traced, 2026-11-17 (**0.2.80**,
 [#344](https://github.com/DeL-TaiseiOzaki/irori/pull/344), published as `v0.2.80-preview.1`): the owner asked why CI
 failed now and then. Of 14 failed runs since Nov 6, two were the change's own,

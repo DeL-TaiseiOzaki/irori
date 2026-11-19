@@ -17,7 +17,13 @@ await writeFile(path.join(root, 'AGENTS.md'), '# Research\n');
 const files = new FileService(path.join(base, 'device'));
 await files.init();
 const space = await files.register(root, 'Research', 'personal');
-await new WorkspaceService(files).save('Lab', [space.scopeId]);
+const fieldRoot = path.join(base, 'Field notes');
+await mkdir(path.join(fieldRoot, 'Knowledge_Base'), { recursive: true });
+await writeFile(path.join(fieldRoot, 'Knowledge_Base', 'site.md'), '# Site\n');
+const field = await files.register(fieldRoot, 'Field notes', 'personal');
+const workspaces = new WorkspaceService(files);
+await workspaces.save('Lab', [space.scopeId]);
+await workspaces.save('Field', [field.scopeId]);
 await chooseJapanese(files.dataDir);
 await showEveryWindowItem(files.dataDir);
 const env = { ...process.env, IRORI_DATA_DIR: files.dataDir } as Record<string, string>;
@@ -83,6 +89,17 @@ try {
   await expect(second).toBeEnabled();
   await second.fill('二列目の下書き');
   await expect(first).toHaveValue('');
+
+  // Each workspace keeps its own columns: another shows one, and coming back shows two.
+  const tabStrip = page.getByRole('navigation', { name: 'ワークスペース', exact: true });
+  await tabStrip.getByRole('button', { name: 'ワークスペースを開く' }).click();
+  await page.locator('.workspace-card').filter({ hasText: 'Field' }).click();
+  await expect(columns).toHaveCount(1);
+  await expect(columns.first()).toHaveAttribute('aria-label', 'Field notes agent');
+  await tabStrip.getByRole('button', { name: 'Lab', exact: true }).click();
+  await expect(columns).toHaveCount(2);
+  await expect(columns.nth(1)).toHaveAttribute('aria-label', 'Research agent');
+  await expect(second).toHaveValue('二列目の下書き');
 
   // The column can show the irori agent instead.
   await columns
@@ -165,4 +182,6 @@ try {
   await app.close();
 }
 if (errors.length) throw Error(errors.join('\n'));
-console.log('Dock UI smoke passed: optional vault agent, columns side by side, page hidden');
+console.log(
+  'Dock UI smoke passed: optional vault agent, columns side by side and kept per workspace, page hidden',
+);
