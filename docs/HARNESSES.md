@@ -149,6 +149,29 @@ CLI was run; the protocol fixtures in `tests/schema-reach.test.ts` follow them.
 | Hermes Agent | Reads one context kind and cuts it (20,000 characters at least). A resumed session keeps its copy. irori gives a changed one, and gives it when `.hermes.md`, `HERMES.md` or `AGENTS.override.md` is present | Appended to tool results there | irori, as words | Only trusted Git projects: irori lists them | Around the run, and PostToolUse after the call | Not reported: words go whole every time |
 | Antigravity CLI | Reads it and cuts at 24,000 bytes; irori says to read the whole file | Never: irori names them | irori, as words | Reads them | `.agents/hooks.json` in irori's `--add-dir` folder | Not reported: words go whole every time |
 
+The shared Schema's skills (ADR 066, 0.2.83) are in the irori agent's folder,
+which no CLI reads, so irori gives them to each as its own skills, beside their
+names in the shared Schema's words (`sharedSkillReach`):
+
+| CLI | Shared Schema skills |
+| --- | --- |
+| Claude Code | Links in a folder given as an additional directory (ADR 049) |
+| Codex | A folder of links set with the app server's `skills/extraRoots/set` before `thread/start` or `thread/resume`; a refusal leaves them to the words |
+| OpenCode | The same folder appended to its `skills.paths` by irori's plugin's `config` hook, so the person's own paths stay |
+| Pi | `--skill` per folder (ADR 058) |
+| Hermes Agent | Listed in the request only |
+| Antigravity CLI | Copies in a folder added with `--add-dir`, whose `.agents/skills` it reads; copies because its standard mode edits workspace files without asking |
+
+A shared skill whose name the folder's own skills have or retired is not given;
+for OpenCode, nor one named in the folder's `.claude/skills` or
+`.opencode/skills`. Sources: `openai/codex` rust-v0.170.0
+(`app-server/src/request_processors/catalog_processor.rs`,
+`ext/skills/src/{host_roots.rs,host_service.rs,loader/host.rs}`,
+`app-server/tests/suite/v2/host_skills.rs`; the method is also in rust-v0.156.0
+to 0.167.0), `anomalyco/opencode` v1.19.6 and v1.18.30
+(`packages/opencode/src/{skill/index.ts,config/config.ts,plugin/index.ts,project/bootstrap.ts}`)
+and the Antigravity CLI's customization discovery page.
+
 Hook events irori runs for a CLI other than Claude Code:
 
 - **Around the run, on every such CLI:** SessionStart, UserPromptSubmit, Stop,

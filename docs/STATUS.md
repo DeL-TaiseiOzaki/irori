@@ -1,5 +1,29 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Shared skills are every CLI's own skills, 2026-11-19 (**0.2.83**, not yet
+published; [ADR 066](decisions/066-shared-skills-are-every-clis-own.md)): the
+owner asked whether what the shared Schema sets reaches Codex and the other CLIs,
+with no part left half delivered. Instructions and rules were words for every
+CLI and every CLI ran the hooks, but the shared skills were skills of Claude Code
+(links) and Pi (`--skill`) only; Codex, OpenCode and the Antigravity CLI heard
+them listed.
+- `src/agents/given-skills.ts` makes `given-skills/<run>/.agents/skills` in the
+  data directory: links for Codex and OpenCode, copies for the Antigravity CLI
+  (its `accept-edits` mode would change the shared Schema through a link).
+  `AgentService.giveSharedSkills` leaves out names the folder's own skills have
+  or retired, and for OpenCode those in `.claude/skills` and `.opencode/skills`.
+- Codex: `skills/extraRoots/set` right after `initialize`, before the thread; a
+  refusal is a status line and the words stay. OpenCode: irori's plugin
+  (`IroriSkillPaths`) appends the folder to `skills.paths` in its `config` hook,
+  as `OPENCODE_CONFIG_CONTENT` would replace the person's paths. Antigravity
+  CLI: the folder is one more `--add-dir`. Hermes Agent: listed, unchanged.
+- `sharedSkillReach` in `src/domain/schema-reach.ts` says how each CLI takes
+  them; HARNESSES and SKILLS give the sources (Codex rust-v0.170.0, OpenCode
+  v1.19.6 and v1.18.30, the Antigravity customization discovery page).
+- Tests: `given-skills.test.ts` (links, copies, skipped names, prune, the
+  plugin keeping the person's paths) and a `schema-reach` stand-in test across
+  the three CLIs, which fails without the change. No real CLI was run.
+
 The agent dock's columns kept per workspace, 2026-11-19 (**0.2.82**,
 [#351](https://github.com/DeL-TaiseiOzaki/irori/pull/351), published as `v0.2.82-preview.1`;
 [ADR 021](decisions/021-optional-hibachi-agent-and-agent-dock.md) D2, amended): the

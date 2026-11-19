@@ -81,6 +81,11 @@ The owner answered that all of it must be fixed, and that 1 to 3 are fatal.
      whatever the project's trust.
    - **Hermes.** It hears the folder's skills listed, as the shared ones are.
    - **Claude Code.** Its links stay (ADR 049).
+   - *Extended by [ADR 066](066-shared-skills-are-every-clis-own.md) (0.2.83):
+     Codex, OpenCode and the Antigravity CLI, which find the folder's skills
+     themselves, are given the shared Schema's skills as their own: an extra
+     skill root, a skill path from irori's plugin, and copies in a workspace
+     folder.*
 5. **Hooks run on every CLI, with Claude Code's meaning.** Claude Code still
    runs a folder's own hooks and gets the shared ones as flag settings (ADR 048).
    For every other CLI, irori runs both itself

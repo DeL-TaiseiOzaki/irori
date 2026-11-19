@@ -36,7 +36,7 @@ AI パネルのスキル選択で選んでから送ると、指示がその依�
 
 **共通 Schema** には、irori が動かすすべてのエージェントに向けた指示・スキル・ルール・フックを置きます。irori agent、各 vault agent、ルーティンの AI ステップに、どの CLI でも届きます。**設定 → エージェント → 共通** の **共通 Schema** から開きます。使うには irori agent の用意が必要です。vault や irori agent の Schema が同じことを別に決めていれば、そちらが優先されます。
 
-共通のスキルは、スキルの選択に（共通）と付いて表示されます。共通 Schema は、irori agent の既定のフォルダの `.irori/shared/` に保存されます。ワークスペースで irori agent に別のフォルダを選んでも、保存先は変わりません。[GitHub に保存する環境](settings.md#section-6)にも含まれます。
+共通のスキルは、スキルの選択に（共通）と付いて表示されます。どの CLI でも、その CLI 自身のスキルとして渡されます（Hermes Agent だけは依頼の中で一覧として伝えます）。vault や irori agent に同じ名前のスキルがあれば、そちらが使われます。共通 Schema は、irori agent の既定のフォルダの `.irori/shared/` に保存されます。ワークスペースで irori agent に別のフォルダを選んでも、保存先は変わりません。[GitHub に保存する環境](settings.md#section-6)にも含まれます。
 
 ## サブエージェント
 

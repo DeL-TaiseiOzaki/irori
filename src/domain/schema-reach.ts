@@ -94,6 +94,32 @@ export const schemaReach: Record<AgentId, SchemaReach> = {
   },
 };
 
+/**
+ * How the shared Schema's skills become each CLI's own skills (ADR 066), beside
+ * their names in the shared Schema's words. The shared Schema is in the irori
+ * agent's folder, which no CLI reads, so irori gives each one its skills:
+ *
+ * - `links`: Claude Code reads links in a folder irori adds (ADR 049).
+ * - `skill-flag`: Pi takes each skill folder with `--skill` (ADR 058).
+ * - `extra-root`: Codex's app server takes a folder of links as an extra skill root.
+ * - `config-path`: irori's plugin adds a folder of links to OpenCode's skill paths.
+ * - `workspace-copy`: the Antigravity CLI reads copies in a workspace folder irori adds.
+ * - `listed`: Hermes Agent takes no skill folder from irori; it hears them listed.
+ *
+ * A name the folder's own skills have, or retired, is never given (ADR 027 D8).
+ */
+export const sharedSkillReach: Record<
+  AgentId,
+  'links' | 'skill-flag' | 'extra-root' | 'config-path' | 'workspace-copy' | 'listed'
+> = {
+  claude: 'links',
+  codex: 'extra-root',
+  opencode: 'config-path',
+  pi: 'skill-flag',
+  hermes: 'listed',
+  antigravity: 'workspace-copy',
+};
+
 /** The events irori runs itself around every run of a CLI that does not run hooks. */
 const aroundRun = ['SessionStart', 'UserPromptSubmit', 'Stop', 'SessionEnd', 'Notification'];
 
