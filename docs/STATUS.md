@@ -1,7 +1,7 @@
 # Implementation status — notes, native agents and connection onboarding
 
 Shared skills are every CLI's own skills, 2026-11-19 (**0.2.84**,
-[#356](https://github.com/DeL-TaiseiOzaki/irori/pull/356), not yet published;
+[#356](https://github.com/DeL-TaiseiOzaki/irori/pull/356), published as `v0.2.84-preview.1`;
 [ADR 066](decisions/066-shared-skills-are-every-clis-own.md)): the
 owner asked whether what the shared Schema sets reaches Codex and the other CLIs,
 with no part left half delivered. Instructions and rules were words for every
@@ -35,6 +35,11 @@ them listed.
   paths) and a `schema-reach` stand-in test across the three CLIs (resume
   order, stable OpenCode place, copies, malformed and `.claude/skills` names).
   Each fix was checked to fail the test without it. No real CLI was run.
+- `publish.yml` published
+  [v0.2.84-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.84-preview.1)
+  from `ae7b88a` (push run `44507574758`). Anonymous downloads matched
+  `SHA256SUMS.txt`: Windows 179,420,672 bytes, Mac 145,737,622 bytes and
+  `irori-0.2.84-full.nupkg` 178,589,449 bytes.
 
 Vaults on SSH hosts boxed on the mapping, 2026-11-19 (**0.2.83**,
 [#353](https://github.com/DeL-TaiseiOzaki/irori/pull/353), published as `v0.2.83-preview.1`;
