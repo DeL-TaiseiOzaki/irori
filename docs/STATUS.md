@@ -1,5 +1,28 @@
 # Implementation status — notes, native agents and connection onboarding
 
+The Schema checked on real CLIs, 2026-11-19 (**0.2.86**, pull request open;
+[ADR 058](decisions/058-every-schema-setting-reaches-every-cli.md) revised): the
+owner asked to confirm that the shared and vault Schemas, skills and rules reach
+each CLI agent, through irori's own launch paths, including knowledge folders'
+AGENTS.md.
+- `scripts/schema-reach-acceptance.ts` (`npm run test:schema-reach`) drives
+  `AgentService` against the signed-in CLIs with canary tokens in every setting.
+  On 0.2.85, Codex 0.166.0 and the Antigravity CLI 1.5.12 passed every check.
+  Claude Code 2.1.316 found the knowledge folder's AGENTS.md only by searching,
+  and treated it as material under the introduction's wording. irori also gave it
+  the vault's AGENTS.md again with every request, with a false status line.
+- Cause: 2.1.316's `InstructionsLoaded` names CLAUDE.md only and reaches no SDK
+  callback, though `cc-plugin-agents-md` loads AGENTS.md. `claudeLoadsAgents` in
+  `src/agents/service.ts` now records, per working folder, whether the session's
+  `init` lists that plugin. `init` follows `UserPromptSubmit`, so a request goes by
+  the folder's previous session; before any, AGENTS.md is given without a status.
+- `folderSchemaParts` names knowledge folders' AGENTS.md to every CLI, and
+  `vaultIntro` says such a file is Schema.
+- Verified by `npm run build`, `npm test` (`tests/schema-reach.test.ts`'s Claude
+  Code stand-in now behaves as 2.1.316, and its case fails without the change)
+  and `npm run test:schema-reach claude codex antigravity`: all twelve checks on
+  each. OpenCode, Pi and Hermes Agent not installed or run; Linux only.
+
 A tab's right click, and one workspace in several tabs, 2026-11-19 (**0.2.85**,
 [#354](https://github.com/DeL-TaiseiOzaki/irori/pull/354), published as `v0.2.85-preview.1`;
 [ADR 067](decisions/067-tab-menu-and-duplicate-tabs.md)): the owner asked to open

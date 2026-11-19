@@ -62,6 +62,15 @@ The owner answered that all of it must be fixed, and that 1 to 3 are fatal.
      another provider, telemetry off) a `UserPromptSubmit` hook gives it with the
      request. With every hook turned off (`disableAllHooks`), or a version known
      to be older, AGENTS.md goes as words up front.
+     *Revised in 0.2.86 after a real run of Claude Code 2.1.316: its
+     `InstructionsLoaded` names CLAUDE.md only, never the AGENTS.md its
+     `cc-plugin-agents-md` plugin loads, and reaches no SDK callback, so irori
+     gave AGENTS.md again with every request and said each time that it had not
+     been loaded. irori now reads the session's `init` message: the plugin is
+     listed in `plugins` where it loads AGENTS.md. `init` comes after the
+     request's `UserPromptSubmit`, so a request goes by what the folder's
+     previous session said; before any session there, AGENTS.md is given without
+     a status line.*
    - **Codex.** It keeps up to 1 MiB of AGENTS.md (`project_doc_max_bytes`). An
      AGENTS.md missing from the thread's `instructionSources` goes as words.
    - **A file read instead.** Where the CLI would read another file in its
@@ -75,6 +84,11 @@ The owner answered that all of it must be fixed, and that 1 to 3 are fatal.
    - **Knowledge folders.** Their AGENTS.md files are named, to be read before
      working there. Claude Code and Hermes are left out of this; they load those
      files themselves.
+     *Revised in 0.2.86: they are named to every CLI. Claude Code loads such a
+     file only on a Read in its folder, not before writing a new file there, and
+     Hermes only in a tool result there. The vault's introduction also says that
+     a knowledge folder's AGENTS.md is Schema, not material: Claude Code took it
+     for material under the introduction's earlier wording.*
 4. **Skills:**
    - **Pi.** It is given each skill folder with `--skill`: the folder's own,
      then the shared Schema's whose names the folder lacks. Pi loads `--skill`

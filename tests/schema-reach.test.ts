@@ -892,10 +892,11 @@ test(
 
 // --- Claude Code -------------------------------------------------------------------
 
-// Speaks the Agent SDK's stream-json as Claude Code does, and calls the hook
-// callbacks the SDK registered: InstructionsLoaded for AGENTS.md when the file
-// `claude-loads-agents` is there, then UserPromptSubmit, whose additional
-// context it records with the request.
+// Speaks the Agent SDK's stream-json as Claude Code 2.1.316 does: it calls the
+// UserPromptSubmit callback, records its additional context with the request,
+// and only then sends `init`, whose `plugins` list the AGENTS.md plugin when
+// the file `claude-loads-agents` is there. Like the real CLI, it never names
+// AGENTS.md to InstructionsLoaded.
 const claudeStandIn = (version: string) => `#!/usr/bin/env node
 const fs = require('node:fs');
 const path = require('node:path');
@@ -931,12 +932,13 @@ require('node:readline').createInterface({ input: process.stdin }).on('line', as
   }
   if (message.type === 'user') {
     const text = message.message.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
-    if (fs.existsSync('claude-loads-agents'))
-      await call('InstructionsLoaded', { file_path: path.join(process.cwd(), 'AGENTS.md'), memory_type: 'Project', load_reason: 'session_start' });
+    if (fs.existsSync('CLAUDE.md'))
+      await call('InstructionsLoaded', { file_path: path.join(process.cwd(), 'CLAUDE.md'), memory_type: 'Project', load_reason: 'session_start' });
     const submitted = await call('UserPromptSubmit', { prompt: text });
     const context = submitted.map((output) => output && output.hookSpecificOutput && output.hookSpecificOutput.additionalContext).filter(Boolean);
     fs.appendFileSync('claude-stand-in.jsonl', JSON.stringify({ args, prompt: text, context }) + '\\n');
-    send({ type: 'system', subtype: 'init', session_id: 'claude-session' });
+    const plugins = fs.existsSync('claude-loads-agents') ? [{ name: 'cc-plugin-agents-md', path: 'builtin', source: 'cc-plugin-agents-md@builtin' }] : [];
+    send({ type: 'system', subtype: 'init', session_id: 'claude-session', plugins });
     send({ type: 'result', subtype: 'success', result: 'done', is_error: false, session_id: 'claude-session', duration_ms: 1, duration_api_ms: 0, num_turns: 1, total_cost_usd: 0, usage: {}, modelUsage: {}, permission_denials: [] });
     setTimeout(() => process.exit(0), 50);
   }
@@ -952,29 +954,51 @@ test(
     await h.settings.write(h.space.scopeId, 'AGENTS.md', 'VAULT-INSTRUCTIONS\n', null);
     await h.settings.write(h.space.scopeId, '.claude/rules/tone.md', 'VAULT-RULE\n', null);
     await writeFile(path.join(h.kb, 'CLAUDE.md'), 'Claude only.\n');
-    // Claude Code loads AGENTS.md: irori adds nothing.
+    await mkdir(path.join(h.kb, 'Knowledge_Base', 'projects'), { recursive: true });
+    await writeFile(path.join(h.kb, 'Knowledge_Base', 'projects', 'AGENTS.md'), 'PROJECTS\n');
+    // Claude Code loads AGENTS.md. Before any session in the folder irori cannot
+    // know that, so the first request has it too, without a status line.
     await writeFile(path.join(h.kb, 'claude-loads-agents'), '');
-    assert.equal((await h.execute('claude', 'one')).at(-1)?.outcome, 'completed');
+    const first = await h.execute('claude', 'one');
+    assert.equal(first.at(-1)?.outcome, 'completed');
     let [record] = await h.lines(path.join(h.kb, 'claude-stand-in.jsonl'));
     assert.doesNotMatch(
       record.prompt,
       /VAULT-RULE|VAULT-INSTRUCTIONS/,
       'Claude Code loads both itself',
     );
-    assert.deepEqual(record.context, []);
+    assert.match(record.context[0], /VAULT-INSTRUCTIONS/);
+    // A knowledge folder's AGENTS.md is named: Claude Code loads it only on a read there.
+    assert.match(record.prompt, /- Knowledge_Base\/projects\/AGENTS\.md/);
+    assert.ok(
+      !first.some((event) =>
+        /AGENTS.md を読み込まなかった|did not load this folder/.test(event.text),
+      ),
+    );
     const settings = JSON.parse(record.args[record.args.indexOf('--settings') + 1]);
     assert.deepEqual(settings.pluginConfigs, {
       'cc-plugin-agents-md@builtin': { options: { instructionFiles: 'claude-md-and-agents-md' } },
     });
-    // It did not load AGENTS.md (another provider, an older version …): irori gives it.
-    await rm(path.join(h.kb, 'claude-loads-agents'));
+    // That session's init listed the plugin: irori adds nothing now.
     await h.execute('claude', 'two');
+    record = (await h.lines(path.join(h.kb, 'claude-stand-in.jsonl'))).at(-1);
+    assert.deepEqual(record.context, []);
+    // It stops loading AGENTS.md (another provider, telemetry off …): the next
+    // session's init says so, and the request after it has AGENTS.md, said.
+    await rm(path.join(h.kb, 'claude-loads-agents'));
+    await h.execute('claude', 'three');
+    const fourth = await h.execute('claude', 'four');
     record = (await h.lines(path.join(h.kb, 'claude-stand-in.jsonl'))).at(-1);
     assert.match(
       record.context[0],
       /did not load this folder's instructions[\s\S]*VAULT-INSTRUCTIONS/,
     );
     assert.doesNotMatch(record.prompt, /VAULT-INSTRUCTIONS/);
+    assert.ok(
+      fourth.some((event) =>
+        /AGENTS.md を読み込まなかった|did not load this folder/.test(event.text),
+      ),
+    );
     // Hooks turned off in the folder's settings: AGENTS.md goes as words up front.
     await writeFile(
       path.join(h.kb, '.claude', 'settings.local.json'),
