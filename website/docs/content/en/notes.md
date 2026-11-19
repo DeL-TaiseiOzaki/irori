@@ -43,7 +43,7 @@ Drag a row onto a folder to move it. Drop files or folders from Finder or Explor
 
 Renaming or moving in Knowledge updates the [links](links.md) to the file or folder. A deleted note goes to deleted notes; bring it back with **Restore deleted notes** in the vault's menu. Other files and folders go to the system trash.
 
-While the vault's agent runs, you can still add notes, folders, and files. Moving, renaming, and deleting wait until the run ends.
+While the vault's agent runs, you can still add notes, folders, and files, restore deleted notes, edit the Schema, change the vault's name, look, and shown names, and open the ontology and materials. Moving, renaming, and deleting, changing a layer's folder, and updating the indexes would move files the agent uses, so they wait until the run ends.
 
 ## Take the next step
 

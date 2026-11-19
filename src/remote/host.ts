@@ -92,7 +92,12 @@ export async function createVaultHost({ dataDir, emit, ask }: VaultHostOptions) 
   );
   agents.approveConfig = async (found) =>
     (await ask({ question: 'approveConfig', params: found })) === true;
-  const git = new GitService(files, () => !agents.anyBusy && !cloud.busy, authorship);
+  // As on the desktop: a run holds only the Git operations that change its vault's files.
+  const git = new GitService(
+    files,
+    (scopeId, tree) => !cloud.busy && !(tree && scopeId !== undefined && agents.busy(scopeId)),
+    authorship,
+  );
   const work = new WorkFolders(files);
   cloud.workFolder = (scopeId) => work.folder(scopeId);
   agents.workFolder = async (scopeId) => {
@@ -231,7 +236,8 @@ export async function createVaultHost({ dataDir, emit, ask }: VaultHostOptions) 
       };
     },
     registerVault: async (root, name, category) => {
-      if (agents.anyBusy || git.busy) throw Error(busy());
+      // A new vault is out of every run's reach, so runs do not hold it.
+      if (git.busy) throw Error(busy());
       const inspection = await inspectRepository(root);
       if (inspection.kind === 'unavailable') throw Error(inspection.detail);
       const space = await files.register(root, name, category);

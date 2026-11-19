@@ -1,5 +1,5 @@
 import { _electron as electron, expect } from '@playwright/test';
-import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm, lstat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -187,6 +187,97 @@ try {
         'draggable',
         'false',
       );
+      // Views and edits stay open during the run; what would move its files waits
+      // (ADR 020 D5).
+      await page.getByRole('button', { name: 'vault のメニュー', exact: true }).click();
+      for (const item of ['資料と成果物', 'オントロジー', '削除したノートを復元'])
+        await expect(page.getByRole('menuitem', { name: item, exact: true })).toBeEnabled();
+      await page.getByRole('menuitem', { name: 'vault の設定', exact: true }).click();
+      const settings = page.getByRole('dialog', { name: 'vault の設定' });
+      await expect(settings.getByRole('status')).toContainText('フォルダの変更と vault の削除');
+      await expect(settings.getByRole('textbox', { name: 'Contents のフォルダ' })).toBeDisabled();
+      await expect(
+        settings.getByRole('button', { name: 'vault を削除', exact: true }),
+      ).toBeDisabled();
+      await settings.getByRole('textbox', { name: '名前' }).fill('ハーネス検証 実行中');
+      await settings.getByRole('button', { name: '保存', exact: true }).click();
+      await expect(settings).toHaveCount(0);
+      expect(
+        (await page.evaluate(() => window.irori.spaces())).find(
+          (item) => item.scopeId === space.scopeId,
+        )?.name,
+      ).toBe('ハーネス検証 実行中');
+      await page.getByRole('button', { name: 'vault のメニュー', exact: true }).click();
+      await page.getByRole('menuitem', { name: 'vault の設定', exact: true }).click();
+      await settings.getByRole('textbox', { name: '名前' }).fill('ハーネス検証');
+      await settings.getByRole('button', { name: '保存', exact: true }).click();
+      await expect(settings).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'ハーネス検証 のクラウド接続' })).toBeVisible();
+      // Connecting goes on during the run (ADR 042 D2): a folder is connected and another
+      // registered; a connected folder the run may have been given is not taken out.
+      const kept = path.join(base, 'Kept folder');
+      const later = path.join(base, 'Later folder');
+      await mkdir(kept);
+      await mkdir(later);
+      const [given, unlinked] = await page.evaluate(
+        async ({ scopeId, folders }) => {
+          const made = [];
+          for (const [name, folder] of folders)
+            made.push(
+              await window.irori.addLocalFolder({
+                scopeId,
+                path: folder,
+                contentsRoot: 'contents',
+                name,
+                access: 'read-write',
+              }),
+            );
+          await window.irori.connectCloud(scopeId, made[0].mountId);
+          return made;
+        },
+        {
+          scopeId: space.scopeId,
+          folders: [
+            ['kept', kept],
+            ['later', later],
+          ],
+        },
+      );
+      expect((await lstat(path.join(root, 'contents', 'kept'))).isSymbolicLink()).toBe(true);
+      await expect(
+        page.evaluate(({ scopeId, mountId }) => window.irori.disconnectCloud(scopeId, mountId), {
+          scopeId: space.scopeId,
+          mountId: given.mountId,
+        }),
+      ).rejects.toThrow(/実行中のエージェント/);
+      await expect(
+        page.evaluate(
+          ({ scopeId, mountId }) => window.irori.setCloudAccess(scopeId, mountId, 'read-only'),
+          { scopeId: space.scopeId, mountId: given.mountId },
+        ),
+      ).rejects.toThrow(/実行中のエージェント/);
+      // One not connected is only a record: its access changes during the run.
+      await page.evaluate(
+        ({ scopeId, mountId }) => window.irori.setCloudAccess(scopeId, mountId, 'read-only'),
+        { scopeId: space.scopeId, mountId: unlinked.mountId },
+      );
+      await page.getByRole('button', { name: 'ハーネス検証 のクラウド接続' }).click();
+      const keptCard = page.locator('.connection-card').filter({ hasText: 'contents/kept/' });
+      const laterCard = page.locator('.connection-card').filter({ hasText: 'contents/later/' });
+      await expect(keptCard.locator('.connection-state')).toHaveText('接続済み');
+      await expect(keptCard.getByRole('button', { name: 'フォルダを開く' })).toBeEnabled();
+      await expect(keptCard.getByRole('button', { name: '読み取り専用にする' })).toBeDisabled();
+      await keptCard.getByRole('button', { name: '接続先の操作' }).click();
+      await expect(page.getByRole('menuitem', { name: '接続を解除' })).toBeDisabled();
+      await keptCard.getByRole('button', { name: '接続先の操作' }).click();
+      await expect(page.getByRole('menuitem')).toHaveCount(0);
+      await expect(laterCard.locator('.connection-state')).toHaveText('未接続');
+      await expect(laterCard.getByRole('button', { name: '編集を許可' })).toBeEnabled();
+      await laterCard.getByRole('button', { name: '再接続', exact: true }).click();
+      await expect(laterCard.locator('.connection-state')).toHaveText('接続済み');
+      expect((await lstat(path.join(root, 'contents', 'later'))).isSymbolicLink()).toBe(true);
+      await page.keyboard.press('Escape');
+      await expect(page.locator('.connect-sheet')).toHaveCount(0);
       // Removing unregistered data waits for the run too, and the sheet says why.
       await mkdir(path.join(root, 'contents', 'leftover'));
       await page.getByRole('button', { name: 'ハーネス検証 のクラウド接続' }).click();
@@ -214,6 +305,19 @@ try {
       await expect(page.getByRole('status').filter({ hasText: '実行が終わると' })).toHaveCount(0);
       await page.keyboard.press('Escape');
       await rm(path.join(root, 'contents', 'leftover'), { recursive: true });
+      // After the run, the connected folders are taken out and unregistered.
+      await page.evaluate(
+        async ({ scopeId, mountIds }) => {
+          for (const mountId of mountIds) {
+            await window.irori.disconnectCloud(scopeId, mountId);
+            await window.irori.removeCloud(scopeId, mountId);
+          }
+        },
+        { scopeId: space.scopeId, mountIds: [given.mountId, unlinked.mountId] },
+      );
+      expect(
+        await lstat(path.join(root, 'contents', 'kept')).catch(() => undefined),
+      ).toBeUndefined();
       for (const cycle of [1, 2]) {
         await app.close();
         app = await launch();

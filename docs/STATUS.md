@@ -1,5 +1,32 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Keep working while an agent runs, 2026-11-18 (**0.2.81**;
+[ADR 020](decisions/020-parallel-conversations.md) D5 and
+[ADR 042](decisions/042-waiting-folders-and-work-folders.md) D2 and D4 amended):
+the owner found contents connections showing 未接続 that could be neither
+reconnected nor removed, and asked for a full review of what a run holds back.
+- The pictured GitHub connections (フォルダ未選択) had every action greyed out:
+  the connection sheet disabled all of them while any run held the vault. The
+  host already let connecting go on during runs; the sheet and the automatic
+  relinking of a waiting folder (`mayLink`) did not.
+- Any run in any vault held every Git operation in every vault (`canMutate`
+  checked `agents.anyBusy`). It now takes the vault and whether the operation
+  changes its files: stage, commit, push, fetch and publish go on; pull, merge,
+  conflict resolution and submodule checkout wait for runs in that vault only.
+  Routines still hold every Git operation, for their change record.
+- Also during runs now: adding, creating or cloning a vault; its name, look and
+  layer names (`irori set` too); restoring a deleted note; a vault's and the
+  irori agent's Schema; the vault home's new note and today's note; the
+  ontology and materials views; reconnecting, cloning and rebinding connections
+  and changing ones not linked (`irori connect` too). Still waiting: moves,
+  renames and deletions, layer folders, vault removal, index rewrites, and
+  taking out or changing the access of a linked folder (`CloudService.isLinked`).
+- A GitHub connection whose folder this device lost kept irori's old link at
+  `contents/<name>`, which refused every new folder; **取得** found that out
+  after cloning. A link that leads nowhere now gives way (`makeWay`), one to a
+  folder is named in the refusal, 取得 checks before cloning, and the sheet
+  shows a note while a clone runs.
+
 CI's intermittent failures traced, 2026-11-17 (**0.2.80**,
 [#344](https://github.com/DeL-TaiseiOzaki/irori/pull/344), published as `v0.2.80-preview.1`): the owner asked why CI
 failed now and then. Of 14 failed runs since Nov 6, two were the change's own,

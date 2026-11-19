@@ -40,6 +40,18 @@ function accessNote(access: CloudConnection['access']) {
       );
 }
 
+/** What a clone in progress holds up, and for how long it may. */
+function CloningNote() {
+  return (
+    <p className="connect-hint" role="status">
+      {t(
+        'リポジトリを取得しています。大きなリポジトリでは数分かかります。GitHub のログイン画面が開いたら、そちらで続けてください。終わるまで、この画面の操作は待ちます。',
+        'Cloning the repository. A large one takes minutes. If a GitHub sign-in window opens, continue there. This sheet waits until it finishes.',
+      )}
+    </p>
+  );
+}
+
 /** One numbered step of the connection, joined to the next by a guide line. */
 function Step({
   n,
@@ -134,6 +146,8 @@ export function Connections({
     [contentsRoot, setContentsRoot] = useState(space.contents[0]),
     [localPath, setLocalPath] = useState('');
   const [updated, setUpdated] = useState<{ mountId: string; text: string }>();
+  // A repository being cloned: its card, or the new connection's form (`''`).
+  const [cloning, setCloning] = useState<string>();
   const [revision, setRevision] = useState(0);
   const { busy, error, run: perform } = useAction({ after: () => setRevision((v) => v + 1) });
   const [editing, setEditing] = useState<string>(),
@@ -151,9 +165,12 @@ export function Connections({
   );
   const strays = leftovers.data ?? [];
   const issue = error || overview.error || leftovers.error;
-  // A new connection is only an addition, so it goes on during a run; changing
-  // or removing the registered ones waits for the run.
+  // During a run, what leaves its connected folders as they are goes on: connecting,
+  // connecting again, choosing a folder or a clone, and changing a connection that
+  // is not connected. Taking a connected folder out, changing what may be done in
+  // it, updating a repository's files and removing unregistered data wait (ADR 042 D2).
   const disabled = busy || running;
+  const held = (connection: CloudConnection) => busy || (running && !!connection.linked);
   const repository = source === 'github' ? githubRepository(url.trim()) : undefined;
   const validURL = !!repository && githubCloneURL(url.trim());
   const validBranch = !branch.trim() || isBranchName(branch.trim());
@@ -184,6 +201,15 @@ export function Connections({
     if (stray.missing && !folder) return;
     const connection = await host.adoptStray(space.scopeId, stray.contentsRoot, stray.name, folder);
     await host.connectCloud(space.scopeId, connection.mountId);
+  }
+  /** Runs a clone, saying while it lasts that it may take minutes. */
+  async function clone<T>(where: string, operation: () => Promise<T>) {
+    setCloning(where);
+    try {
+      return await operation();
+    } finally {
+      setCloning(undefined);
+    }
   }
   function chooseSource(value: 'local' | 'github') {
     setSource(value);
@@ -338,16 +364,18 @@ export function Connections({
                       const access = editable ? 'read-write' : 'read-only';
                       const connection =
                         source === 'github'
-                          ? await host.addRepository({
-                              scopeId: space.scopeId,
-                              url: url.trim(),
-                              ...(branch.trim() && !existing && { branch: branch.trim() }),
-                              folder: localPath,
-                              existing,
-                              contentsRoot,
-                              name,
-                              access,
-                            })
+                          ? await clone('', () =>
+                              host.addRepository({
+                                scopeId: space.scopeId,
+                                url: url.trim(),
+                                ...(branch.trim() && !existing && { branch: branch.trim() }),
+                                folder: localPath,
+                                existing,
+                                contentsRoot,
+                                name,
+                                access,
+                              }),
+                            )
                           : await host.addLocalFolder({
                               scopeId: space.scopeId,
                               path: localPath,
@@ -430,6 +458,7 @@ export function Connections({
                         : t('登録して接続', 'Register and connect')}
                     </button>
                   </div>
+                  {cloning === '' && !existing && <CloningNote />}
                 </form>
               ) : null}
             </Step>
@@ -438,11 +467,11 @@ export function Connections({
             className="connect-registered"
             aria-label={t('登録済みの接続先', 'Registered connections')}
           >
-            {running && (connections.length > 0 || strays.length > 0) && (
+            {running && (connections.some((item) => item.linked) || strays.length > 0) && (
               <p className="connect-hint" role="status">
                 {t(
-                  'エージェントの実行中は、接続の変更や解除、未登録データの削除はできません。実行が終わると操作できます。',
-                  'While an agent runs, connections cannot be changed or removed, nor unregistered data removed. They can once the run ends.',
+                  'エージェントの実行中は、接続中のフォルダの解除やアクセスの変更、リポジトリの更新、未登録データの削除はできません。実行が終わると操作できます。再接続や接続していないものの変更はできます。',
+                  'While an agent runs, a connected folder cannot be disconnected or have its access changed, a repository cannot be updated, and unregistered data cannot be removed. They can once the run ends. Connecting again, and changing what is not connected, still can.',
                 )}
               </p>
             )}
@@ -493,6 +522,7 @@ export function Connections({
                     </span>
                   </div>
                   {connection.detail && <p className="connect-hint">{connection.detail}</p>}
+                  {cloning === connection.mountId && <CloningNote />}
                   {updated?.mountId === connection.mountId && (
                     <p className="connect-hint" role="status">
                       {updated.text}
@@ -502,7 +532,7 @@ export function Connections({
                     <div className="connection-actions">
                       <button
                         className="stage-text-button framed"
-                        disabled={disabled}
+                        disabled={busy}
                         onClick={() =>
                           void perform(async () => {
                             const folder = await host.chooseFolder();
@@ -520,7 +550,7 @@ export function Connections({
                       </button>
                       <MoreMenu label={t('接続先の操作', 'Connection actions')} host={sheet}>
                         <Menu.Item
-                          disabled={disabled}
+                          disabled={busy}
                           onClick={() =>
                             void perform(() => host.removeCloud(space.scopeId, connection.mountId))
                           }
@@ -534,12 +564,14 @@ export function Connections({
                       {connection.provider === 'github' && connection.state === 'unconfigured' ? (
                         <button
                           className="stage-text-button framed"
-                          disabled={disabled}
+                          disabled={busy}
                           onClick={() =>
                             void perform(async () => {
                               const folder = await host.chooseFolder();
                               if (!folder) return;
-                              await host.cloneRepository(space.scopeId, connection.mountId, folder);
+                              await clone(connection.mountId, () =>
+                                host.cloneRepository(space.scopeId, connection.mountId, folder),
+                              );
                               await host.connectCloud(space.scopeId, connection.mountId);
                             })
                           }
@@ -550,7 +582,7 @@ export function Connections({
                         <>
                           <button
                             className="stage-text-button framed"
-                            disabled={disabled}
+                            disabled={busy}
                             onClick={() =>
                               void perform(() =>
                                 host.openCloudFolder(space.scopeId, connection.mountId),
@@ -593,7 +625,7 @@ export function Connections({
                       ) : (
                         <button
                           className="stage-text-button framed"
-                          disabled={disabled || connection.state === 'unconfigured'}
+                          disabled={busy || connection.state === 'unconfigured'}
                           onClick={() =>
                             void perform(() => host.connectCloud(space.scopeId, connection.mountId))
                           }
@@ -603,7 +635,7 @@ export function Connections({
                       )}
                       <button
                         className="stage-text-button framed"
-                        disabled={disabled || connection.state === 'connecting'}
+                        disabled={held(connection) || connection.state === 'connecting'}
                         title={accessNote(
                           connection.access === 'read-write' ? 'read-only' : 'read-write',
                         )}
@@ -626,7 +658,7 @@ export function Connections({
                           connection.state === 'waiting' ||
                           connection.state === 'error') && (
                           <Menu.Item
-                            disabled={disabled}
+                            disabled={held(connection)}
                             onClick={() =>
                               void perform(() =>
                                 host.disconnectCloud(space.scopeId, connection.mountId),
@@ -638,7 +670,7 @@ export function Connections({
                         )}
                         {connection.state !== 'mounted' && (
                           <Menu.Item
-                            disabled={disabled}
+                            disabled={busy}
                             onClick={() =>
                               void perform(async () => {
                                 const folder = await host.chooseFolder();
@@ -658,7 +690,7 @@ export function Connections({
                         )}
                         <Menu.Item
                           disabled={
-                            disabled ||
+                            busy ||
                             connection.state === 'mounted' ||
                             connection.state === 'connecting'
                           }
@@ -671,7 +703,7 @@ export function Connections({
                         </Menu.Item>
                         <Menu.Item
                           disabled={
-                            disabled ||
+                            busy ||
                             connection.state === 'mounted' ||
                             connection.state === 'connecting'
                           }
@@ -698,7 +730,7 @@ export function Connections({
                       <input
                         aria-label={t('新しい名前', 'New name')}
                         value={newName}
-                        disabled={disabled}
+                        disabled={busy}
                         onChange={(e) => setNewName(e.target.value)}
                         required
                       />
@@ -706,14 +738,14 @@ export function Connections({
                         <button
                           type="button"
                           className="stage-text-button framed small"
-                          disabled={disabled}
+                          disabled={busy}
                           onClick={() => setEditing(undefined)}
                         >
                           {t('キャンセル', 'Cancel')}
                         </button>
                         <button
                           className="solid-button"
-                          disabled={disabled || !!mountNameError(newName)}
+                          disabled={busy || !!mountNameError(newName)}
                         >
                           {t('保存', 'Save')}
                         </button>

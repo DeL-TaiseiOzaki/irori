@@ -150,7 +150,10 @@ export class CloudService {
   private waiting = new Map<string, Waiting>();
   private timer?: ReturnType<typeof setTimeout>;
   private stopping = false;
-  /** Whether a vault's folders may be linked now; no run or Git operation works in it. */
+  /**
+   * Whether a vault's folders may be linked by themselves now: no Git operation works
+   * in it. A run does not stop them: it keeps the folders it was given (ADR 042 D2).
+   */
   mayLink?: (scopeId: string) => boolean;
   /** A waiting or lost folder was linked again without anyone asking. */
   onLinked?: (scopeId: string) => void;
@@ -272,7 +275,7 @@ export class CloudService {
             ...(known && (binding || known.state !== 'disconnected')
               ? known
               : { state: binding ? ('disconnected' as const) : ('unconfigured' as const) }),
-            ...(current ? { writable: current.writable } : {}),
+            ...(current ? { writable: current.writable, linked: true } : {}),
           };
         }),
       )),
@@ -390,7 +393,7 @@ export class CloudService {
       const item = this.waiting.get(key);
       if (!item || this.stopping) break;
       if (this.mayLink?.(item.scopeId) === false) {
-        // A run or Git operation works in the vault: looked for after it, at the same pace.
+        // A Git operation works in the vault: looked for after it, at the same pace.
         this.waiting.set(key, { ...item, due: now + item.delay });
         continue;
       }
@@ -468,6 +471,49 @@ export class CloudService {
           'A folder, file or connection with the same name exists.',
         ),
       );
+  }
+  /**
+   * Makes way at `contents/<name>` for a registered connection's link. A link there
+   * that leads nowhere is removed: nothing is behind it, and it is what a stop without
+   * disconnecting leaves once its clone or folder has moved. Anything else stays; for a
+   * link to a folder, the refusal names that folder, for the person to choose it
+   * (手元のクローンを選ぶ, フォルダを選び直す) or remove the link (ADR 042 D4).
+   */
+  private async makeWay(record: FolderAttachment) {
+    const parent = await this.parent(record);
+    if (!parent) return;
+    for (const name of await fs.readdir(parent)) {
+      if (nameKey(name) !== nameKey(record.name)) continue;
+      const entry = path.join(parent, name);
+      const info = await fs.lstat(entry).catch(() => undefined);
+      if (!info) continue;
+      if (info.isSymbolicLink()) {
+        const missing = await fs.stat(entry).then(
+          () => false,
+          (error) => isMissing(error),
+        );
+        if (missing) {
+          await fs.unlink(entry);
+          continue;
+        }
+        const value = await fs.readlink(entry).catch(() => undefined);
+        if (value !== undefined) {
+          const leads = path.resolve(parent, value.replace(/^\\\\\?\\/, ''));
+          throw Error(
+            t(
+              `${record.contentsRoot}/${name} には ${leads} へのリンクがあります。そのフォルダを使うなら「手元のクローンを選ぶ」または「フォルダを選び直す」で選び、使わないならリンクを削除してください。`,
+              `${record.contentsRoot}/${name} is a link to ${leads}. To use that folder, choose it with "Choose a clone" or "Choose folder again"; otherwise remove the link.`,
+            ),
+          );
+        }
+      }
+      throw Error(
+        t(
+          '同じ名前のフォルダ・ファイルまたは接続先があります。',
+          'A folder, file or connection with the same name exists.',
+        ),
+      );
+    }
   }
   private retiredBindingFile(scopeId: string, mountId: string) {
     return path.join(this.files.dataDir, 'cloud-bindings', `${scopeId}-${mountId}.json`);
@@ -870,6 +916,8 @@ export class CloudService {
       throw Error(
         t('接続を解除してからフォルダを選び直してください。', 'Disconnect before choosing again.'),
       );
+    // What stands at contents/<name> is found before minutes of cloning, not after.
+    await this.mutate(() => this.makeWay(record));
     const target = await this.cloneInto(parent, record);
     await this.bindLocal(scopeId, mountId, target);
   }
@@ -1042,7 +1090,7 @@ export class CloudService {
       });
       // A link irori left when it last stopped without disconnecting is used again.
       if (!(existing?.isSymbolicLink() && (await this.pointsTo(entry, target)))) {
-        await this.checkVacant(record);
+        await this.makeWay(record);
         await fs.symlink(target, entry, process.platform === 'win32' ? 'junction' : 'dir');
         made = entry;
         await excludeFromGit((await this.files.get(scopeId)).root, record.contentsRoot);
@@ -1149,6 +1197,13 @@ export class CloudService {
   }
   connect(scopeId: string, mountId: string) {
     return this.mutate(() => this.mount(scopeId, mountId));
+  }
+  /**
+   * Whether a connection's folder is linked now, or was and its link no longer checks
+   * out: the folder runs of its vault may have been given.
+   */
+  isLinked(scopeId: string, mountId: string) {
+    return this.mounted.has(this.key(scopeId, mountId));
   }
   private async mount(scopeId: string, mountId: string) {
     const local = (await this.localDeclarations(scopeId)).find((item) => item.mountId === mountId);

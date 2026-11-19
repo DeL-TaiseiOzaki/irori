@@ -2,11 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { lstat, mkdir, readFile, readlink, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readdir, readFile, readlink, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { RepositoryGit } from '../src/cloud/repositories';
 import { GitProcess } from '../src/git/process';
+import { CloudService } from '../src/cloud/service';
 import { fixture } from './fixtures/cloud';
 
 const run = promisify(execFile);
@@ -217,4 +218,51 @@ test('An existing clone is registered without cloning, and a non-GitHub URL is r
     }),
     /overlaps|重なる/,
   );
+});
+
+test('A link left where a repository shows: one leading nowhere gives way, one to a folder is named before cloning', async (t) => {
+  const { files, space, cloud, clones, base, trash } = await repositoryFixture(t);
+  const { mountId } = await cloud.addRepository({
+    scopeId: space.scopeId,
+    url,
+    folder: clones,
+    existing: false,
+    contentsRoot: 'contents',
+    name: 'project',
+  });
+  await cloud.connect(space.scopeId, mountId);
+  const entry = path.join(space.root, 'contents', 'project');
+  // irori stops without disconnecting, and this device no longer knows the clone.
+  const fresh = new CloudService(files, trash);
+  fresh.repositories = cloud.repositories;
+  files.cloud = fresh;
+  await rm(path.join(files.dataDir, 'local-bindings', `${space.scopeId}-${mountId}.json`));
+  assert.equal((await fresh.connections(space.scopeId))[0].state, 'unconfigured');
+  // The link still leads to the clone: 取得 names it before cloning anything.
+  const elsewhere = path.join(base, 'Elsewhere');
+  await mkdir(elsewhere);
+  await assert.rejects(
+    fresh.cloneRepository(space.scopeId, mountId, elsewhere),
+    /project へのリンクがあります|is a link to .*project/,
+  );
+  assert.deepEqual(await readdir(elsewhere), []);
+  // Choosing that clone uses the link as it is.
+  await fresh.bindLocal(space.scopeId, mountId, path.join(clones, 'project'));
+  await fresh.connect(space.scopeId, mountId);
+  assert.equal(await readlink(entry), path.join(clones, 'project'));
+  // Stopped again, and the clone is gone: the link leads nowhere and gives way.
+  const again = new CloudService(files, trash);
+  again.repositories = cloud.repositories;
+  files.cloud = again;
+  await rm(path.join(files.dataDir, 'local-bindings', `${space.scopeId}-${mountId}.json`));
+  await rm(path.join(clones, 'project'), { recursive: true, force: true });
+  await again.cloneRepository(space.scopeId, mountId, elsewhere);
+  await again.connect(space.scopeId, mountId);
+  assert.equal(await readlink(entry), path.join(elsewhere, 'project'));
+  // A folder of the person's at that place is never removed.
+  await again.disconnect(space.scopeId, mountId);
+  await mkdir(entry);
+  await writeFile(path.join(entry, 'mine.md'), '# Mine\n');
+  await assert.rejects(again.connect(space.scopeId, mountId), /同じ名前|same name/);
+  assert.equal(await readFile(path.join(entry, 'mine.md'), 'utf8'), '# Mine\n');
 });

@@ -35,6 +35,19 @@ In the same request the owner asked where agents work. An agent had made
    cloud queue, so waiting never makes irori busy, and a folder is linked only
    when no run or Git operation works in its vault, as a person's 再接続 would be.
    A folder linked this way announces the vault's files as changed.
+   *(Amended 2026-11-18, 0.2.81, owner request: "a reconnect can surely happen
+   while an agent runs".)* A run keeps what it was given when it started: the
+   folders it is told about, Claude Code's additional directories and deny rules,
+   and Codex's writable roots (5). A folder linked during the run is outside
+   those, so linking it takes nothing from the run. irori now links a waiting or
+   lost folder during runs too, and only a Git operation in the vault holds it
+   back. In the connection sheet, and for `irori connect`, connecting, connecting
+   again, choosing a folder or a clone, and renaming, changing the access of or
+   unregistering a connection that is not linked go on during the vault's runs.
+   What may change a folder a run was given still waits for the runs: taking a
+   linked folder out, changing its access, **最新にする** on a repository and
+   removing unregistered data in contents. The host refuses the first two while a
+   run works in the vault and the folder is linked (`CloudService.isLinked`).
 3. **A changed identity is linked again.** When a mounted connection's link or
    folder no longer checks out, `connections()` links it again to the folder now
    at the binding's path. irori's own link, unchanged since irori made it, is
@@ -47,6 +60,17 @@ In the same request the owner asked where agents work. An agent had made
    are unchanged. irori makes, moves or removes nothing in the person's folder.
    Disconnecting a waiting connection stops the wait and removes only irori's
    own link if one was left.
+   *(Amended 2026-11-18, 0.2.81, owner report: a GitHub connection showing
+   フォルダ未選択 could be neither connected again nor cloned.)* When this
+   device no longer knows a connection's folder, its link from a stop without
+   disconnecting can stay at `contents/<name>`; the old rule then refused every
+   new folder, and **取得** found that out only after minutes of cloning. Now a
+   link there that leads nowhere is removed when the connection is linked,
+   since nothing is behind it. A link to an existing folder still stays, and the
+   refusal names where it leads, for the person to choose that folder
+   (手元のクローンを選ぶ, フォルダを選び直す) or remove the link. **取得** checks
+   `contents/<name>` before it clones, and the sheet says while a clone runs that
+   it may take minutes. A folder or file at that place is never touched.
 5. **Agents are told about a folder once it is linked.** `linkedPaths()` and
    `localFolders()` list mounted connections only, so a run that starts after a
    folder came back is told about it and may change it; one that started before
