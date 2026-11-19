@@ -142,7 +142,7 @@ try {
 
   // The Overview, as a map and side by side.
   await page.getByRole('button', { name: 'irori mode', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Vault map' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Vault mapping' })).toBeVisible();
   await expect(page.getByRole('complementary', { name: 'irori agent' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Set up the irori agent' })).toBeVisible();
   await page.getByRole('button', { name: 'vault agents', exact: true }).click();
@@ -151,13 +151,13 @@ try {
   await page.getByRole('button', { name: 'Columns', exact: true }).click();
   await expect(page.getByRole('region', { name: 'vaults side by side' })).toBeVisible();
   await japaneseLeft(page, 'the Overview columns');
-  await page.getByRole('button', { name: 'Map', exact: true }).click();
+  await page.getByRole('button', { name: 'Mapping', exact: true }).click();
   await page.getByRole('button', { name: /^Search vaults/ }).click();
   await expect(page.getByRole('radio', { name: 'All vaults', exact: true })).toBeChecked();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('button', { name: 'Open Research', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Vault map' })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Vault mapping' })).toHaveCount(0);
   visited.push('Overview');
 
   // The host speaks the same language: a message it writes arrives in English.

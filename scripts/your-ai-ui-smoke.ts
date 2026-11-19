@@ -120,7 +120,7 @@ try {
   expect(
     await readFile(path.join(you, '.agents', 'skills', 'irori-setup', 'SKILL.md'), 'utf8'),
   ).toContain('name: irori-setup');
-  const map = page.getByRole('region', { name: 'vault map' });
+  const map = page.getByRole('region', { name: 'vault マッピング' });
   await expect(map.getByRole('button', { name: 'irori agent の Schema を開く' })).toBeVisible();
   // The island beside the map widens by its handle, and keeps that width on the device.
   const narrow = (await island.boundingBox())!.width;
