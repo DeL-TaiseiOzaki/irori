@@ -1,7 +1,8 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Shared skills are every CLI's own skills, 2026-11-19 (**0.2.84**, not yet
-published; [ADR 066](decisions/066-shared-skills-are-every-clis-own.md)): the
+Shared skills are every CLI's own skills, 2026-11-19 (**0.2.84**,
+[#356](https://github.com/DeL-TaiseiOzaki/irori/pull/356), not yet published;
+[ADR 066](decisions/066-shared-skills-are-every-clis-own.md)): the
 owner asked whether what the shared Schema sets reaches Codex and the other CLIs,
 with no part left half delivered. Instructions and rules were words for every
 CLI and every CLI ran the hooks, but the shared skills were skills of Claude Code
