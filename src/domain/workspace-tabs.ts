@@ -3,7 +3,7 @@ import type { WorkspaceProfile } from './types';
 /**
  * The workspaces open side by side, as tabs along the window's top. One is on
  * show; the others keep their agents running and their place. A workspace may be
- * open in several tabs, each with its own place (ADR 066): a tab is known by its
+ * open in several tabs, each with its own place (ADR 067): a tab is known by its
  * `key`, and what the workspace shares (its agents, its vaults' runs and clouds)
  * goes on while any tab, here or in another window, has it.
  */
@@ -107,7 +107,7 @@ export function reorderTab(tabs: WorkspaceTab[], key: string, index: number) {
 
 /**
  * A tab dropped into the strip at `index` (ADR 064). It is a tab of its own even when the
- * workspace is open here already (ADR 066).
+ * workspace is open here already (ADR 067).
  */
 export function insertTab(tabs: WorkspaceTab[], tab: WorkspaceTab, index: number) {
   if (tabs.some((item) => item.key === tab.key)) return openTab(tabs, tab);

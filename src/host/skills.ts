@@ -147,6 +147,22 @@ export async function readSkills(files: FileService, scopeId: string): Promise<S
   return readFolderSkills(spaceFolder(files, scopeId));
 }
 
+/**
+ * The name of every folder in `.agents/skills/`, a malformed, retired or unlisted
+ * one too: a CLI that reads the folder itself may still load a package irori
+ * reports as a problem or leaves past its limit.
+ */
+export async function skillFolderNames(folder: SchemaFolder): Promise<string[]> {
+  try {
+    return (await folder.entries(skillsRoot))
+      .filter((entry) => entry.directory || entry.blocked)
+      .map((entry) => entry.name);
+  } catch (error) {
+    if (isMissing(error)) return [];
+    throw error;
+  }
+}
+
 /** The same listing for any Schema folder, the irori agent's among them. */
 export async function readFolderSkills(folder: SchemaFolder): Promise<SkillListing> {
   let directories: string[];

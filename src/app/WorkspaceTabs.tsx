@@ -51,7 +51,7 @@ export function stripIndexAt(x: number) {
  * which shows where while it is over them (ADR 064), or else opens in a window of its
  * own while two or more are open (ADR 063). A tab's right click offers what a browser's
  * does: duplicate it, move it to a new window, close it, the others or those to its
- * right (ADR 066).
+ * right (ADR 067).
  * Memoised: it re-renders for its own data, not for every keystroke in the editor.
  */
 export const WorkspaceTabs = memo(function WorkspaceTabs({

@@ -34,9 +34,9 @@ Hooks execute programs. Review the CLI and command before saving one. Deleting a
 
 ## Shared Schema
 
-The **Shared Schema** holds instructions, skills, rules and hooks for every agent irori runs: the irori agent, each vault agent and the agent steps of routines, on every CLI. Open it from **Shared Schema** in **Settings → Agents → Shared**; it needs the irori agent set up. Where a vault's or the irori agent's own Schema says otherwise, its own wins.
+The **Shared Schema** holds instructions, skills, rules and hooks for every agent irori runs: the irori agent, each vault agent and the agent steps of routines, on every CLI. It does not yet reach the agent of a [vault on an SSH host](ssh-hosts.md). Open it from **Shared Schema** in **Settings → Agents → Shared**; it needs the irori agent set up. Where a vault's or the irori agent's own Schema says otherwise, its own wins.
 
-Shared skills appear in the skill menu marked (shared). irori keeps the Shared Schema in `.irori/shared/` of the irori agent's default folder, even when a workspace chooses another folder for the irori agent. It is part of the [environment saved on GitHub](settings.md#section-6).
+Shared skills appear in the skill menu marked (shared). Every CLI gets them as skills of its own (Hermes Agent alone hears them listed in the request). A skill of the same name in the vault or the irori agent's Schema is used instead. irori keeps the Shared Schema in `.irori/shared/` of the irori agent's default folder, even when a workspace chooses another folder for the irori agent. It is part of the [environment saved on GitHub](settings.md#section-6).
 
 ## Sub-agents
 

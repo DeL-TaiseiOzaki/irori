@@ -6,7 +6,7 @@ import { FileService } from '../src/host/files';
 import { WorkspaceService } from '../src/host/workspaces';
 import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
-// A workspace tab's right click (ADR 066): a tab is duplicated, the same workspace then
+// A workspace tab's right click (ADR 067): a tab is duplicated, the same workspace then
 // open in two tabs that each keep their own place; one, the others or those to the right
 // close; a tab moves to a new window; and a tab dropped on a window that has its
 // workspace open already becomes a tab of its own there.
@@ -134,7 +134,7 @@ try {
   expect(await windowCount()).toBe(2);
 
   // Dropped on this window's tabs, where the workspace is open already, it is a tab of
-  // its own after the one there, and its emptied window closes (ADR 064, 066).
+  // its own after the one there, and its emptied window closes (ADR 064, 067).
   await app.evaluate(({ BrowserWindow }) => {
     const [first, other] = BrowserWindow.getAllWindows().sort((a, b) => a.id - b.id);
     first.setBounds({ x: 0, y: 0, width: 980, height: 680 });

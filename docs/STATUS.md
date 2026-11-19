@@ -1,7 +1,7 @@
 # Implementation status — notes, native agents and connection onboarding
 
-A tab's right click, and one workspace in several tabs, 2026-11-19 (**0.2.84**,
-[ADR 066](decisions/066-tab-menu-and-duplicate-tabs.md)): the owner asked to open
+A tab's right click, and one workspace in several tabs, 2026-11-19 (**0.2.85**,
+[ADR 067](decisions/067-tab-menu-and-duplicate-tabs.md)): the owner asked to open
 the same workspace more than once in a window, with a browser's tab menu.
 - The renderer knows a tab by a key (`WorkspaceTab` in
   `src/domain/workspace-tabs.ts`); `shownTab` is the key on show and `tabViews`
@@ -15,6 +15,42 @@ the same workspace more than once in a window, with a browser's tab menu.
   the host's `WindowTabs.onlyTab` counts tabs, not workspaces.
 - `scripts/tab-menu-ui-smoke.ts` (added to `test:ui`) and
   `tests/workspace-tabs.test.ts` cover it. Linux under Xvfb only.
+
+Shared skills are every CLI's own skills, 2026-11-19 (**0.2.84**,
+[#356](https://github.com/DeL-TaiseiOzaki/irori/pull/356), not yet published;
+[ADR 066](decisions/066-shared-skills-are-every-clis-own.md)): the
+owner asked whether what the shared Schema sets reaches Codex and the other CLIs,
+with no part left half delivered. Instructions and rules were words for every
+CLI and every CLI ran the hooks, but the shared skills were skills of Claude Code
+(links) and Pi (`--skill`) only; Codex, OpenCode and the Antigravity CLI heard
+them listed.
+- `src/agents/given-skills.ts` makes `given-skills/<conversation>/.agents/skills`
+  in the data directory: links for Codex, copies for OpenCode and the
+  Antigravity CLI, either of which could change the shared Schema through a link
+  (OpenCode allows edits in skill folders; the Antigravity CLI's `accept-edits`
+  mode edits workspace folders). Copies hold what a link inside a skill leads
+  to. The place is per conversation, as OpenCode writes it into its system
+  prompt. `AgentService.giveSharedSkills` leaves out every folder name in the
+  vault's `.agents/skills` (`skillFolderNames`), and for OpenCode those in
+  `.claude/skills` and `.opencode/skills`.
+- Codex: `skills/extraRoots/set` right after `initialize`, before the thread; a
+  refusal is a status line and the words stay. OpenCode: irori's plugin
+  (`IroriSkillPaths`) appends the folder to `skills.paths` in its `config` hook,
+  as `OPENCODE_CONFIG_CONTENT` would replace the person's paths. Antigravity
+  CLI: the folder is one more `--add-dir`. Hermes Agent: listed, unchanged.
+- `sharedSkillReach` in `src/domain/schema-reach.ts` says how each CLI takes
+  them; HARNESSES and SKILLS give the sources (Codex rust-v0.170.0, OpenCode
+  v1.19.6 and v1.18.30, the Antigravity customization discovery page).
+- An independent review (fable-advisor) of the first version found the
+  OpenCode write path through links, malformed vault skills not keeping their
+  names, a per-run place, and links kept inside copies; all four are fixed.
+  It also found the guide claiming the shared Schema reaches every vault agent,
+  which a vault on an SSH host does not get (ADR 061); the guide now says so.
+- Tests: `given-skills.test.ts` (links, copies with links followed, replacing a
+  conversation's folder, skipped names, prune, the plugin keeping the person's
+  paths) and a `schema-reach` stand-in test across the three CLIs (resume
+  order, stable OpenCode place, copies, malformed and `.claude/skills` names).
+  Each fix was checked to fail the test without it. No real CLI was run.
 
 Vaults on SSH hosts boxed on the mapping, 2026-11-19 (**0.2.83**,
 [#353](https://github.com/DeL-TaiseiOzaki/irori/pull/353), published as `v0.2.83-preview.1`;

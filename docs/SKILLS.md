@@ -160,14 +160,30 @@ opens one dialog with every Schema: the shared Schema (共通), the irori agent'
 and, while vault agents are on, each vault's of the workspace, edited with
 the same forms (`src/app/SchemaDialog.tsx`). The shared Schema is the folder
 `.irori/shared/` inside the irori agent's folder (`YourAiService.sharedFolder`),
-with `AGENTS.md` and `.agents/skills/` only: the host refuses rules and hooks
-there. The four methods take the fixed `sharedSchemaId` as its scope.
+with `AGENTS.md`, `.agents/skills/` and, since 0.2.26
+([ADR 048](decisions/048-shared-schema-settings-and-irori-agent-files.md)),
+`.claude/rules/` and `.claude/settings.json` hooks. The four methods take the
+fixed `sharedSchemaId` as its scope.
 
 irori puts the shared instructions and each shared skill's name, description
 and file first in every agent's request (`prompts/shared-schema.ts`). A
 vault's composer offers the shared skills after its own, marked (共通); its
 own skill wins a name both have, and a run naming a skill its Schema lacks
 takes the shared one.
+
+No CLI reads the shared Schema's folder, so irori also gives each one the
+shared skills as skills of its own (`sharedSkillReach` in
+`src/domain/schema-reach.ts`): Claude Code links in an added folder
+([ADR 049](decisions/049-skills-for-claude-code.md)), Pi `--skill` folders
+([ADR 058](decisions/058-every-schema-setting-reaches-every-cli.md)), and since
+0.2.84 ([ADR 066](decisions/066-shared-skills-are-every-clis-own.md)) Codex a
+folder of links as an extra skill root (`skills/extraRoots/set`), OpenCode a
+folder of copies its skill paths gain through irori's plugin, and the
+Antigravity CLI copies in an added workspace folder. These are
+`given-skills/<conversation>/.agents/skills` in irori's data directory, removed
+when the run ends. A name that is a folder in the vault's own `.agents/skills`
+is not given. Hermes Agent hears them listed only. A vault on an SSH host gets
+no shared Schema yet.
 
 ## Roles and projects
 

@@ -124,7 +124,7 @@ test('A tab dropped into the tabs stands where it was let go, beside one of its 
   assert.deepEqual(keys(insertTab(tabs, tab('d'), 0)), ['d', 'a', 'b', 'c']);
   assert.deepEqual(keys(insertTab(tabs, tab('d'), 9)), ['a', 'b', 'c', 'd']);
   assert.deepEqual(keys(insertTab([], tab('d'), 0)), ['d']);
-  // The workspace is open here already: the dropped tab is a tab of its own (ADR 066).
+  // The workspace is open here already: the dropped tab is a tab of its own (ADR 067).
   const again = insertTab(tabs, tab('b', ['b'], 'b2'), 0);
   assert.deepEqual(keys(again), ['b2', 'a', 'b', 'c']);
 });

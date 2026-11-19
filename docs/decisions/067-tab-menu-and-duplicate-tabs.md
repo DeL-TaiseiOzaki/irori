@@ -1,6 +1,6 @@
-# 066 — A workspace tab's right click, and one workspace in several tabs
+# 067 — A workspace tab's right click, and one workspace in several tabs
 
-Date: 2026-11-19. Status: owner request; implemented for 0.2.84.
+Date: 2026-11-19. Status: owner request; implemented for 0.2.85.
 Changes [ADR 037](037-workspace-tabs.md) decision 1 (one tab per workspace) and
 [ADR 064](064-tab-joins-another-window.md) decision 3. Builds on
 [ADR 063](063-tab-out-to-a-new-window.md) and [ADR 065](065-tabs-reordered-by-dragging.md).

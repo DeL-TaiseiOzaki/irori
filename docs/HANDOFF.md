@@ -1,10 +1,27 @@
 # irori continuation handoff
 
-**A tab's right click, and one workspace in several tabs, 0.2.84**
-([ADR 066](decisions/066-tab-menu-and-duplicate-tabs.md)). Tabs are known by a key
+**A tab's right click, and one workspace in several tabs, 0.2.85**
+([ADR 067](decisions/067-tab-menu-and-duplicate-tabs.md)). Tabs are known by a key
 of their own in the renderer; what a workspace shares stops only when its last tab
 closes, here and in other windows. Run on Linux under Xvfb only. Not covered:
 reopening a closed tab, a new tab to the right, pinning or grouping tabs.
+
+**Shared skills are every CLI's own skills, 0.2.84** (see STATUS;
+[ADR 066](decisions/066-shared-skills-are-every-clis-own.md)). Every shared
+Schema setting now reaches every CLI as the vault's own does. Next:
+1. Run a real Codex, OpenCode and Antigravity CLI once each with a shared skill
+   and check that it is listed among their skills (`skills/list`, OpenCode's
+   skill tool, `/skills` in agy). Only stand-ins have run it; that the
+   Antigravity CLI reads `.agents/skills` in an `--add-dir` folder is read from
+   its documentation, as its hooks folder was.
+2. Not covered, for every CLI alike: a vault on an SSH host gets no shared
+   Schema at all (ADR 061). Giving it there means carrying the shared Schema to
+   the vault host per run and deciding whether shared hooks may run on the host;
+   that is the owner's decision. A CLI's own sub-agents do not see irori's
+   words, so shared instructions and rules reach them only when the agent passes
+   them on.
+3. Hermes Agent still hears skills listed, and the hook events each CLI cannot
+   run stay as ADR 058 D5 lists them.
 
 **Keep working while an agent runs, 0.2.81** (see STATUS;
 [ADR 020](decisions/020-parallel-conversations.md) D5,

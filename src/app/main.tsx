@@ -605,7 +605,7 @@ function App() {
   const [workspace, setWorkspace] = useState<WorkspaceProfile>(),
     [startup, setStartup] = useState(true);
   // The workspaces open as tabs, by each tab's key, and where each was left: its level,
-  // vault and note. A workspace may be open in several tabs (ADR 066); `shownTab` is the
+  // vault and note. A workspace may be open in several tabs (ADR 067); `shownTab` is the
   // key of the one on show, or of the last one on show while the start screen is.
   const [workspaceTabs, setWorkspaceTabs] = useState<WorkspaceTab[]>([]);
   const [shownTab, setShownTab] = useState<string>();
@@ -1929,7 +1929,7 @@ function App() {
   useEffect(() => {
     if (!arriving) return;
     const { profile, place, x } = arriving;
-    // It is a tab of its own, with its place, even beside a tab of the same workspace (ADR 066).
+    // It is a tab of its own, with its place, even beside a tab of the same workspace (ADR 067).
     const tab = tabOf(profile, crypto.randomUUID());
     if (place) tabViews.current[tab.key] = place;
     // It joins the tabs where it was let go, so the window it left lets go of it, and comes
@@ -2939,7 +2939,7 @@ function App() {
   }
   /**
    * A tab's copy, after it and on show: the same workspace where the tab is, as a tab of
-   * its own (ADR 066).
+   * its own (ADR 067).
    */
   function duplicateTab(tab: WorkspaceTab) {
     if (gitBusy || connecting || goingHome || sending) return;
