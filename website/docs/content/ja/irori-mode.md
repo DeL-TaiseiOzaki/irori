@@ -5,7 +5,7 @@ description: ワークスペースを見渡し、複数の vault にまたがる
 
 ## 全体を見渡す
 
-左のレールから **irori mode** を開きます。**地図** では、ワークスペースの vault をその順に1行4つずつ並べて見渡せます。**並列** では、それぞれの AI・Schema・Knowledge・Contents を並べて確認できます。
+左のレールから **irori mode** を開きます。**マッピング** では、ワークスペースの vault をその順に1行4つずつ並べて見渡せます。[SSH ホストの vault](ssh-hosts.md) は、このコンピュータの vault の下に、ホストの名前が付いた四角い枠の中に並びます。**並列** では、それぞれの AI・Schema・Knowledge・Contents を並べて確認できます。
 
 vault の名前・アイコン・色は[vault の設定](workspaces.md#section-3)から変更できます。
 

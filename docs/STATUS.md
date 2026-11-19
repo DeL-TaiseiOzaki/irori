@@ -1,5 +1,21 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Vaults on SSH hosts boxed on the mapping, 2026-11-19 (**0.2.83**;
+[ADR 061](decisions/061-vaults-on-ssh-hosts.md) decision 1, amended): the owner
+found a vault on an SSH host drawn on irori mode's map like one of this computer's
+and asked for a rectangle that says it is on another machine, and for the view not
+to be called 地図 but マッピング. `mapLayout` (`src/domain/overview.ts`) now puts
+this computer's vaults first and each host's after them, and returns `hosts`, one
+box per host with room for its name at the top, and `rowStep`. Rows, names and gaps
+shrink together to fit the 1000 × 640 board; `OverviewMap` keeps a row at least
+140 px tall and lets the map scroll instead. The box is `--raised` with a hairline
+(ADR 053: a place takes no colour); a node in it is described by the host's name
+(`aria-describedby`). The tab, the region (`vault マッピング` / `Vault mapping`) and
+the vault settings' preview are renamed; the view's id stays `map`, so a tab saved
+on the map comes back to it. `tests/overview.test.ts` covers the boxes;
+`scripts/remote-hosts-ui-smoke.ts` checks the box around the host's vault in the real
+window (`test-results/remote-hosts-mapping.png`).
+
 The agent dock's columns kept per workspace, 2026-11-19 (**0.2.82**,
 [#351](https://github.com/DeL-TaiseiOzaki/irori/pull/351), published as `v0.2.82-preview.1`;
 [ADR 021](decisions/021-optional-hibachi-agent-and-agent-dock.md) D2, amended): the

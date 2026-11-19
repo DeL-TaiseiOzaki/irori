@@ -330,6 +330,36 @@ try {
   await terminal.getByRole('button', { name: '終了して閉じる' }).click();
   await expect(terminal).toHaveCount(0);
   await expect(banner(page)).toHaveCount(0);
+
+  // irori mode's mapping draws the host's vault in a box named after the host, apart
+  // from this computer's vault, and reads the host with the vault's name.
+  await rail(page).getByRole('button', { name: 'irori mode', exact: true }).click();
+  const mapping = page.getByRole('region', { name: 'vault マッピング' });
+  await expect(mapping).toBeVisible();
+  await expect(page.locator('.islands.level-exit, .overview.level-return')).toHaveCount(0);
+  const area = mapping.locator('.map-host');
+  await expect(area).toHaveCount(1);
+  await expect(area).toContainText('Lab server');
+  await expect(area).toContainText('SSH ホスト');
+  const remoteNode = mapping.getByRole('button', { name: 'Remote notes を開く', exact: true });
+  const homeNode = mapping.getByRole('button', { name: 'Home を開く', exact: true });
+  await expect(remoteNode).toHaveAccessibleDescription(/Lab server/);
+  await expect(homeNode).toHaveAccessibleDescription('');
+  const centre = async (locator: typeof area) => {
+    const box = (await locator.boundingBox())!;
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  };
+  const bounds = (await area.boundingBox())!;
+  const within = ({ x, y }: { x: number; y: number }) =>
+    x > bounds.x && x < bounds.x + bounds.width && y > bounds.y && y < bounds.y + bounds.height;
+  expect(within(await centre(remoteNode))).toBe(true);
+  expect(within(await centre(homeNode))).toBe(false);
+  // The whole vault, its name and its state, is inside the box.
+  const remoteBox = (await remoteNode.boundingBox())!;
+  expect(remoteBox.y).toBeGreaterThanOrEqual(bounds.y);
+  expect(remoteBox.y + remoteBox.height).toBeLessThanOrEqual(bounds.y + bounds.height);
+  await expect(mapping.locator('.map-legend')).toContainText('SSH ホスト上の vault');
+  await page.screenshot({ path: 'test-results/remote-hosts-mapping.png' });
 } catch (error) {
   await (await app.firstWindow()).screenshot({ path: 'test-results/remote-hosts-failure.png' });
   throw error;

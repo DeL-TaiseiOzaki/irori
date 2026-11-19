@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { board, mapLayout, noteLabel, referenceLinks } from '../src/domain/overview';
+import {
+  board,
+  mapLayout,
+  noteLabel,
+  referenceLinks,
+  type MapHostArea,
+} from '../src/domain/overview';
 import type { RunRecord } from '../src/domain/knowledge';
 
 const ids = {
@@ -31,7 +37,8 @@ test('the map places each brain once, the same way every time, inside the board'
   assert.ok(layout.nodes.every((node) => node.y === layout.nodes[0].y));
   assert.ok(layout.nodes.every((node, i) => i === 0 || node.x > layout.nodes[i - 1].x));
   assert.equal('groups' in layout, false);
-  assert.deepEqual(mapLayout([]), { nodes: [], hearth: undefined });
+  assert.deepEqual(layout.hosts, []);
+  assert.deepEqual(mapLayout([]), { nodes: [], hosts: [], rowStep: 210, hearth: undefined });
 });
 
 test('with your AI, the hearth is on the left and the brains keep to its right', () => {
@@ -57,6 +64,71 @@ test('many vaults wrap into rows of four in order', () => {
     );
     for (const node of layout.nodes) assert.ok(node.y > 0 && node.y < board.height);
   }
+});
+
+const inside = (node: { x: number; y: number }, area: MapHostArea) =>
+  node.x > area.x &&
+  node.x < area.x + area.width &&
+  node.y > area.y &&
+  node.y < area.y + area.height;
+
+test('the vaults of each SSH host keep to an area of their own, below this device’s', () => {
+  const lab = { id: '00000000-0000-4000-8000-0000000000f1', name: 'lab' };
+  const gpu = { id: '00000000-0000-4000-8000-0000000000f2', name: 'gpu' };
+  const spaces = [
+    { scopeId: ids.a, host: lab },
+    { scopeId: ids.b },
+    { scopeId: ids.c, host: gpu },
+    { scopeId: ids.d, host: lab },
+  ];
+  for (const hearth of [false, true]) {
+    const layout = mapLayout(spaces, { hearth });
+    const at = (id: string) => layout.nodes.find((node) => node.scopeId === id)!;
+    // One area per host, in the order of the host's first vault in the workspace.
+    assert.deepEqual(
+      layout.hosts.map((area) => area.host),
+      [lab, gpu],
+    );
+    const [labArea, gpuArea] = layout.hosts;
+    // A host's vaults are inside its area, in the workspace's order; this device's are in none.
+    assert.ok(inside(at(ids.a), labArea) && inside(at(ids.d), labArea));
+    assert.ok(at(ids.a).x < at(ids.d).x);
+    assert.ok(inside(at(ids.c), gpuArea) && !inside(at(ids.c), labArea));
+    assert.ok(layout.hosts.every((area) => !inside(at(ids.b), area)));
+    // This device's vaults come first, and the areas do not overlap.
+    assert.ok(at(ids.b).y < labArea.y);
+    assert.ok(labArea.y + labArea.height < gpuArea.y);
+    for (const area of layout.hosts) {
+      assert.ok(area.x > 0 && area.x + area.width < board.width);
+      assert.ok(area.y > 0 && area.y + area.height < board.height);
+      // The host's name has room above its vaults' row.
+      assert.ok(
+        layout.nodes
+          .filter((node) => inside(node, area))
+          .every((node) => node.y - area.y >= layout.rowStep / 2 + 20),
+      );
+      if (layout.hearth) assert.ok(area.x > layout.hearth.x + 150);
+    }
+  }
+});
+
+test('many vaults and hosts still fit on the board', () => {
+  const spaces = Array.from({ length: 24 }, (_, i) => ({
+    scopeId: `00000000-0000-4000-8000-0000000002${String(i).padStart(2, '0')}`,
+    host:
+      i % 3
+        ? {
+            id: `00000000-0000-4000-8000-0000000003${String(i % 6).padStart(2, '0')}`,
+            name: `h${i % 6}`,
+          }
+        : undefined,
+  }));
+  const layout = mapLayout(spaces, { hearth: true });
+  assert.equal(layout.nodes.length, 24);
+  assert.equal(layout.hosts.length, 4);
+  assert.ok(layout.rowStep < 210);
+  for (const node of layout.nodes) assert.ok(node.y > 0 && node.y < board.height);
+  for (const area of layout.hosts) assert.ok(area.y > 0 && area.y + area.height < board.height);
 });
 
 function run(scopeId: string, createdAt: string, sources: [string, string][]): RunRecord {
