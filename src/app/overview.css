@@ -174,6 +174,39 @@
   min-height: 420px;
   margin: 36px 48px 12px;
 }
+/* The vaults of an SSH host stand in a box of their own, named at its top:
+   another machine, told by the place and not by a colour. */
+.map-host {
+  position: absolute;
+  z-index: 0;
+  border-radius: 14px;
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+  pointer-events: none;
+}
+.map-host-name {
+  position: absolute;
+  top: 7px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--tx-2);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.map-host-name strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--tx);
+  font-weight: 600;
+}
+.map-host-name small {
+  color: var(--tx-3);
+  font-size: 11px;
+}
 .map-lines {
   position: absolute;
   inset: 0;
@@ -257,6 +290,13 @@
 .legend-reference {
   width: 26px;
   border-top: 1.5px dashed var(--tx-3);
+}
+.legend-host {
+  width: 18px;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--hair-2);
 }
 
 /* One brain's AI in a few lines. */

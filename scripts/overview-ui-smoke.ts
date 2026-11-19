@@ -125,7 +125,7 @@ try {
 
   // The Overview: a map of both brains and their AIs.
   await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
-  const map = page.getByRole('region', { name: 'vault map' });
+  const map = page.getByRole('region', { name: 'vault マッピング' });
   await expect(map.getByRole('button', { name: 'Product を開く' })).toContainText('許可待ち');
   await expect(map.getByRole('button', { name: 'Research を開く' })).toContainText('実行中');
   // The map does not group vaults by category.
@@ -222,7 +222,7 @@ try {
   expect(await turns(research.scopeId)).toEqual(['hold', 'queued from overview']);
 
   // A brain with nothing running takes an instruction from the Overview at once.
-  await page.getByRole('button', { name: '地図', exact: true }).click();
+  await page.getByRole('button', { name: 'マッピング', exact: true }).click();
   await ais.getByRole('radio', { name: 'Product', exact: true }).check();
   await ais.getByLabel('Product agent への指示').fill('from overview');
   await ais.getByRole('button', { name: '送信', exact: true }).click();
@@ -248,7 +248,7 @@ try {
   // The Overview comes back as it was left: side by side.
   await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
   await expect(columns).toBeVisible();
-  await page.getByRole('button', { name: '地図', exact: true }).click();
+  await page.getByRole('button', { name: 'マッピング', exact: true }).click();
   await map.getByRole('button', { name: 'Product を開く' }).click();
   // The Overview zooms away around the brain while the brain settles in.
   await expect(page.locator('.islands.level-enter')).toHaveCount(1);

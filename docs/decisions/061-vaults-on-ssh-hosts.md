@@ -54,6 +54,16 @@ weighed and dropped:
    host, and a workspace holds both kinds. `Space.host` names the host; `root`
    is then the vault's folder there. Windows, workspaces, the irori agent, the
    settings, secrets and routines stay this device's.
+   *Amended 2026-11-19 (0.2.83), owner request: irori mode's mapping shows the
+   place.* The owner found a vault on a host drawn among this computer's, with
+   nothing on the map to tell it was on another machine. The mapping now puts
+   this computer's vaults first and each host's vaults after them in a box of
+   their own, named after the host (`mapLayout`'s `hosts` in
+   `src/domain/overview.ts`), in the order the host's first vault has in the
+   workspace. The box is a neutral surface and hairline, as ADR 053 gives a
+   place no colour, and a vault inside it is read with its host's name. In the
+   same change the view's name became **マッピング** (*Mapping*); it was
+   **地図** (*Map*), which the owner did not want it called.
 2. **irori's own services run beside the vault.** On the host runs a *vault
    host*: the same `FileService`, `SearchService`, `GitService`, `AgentService`
    and the rest that the main process uses, in one file with every package

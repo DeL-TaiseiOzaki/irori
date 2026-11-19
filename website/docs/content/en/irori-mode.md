@@ -5,7 +5,7 @@ description: See the workspace and ask for work that spans several vaults.
 
 ## See the whole workspace
 
-Open **irori mode** from the left rail. **Map** shows the workspace's vaults in its order, four to a row. **Columns** places each one's AI, Schema, Knowledge, and Contents beside the others.
+Open **irori mode** from the left rail. **Mapping** shows the workspace's vaults in its order, four to a row. [Vaults on an SSH host](ssh-hosts.md) stand below this computer's, in a box named after their host. **Columns** places each one's AI, Schema, Knowledge, and Contents beside the others.
 
 Change vault names, icons, and colors in [vault settings](workspaces.md#section-3).
 
