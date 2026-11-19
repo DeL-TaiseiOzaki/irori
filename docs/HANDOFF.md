@@ -180,6 +180,18 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-11-19: **0.2.84** ([#356](https://github.com/DeL-TaiseiOzaki/irori/pull/356),
+the shared Schema's skills given to Codex, OpenCode and the Antigravity CLI as
+their own skills; ADR 066) as `ae7b88a`, by `publish.yml` alone (push run
+`44507574758`). Merged at 10:38:39 UTC, the release out at 10:40:43, the page
+deployed by 10:47:07, and the drift check passed at 10:47:32. Anonymous downloads
+of the Windows installer, the Mac image and `irori-0.2.84-full.nupkg` matched
+`SHA256SUMS.txt`, the live page links the 0.2.84 installers, and the live guide
+says the shared skills are each CLI's own and that a vault on an SSH host does not
+get the shared Schema yet. CI passed on the head (run `44505552143`). Seen on
+Linux through the stand-in CLIs and CI's packaged-app smokes; no real Codex,
+OpenCode or Antigravity CLI has run it.
+
 Published 2026-11-19: **0.2.83** ([#353](https://github.com/DeL-TaiseiOzaki/irori/pull/353),
 each SSH host's vaults in a box of their own on irori mode's mapping, and the view
 renamed from 地図 to マッピング; ADR 061 decision 1 amended) as `00667d6`, by
