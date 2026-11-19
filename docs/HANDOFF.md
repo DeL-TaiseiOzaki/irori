@@ -1,5 +1,19 @@
 # irori continuation handoff
 
+**Keep working while an agent runs, 0.2.81** (see STATUS;
+[ADR 020](decisions/020-parallel-conversations.md) D5,
+[ADR 042](decisions/042-waiting-folders-and-work-folders.md) D2 and D4). The rule
+now: a run keeps what it was given when it started, so only what would move or
+rewrite files it works on waits, and only for runs in that vault. New gates
+should follow it: `addToVault` for edits and additions, `changeVault` for moves
+and removals, `takeCloud` for a linked folder, and `GitService`'s
+`canMutate(scopeId, tree)` with `tree` for operations that change files. Still
+global and unchanged: `whenIdle` (environment restore, workspace removal) and
+`git.busy` holding saves and agent starts in every vault. `comments-ui-smoke.ts`
+failed twice inside a full `test:ui` on this change at `select(page, 'A claim')`
+after a quote revealed its passage (passed standalone five times, and in a third
+full run); if CI shows it, look at the editor re-applying the revealed selection.
+
 **CI's intermittent failures, 0.2.80** (see STATUS). Two were app races (find in a
 PDF, the vault host's place) and four were tests reading before a write ended;
 all are fixed. A GitHub download timeout (504) on Nov 9 failed packaging twice
