@@ -904,6 +904,11 @@
   font-size: 11px;
   line-height: 1.5;
 }
+/* An item with no icon of its own keeps its words in line with those that have one. */
+.menu-icon-blank {
+  width: 15px;
+  flex: none;
+}
 .menu-separator {
   height: 1px;
   margin: 5px 6px;

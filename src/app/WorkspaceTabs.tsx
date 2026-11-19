@@ -1,6 +1,8 @@
 import { Fragment, memo, useRef, useState, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { ContextMenu } from '@base-ui/react/context-menu';
 import type { WorkspaceProfile } from '../domain/types';
+import type { WorkspaceTab } from '../domain/workspace-tabs';
 import { t } from '../domain/i18n';
 import { Icon } from './Icon';
 import { useLanguage } from './useLanguage';
@@ -47,7 +49,9 @@ export function stripIndexAt(x: number) {
  * A tab dragged along the strip takes the place it is let go at (ADR 065). One dragged
  * out of it, below it or off the window, joins the tabs of the window it is let go on,
  * which shows where while it is over them (ADR 064), or else opens in a window of its
- * own while two or more are open (ADR 063).
+ * own while two or more are open (ADR 063). A tab's right click offers what a browser's
+ * does: duplicate it, move it to a new window, close it, the others or those to its
+ * right (ADR 066).
  * Memoised: it re-renders for its own data, not for every keystroke in the editor.
  */
 export const WorkspaceTabs = memo(function WorkspaceTabs({
@@ -60,29 +64,32 @@ export const WorkspaceTabs = memo(function WorkspaceTabs({
   incoming,
   onShow,
   onClose,
+  onDuplicate,
   onMoveOut,
   onDragOver,
   onReorder,
   onAdd,
 }: {
-  tabs: WorkspaceProfile[];
-  /** The tab on show; none while the start screen is. */
+  tabs: WorkspaceTab[];
+  /** The key of the tab on show; none while the start screen is. */
   shown?: string;
   running: string[];
   waiting: string[];
   disabled: boolean;
-  /** Tabs on their way to another window: they stay until it shows them. */
+  /** The keys of tabs on their way to another window: they stay until it shows them. */
   moving: string[];
   /** A tab dragged out of another window, over these: where it would join them. */
   incoming?: { index: number; name: string };
-  onShow: (profile: WorkspaceProfile) => void;
-  onClose: (profile: WorkspaceProfile) => void;
-  /** A tab let go of out of the strip, at a point of the screen. */
-  onMoveOut: (profile: WorkspaceProfile, at: Point) => void;
+  onShow: (tab: WorkspaceTab) => void;
+  /** Closes the tabs these keys name. */
+  onClose: (keys: string[]) => void;
+  onDuplicate: (tab: WorkspaceTab) => void;
+  /** A tab let go of out of the strip at a point of the screen, or moved from its menu. */
+  onMoveOut: (tab: WorkspaceTab, at?: Point) => void;
   /** Where a tab dragged out of the strip is on the screen; none once it is not. */
   onDragOver: (drag?: { name: string; at: Point }) => void;
   /** A tab let go along the strip, before the `index`-th of the other tabs. */
-  onReorder: (profile: WorkspaceProfile, index: number) => void;
+  onReorder: (tab: WorkspaceTab, index: number) => void;
   onAdd: () => void;
 }) {
   useLanguage();
@@ -90,7 +97,7 @@ export const WorkspaceTabs = memo(function WorkspaceTabs({
   // `places` are the other tabs as they stood when the drag began, and `from` the place
   // among them the tab already has (ADR 065).
   const held = useRef<{
-    id: string;
+    key: string;
     x: number;
     y: number;
     foot: number;
@@ -100,7 +107,7 @@ export const WorkspaceTabs = memo(function WorkspaceTabs({
   // A drag ends with a click on the tab it started on, in the same task; it shows nothing.
   const swallow = useRef(false);
   const [drag, setDrag] = useState<{
-    id: string;
+    key: string;
     name: string;
     x: number;
     y: number;
@@ -130,10 +137,10 @@ export const WorkspaceTabs = memo(function WorkspaceTabs({
     if (now.told) onDragOver();
     pointing.current = { told: false };
   }
-  const state = (profile: WorkspaceProfile) =>
-    profile.scopeIds.some((id) => waiting.includes(id))
+  const state = (tab: WorkspaceProfile) =>
+    tab.scopeIds.some((id) => waiting.includes(id))
       ? 'waiting'
-      : profile.scopeIds.some((id) => running.includes(id))
+      : tab.scopeIds.some((id) => running.includes(id))
         ? 'running'
         : undefined;
   const out = (event: PointerEvent, foot: number) =>
@@ -141,25 +148,25 @@ export const WorkspaceTabs = memo(function WorkspaceTabs({
     event.clientY < 0 ||
     event.clientX < 0 ||
     event.clientX > window.innerWidth;
-  function hold(event: PointerEvent<HTMLButtonElement>, profile: WorkspaceProfile) {
+  function hold(event: PointerEvent<HTMLButtonElement>, tab: WorkspaceTab) {
     if (disabled || event.button !== 0 || !event.isPrimary) return;
     // The pointer stays the tab's when it leaves the strip, or the window.
     event.currentTarget.setPointerCapture(event.pointerId);
     const foot = event.currentTarget.closest('nav')?.getBoundingClientRect().bottom ?? 0;
-    held.current = { id: profile.id, x: event.clientX, y: event.clientY, foot, dragged: false };
+    held.current = { key: tab.key, x: event.clientX, y: event.clientY, foot, dragged: false };
   }
-  function follow(event: PointerEvent, profile: WorkspaceProfile) {
+  function follow(event: PointerEvent, tab: WorkspaceTab) {
     const start = held.current;
-    if (start?.id !== profile.id) return;
+    if (start?.key !== tab.key) return;
     if (!start.dragged && Math.hypot(event.clientX - start.x, event.clientY - start.y) < dragFrom)
       return;
     start.dragged = true;
-    start.places ??= measure(event.currentTarget, profile.id);
+    start.places ??= measure(event.currentTarget, tab.key);
     const away = out(event, start.foot);
     const index = away ? undefined : placeAt(start.places, event.clientX);
     setDrag({
-      id: profile.id,
-      name: profile.name,
+      key: tab.key,
+      name: tab.name,
       x: event.clientX,
       y: event.clientY,
       out: away,
@@ -168,15 +175,15 @@ export const WorkspaceTabs = memo(function WorkspaceTabs({
           ? undefined
           : slotOf(start.places, index),
     });
-    point(away ? { name: profile.name, at: onScreen(event) } : undefined);
+    point(away ? { name: tab.name, at: onScreen(event) } : undefined);
   }
   /** The other tabs' places across the strip, and the one the dragged tab has among them. */
-  function measure(button: Element, id: string): Places {
+  function measure(button: Element, key: string): Places {
     const list = button.closest('.workspace-tab-list');
     const boxes = [
       ...(list?.querySelectorAll(':scope > .workspace-tab:not([data-incoming])') ?? []),
     ].map((tab) => tab.getBoundingClientRect());
-    const from = tabs.findIndex((tab) => tab.id === id);
+    const from = tabs.findIndex((tab) => tab.key === key);
     const origin = (list?.getBoundingClientRect().left ?? 0) - (list?.scrollLeft ?? 0);
     return {
       others: boxes.filter((_, index) => index !== from),
@@ -184,19 +191,19 @@ export const WorkspaceTabs = memo(function WorkspaceTabs({
       origin,
     };
   }
-  function letGo(event: PointerEvent, profile: WorkspaceProfile, cancelled = false) {
+  function letGo(event: PointerEvent, tab: WorkspaceTab, cancelled = false) {
     const start = held.current;
     held.current = undefined;
     setDrag(undefined);
     // The place shown in another window goes, whatever the drop then does.
     stopPointing();
-    if (start?.id !== profile.id || !start.dragged) return;
+    if (start?.key !== tab.key || !start.dragged) return;
     swallow.current = true;
     setTimeout(() => (swallow.current = false));
     if (cancelled) return;
-    if (out(event, start.foot)) return onMoveOut(profile, onScreen(event));
+    if (out(event, start.foot)) return onMoveOut(tab, onScreen(event));
     const index = start.places && placeAt(start.places, event.clientX);
-    if (index !== undefined && index !== start.places?.from) onReorder(profile, index);
+    if (index !== undefined && index !== start.places?.from) onReorder(tab, index);
   }
   // A window's one tab moves only onto another window's tabs (ADR 064).
   const alone = tabs.length - moving.length < 2;
@@ -211,54 +218,106 @@ export const WorkspaceTabs = memo(function WorkspaceTabs({
         {drag?.slot !== undefined && (
           <i className="workspace-tab-slot" style={{ left: drag.slot }} aria-hidden="true" />
         )}
-        {tabs.map((profile, index) => {
-          const ai = state(profile);
-          const current = profile.id === shown;
-          const away = moving.includes(profile.id);
+        {tabs.map((tab, index) => {
+          const ai = state(tab);
+          const current = tab.key === shown;
+          const away = moving.includes(tab.key);
+          const others = tabs.filter(
+            (other) => other.key !== tab.key && !moving.includes(other.key),
+          );
+          const right = tabs.slice(index + 1).filter((other) => !moving.includes(other.key));
           return (
-            <Fragment key={profile.id}>
+            <Fragment key={tab.key}>
               {incoming?.index === index && joining}
-              <div
-                className="workspace-tab"
-                data-current={current || undefined}
-                data-moving={away || drag?.id === profile.id || undefined}
-              >
-                <button
-                  aria-current={current ? 'page' : undefined}
-                  className="workspace-tab-name"
-                  disabled={disabled || away}
-                  title={profile.name}
-                  aria-label={
-                    ai === 'waiting'
-                      ? t(`${profile.name}・許可待ち`, `${profile.name} · waiting`)
-                      : ai === 'running'
-                        ? t(`${profile.name}・実行中`, `${profile.name} · running`)
-                        : profile.name
-                  }
-                  onPointerDown={(event) => hold(event, profile)}
-                  onPointerMove={(event) => follow(event, profile)}
-                  onPointerUp={(event) => letGo(event, profile)}
-                  onPointerCancel={(event) => letGo(event, profile, true)}
-                  // The system took the pointer away (another window came to the front).
-                  onLostPointerCapture={(event) => letGo(event, profile, true)}
-                  onClick={() => {
-                    if (swallow.current) swallow.current = false;
-                    else onShow(profile);
-                  }}
+              <ContextMenu.Root>
+                <ContextMenu.Trigger
+                  className="workspace-tab"
+                  data-current={current || undefined}
+                  data-moving={away || drag?.key === tab.key || undefined}
                 >
-                  {ai && <i className="workspace-tab-ai" data-ai={ai} aria-hidden="true" />}
-                  <span>{profile.name}</span>
-                </button>
-                <button
-                  className="workspace-tab-close"
-                  disabled={disabled || away}
-                  title={t('閉じる', 'Close')}
-                  aria-label={t(`${profile.name} を閉じる`, `Close ${profile.name}`)}
-                  onClick={() => onClose(profile)}
-                >
-                  <Icon name="close" size={13} />
-                </button>
-              </div>
+                  <button
+                    aria-current={current ? 'page' : undefined}
+                    className="workspace-tab-name"
+                    disabled={disabled || away}
+                    title={tab.name}
+                    aria-label={
+                      ai === 'waiting'
+                        ? t(`${tab.name}・許可待ち`, `${tab.name} · waiting`)
+                        : ai === 'running'
+                          ? t(`${tab.name}・実行中`, `${tab.name} · running`)
+                          : tab.name
+                    }
+                    onPointerDown={(event) => hold(event, tab)}
+                    onPointerMove={(event) => follow(event, tab)}
+                    onPointerUp={(event) => letGo(event, tab)}
+                    onPointerCancel={(event) => letGo(event, tab, true)}
+                    // The system took the pointer away (another window came to the front).
+                    onLostPointerCapture={(event) => letGo(event, tab, true)}
+                    onClick={() => {
+                      if (swallow.current) swallow.current = false;
+                      else onShow(tab);
+                    }}
+                  >
+                    {ai && <i className="workspace-tab-ai" data-ai={ai} aria-hidden="true" />}
+                    <span>{tab.name}</span>
+                  </button>
+                  <button
+                    className="workspace-tab-close"
+                    disabled={disabled || away}
+                    title={t('閉じる', 'Close')}
+                    aria-label={t(`${tab.name} を閉じる`, `Close ${tab.name}`)}
+                    onClick={() => onClose([tab.key])}
+                  >
+                    <Icon name="close" size={13} />
+                  </button>
+                </ContextMenu.Trigger>
+                <ContextMenu.Portal>
+                  <ContextMenu.Positioner>
+                    <ContextMenu.Popup
+                      className="menu"
+                      aria-label={t(`${tab.name} のタブ`, `${tab.name} tab`)}
+                    >
+                      <ContextMenu.Item
+                        disabled={disabled || away}
+                        onClick={() => onDuplicate(tab)}
+                      >
+                        <Icon name="copy" size={15} />
+                        {t('タブを複製', 'Duplicate tab')}
+                      </ContextMenu.Item>
+                      {/* A window's one tab stays (ADR 063); it can only join another's. */}
+                      <ContextMenu.Item
+                        disabled={disabled || away || alone}
+                        onClick={() => onMoveOut(tab)}
+                      >
+                        <Icon name="move" size={15} />
+                        {t('新しいウィンドウに移動', 'Move tab to new window')}
+                      </ContextMenu.Item>
+                      <ContextMenu.Separator className="menu-separator" />
+                      <ContextMenu.Item
+                        disabled={disabled || away}
+                        onClick={() => onClose([tab.key])}
+                      >
+                        <Icon name="close" size={15} />
+                        {t('タブを閉じる', 'Close tab')}
+                      </ContextMenu.Item>
+                      <ContextMenu.Item
+                        disabled={disabled || !others.length}
+                        onClick={() => onClose(others.map((other) => other.key))}
+                      >
+                        <span className="menu-icon-blank" aria-hidden="true" />
+                        {t('他のタブを閉じる', 'Close other tabs')}
+                      </ContextMenu.Item>
+                      <ContextMenu.Item
+                        disabled={disabled || !right.length}
+                        onClick={() => onClose(right.map((other) => other.key))}
+                      >
+                        <span className="menu-icon-blank" aria-hidden="true" />
+                        {t('右側のタブを閉じる', 'Close tabs to the right')}
+                      </ContextMenu.Item>
+                    </ContextMenu.Popup>
+                  </ContextMenu.Positioner>
+                </ContextMenu.Portal>
+              </ContextMenu.Root>
             </Fragment>
           );
         })}

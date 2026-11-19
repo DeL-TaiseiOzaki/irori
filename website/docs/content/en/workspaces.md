@@ -42,6 +42,8 @@ Agents keep running in tabs not on show. A tab shows a dot while an agent in it 
 
 With two or more workspaces open, drag a tab below the tabs, or out of the window, and let go once it says **Opens in a new window**: the workspace opens in a new window where you let go, on the vault and view it showed. Its agents keep running while it moves. If the tab on show has a terminal open, irori asks first and closes it. Drag a tab along the tabs and let go to change their order; a short line shows where it will go.
 
+Right-click a tab for **Duplicate tab**, **Move tab to new window**, **Close tab**, **Close other tabs** and **Close tabs to the right**. **Duplicate tab** opens the same workspace in another tab: each tab keeps its own vault and view, while the workspace's agents and conversations are shared, so closing one of its tabs stops nothing another tab still has open.
+
 Let go on the title bar of another irori window, where its tabs are, and the tab joins that window's tabs. While it is over them, its name shows where it will go. A window's only tab can be dragged too: moved onto another window's tabs, its window closes; let go anywhere else, nothing happens.
 
 ## Two vaults side by side

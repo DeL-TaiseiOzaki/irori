@@ -2,47 +2,75 @@ import type { WorkspaceProfile } from './types';
 
 /**
  * The workspaces open side by side, as tabs along the window's top. One is on
- * show; the others keep their agents running and their place.
+ * show; the others keep their agents running and their place. A workspace may be
+ * open in several tabs, each with its own place (ADR 066): a tab is known by its
+ * `key`, and what the workspace shares (its agents, its vaults' runs and clouds)
+ * goes on while any tab, here or in another window, has it.
  */
+export type WorkspaceTab = WorkspaceProfile & { key: string };
 
-/** Opens a workspace: an open one comes on show, a new one stands after the one on show. */
-export function openTab(
-  tabs: WorkspaceProfile[],
-  profile: WorkspaceProfile,
-  after?: string,
-): WorkspaceProfile[] {
-  if (tabs.some((tab) => tab.id === profile.id)) return replaceTab(tabs, profile);
-  const at = tabs.findIndex((tab) => tab.id === after);
-  return at < 0 ? [...tabs, profile] : [...tabs.slice(0, at + 1), profile, ...tabs.slice(at + 1)];
+/** A workspace as a tab of its own. */
+export const tabOf = (profile: WorkspaceProfile, key: string): WorkspaceTab => ({
+  ...profileOf(profile),
+  key,
+});
+
+/** The workspace a tab shows, without the tab's own key. */
+export function profileOf(tab: WorkspaceProfile): WorkspaceProfile {
+  const { key: _, ...profile } = tab as WorkspaceTab;
+  return profile;
 }
 
-/** A workspace's newer profile (renamed, its vaults or groups changed) in its place. */
-export function replaceTab(tabs: WorkspaceProfile[], profile: WorkspaceProfile) {
-  return tabs.map((tab) => (tab.id === profile.id ? profile : tab));
+/** Opens a tab: one already in the strip comes on show where it is, a new one stands after `after`. */
+export function openTab(tabs: WorkspaceTab[], tab: WorkspaceTab, after?: string): WorkspaceTab[] {
+  if (tabs.some((item) => item.key === tab.key))
+    return tabs.map((item) => (item.key === tab.key ? tab : item));
+  const at = tabs.findIndex((item) => item.key === after);
+  return at < 0 ? [...tabs, tab] : [...tabs.slice(0, at + 1), tab, ...tabs.slice(at + 1)];
+}
+
+/** A workspace's newer profile (renamed, its vaults or groups changed), in every tab it is open in. */
+export function replaceTab(tabs: WorkspaceTab[], profile: WorkspaceProfile) {
+  return tabs.map((tab) => (tab.id === profile.id ? tabOf(profile, tab.key) : tab));
 }
 
 /**
- * Closes a tab. When it was on show, the one after it comes on show, or the one
- * before when it was the last; `next` is undefined when no tab is left.
+ * Closes tabs. When the one on show is among them, the nearest tab after it comes on
+ * show, or else the nearest before it; `next` is undefined when no tab is left.
  */
-export function closeTab(
-  tabs: WorkspaceProfile[],
-  id: string,
+export function closeTabs(
+  tabs: WorkspaceTab[],
+  keys: string[],
   shown?: string,
-): { tabs: WorkspaceProfile[]; next?: WorkspaceProfile } {
-  const at = tabs.findIndex((tab) => tab.id === id);
-  if (at < 0) return { tabs, next: tabs.find((tab) => tab.id === shown) };
-  const left = tabs.filter((tab) => tab.id !== id);
-  if (shown !== id) return { tabs: left, next: left.find((tab) => tab.id === shown) };
-  return { tabs: left, next: left[Math.min(at, left.length - 1)] };
+): { tabs: WorkspaceTab[]; next?: WorkspaceTab } {
+  const closing = new Set(keys);
+  const left = tabs.filter((tab) => !closing.has(tab.key));
+  if (!shown || !closing.has(shown))
+    return { tabs: left, next: left.find((tab) => tab.key === shown) };
+  const at = tabs.findIndex((tab) => tab.key === shown);
+  const after = tabs.slice(at + 1).find((tab) => !closing.has(tab.key));
+  const before = tabs
+    .slice(0, Math.max(at, 0))
+    .reverse()
+    .find((tab) => !closing.has(tab.key));
+  return { tabs: left, next: after ?? before };
 }
 
-/** The vaults only this tab has open: closing it may stop their runs and release their clouds. */
-export function onlyIn(tabs: WorkspaceProfile[], id: string): string[] {
-  const tab = tabs.find((item) => item.id === id);
-  if (!tab) return [];
-  const elsewhere = new Set(tabs.filter((item) => item.id !== id).flatMap((item) => item.scopeIds));
-  return tab.scopeIds.filter((scopeId) => !elsewhere.has(scopeId));
+/**
+ * What only the closing tabs have open: the vaults, whose runs may stop and whose
+ * clouds may be let go, and the workspaces, whose irori agent conversations may stop.
+ * Another tab of the same workspace keeps both.
+ */
+export function onlyIn(tabs: WorkspaceTab[], keys: string[]) {
+  const closing = new Set(keys);
+  const staying = tabs.filter((tab) => !closing.has(tab.key));
+  const going = tabs.filter((tab) => closing.has(tab.key));
+  const vaults = new Set(staying.flatMap((tab) => tab.scopeIds));
+  const workspaces = new Set(staying.map((tab) => tab.id));
+  return {
+    scopeIds: [...new Set(going.flatMap((tab) => tab.scopeIds))].filter((id) => !vaults.has(id)),
+    workspaces: [...new Set(going.map((tab) => tab.id))].filter((id) => !workspaces.has(id)),
+  };
 }
 
 /** What the host keeps of a window's tab: the workspace and the vaults it shows. */
@@ -69,22 +97,22 @@ export type MovedTab = { id: string; place?: TabPlace };
  * A tab dragged along its own strip (ADR 065): it leaves its place and stands before the
  * `index`-th of the other tabs, or after them all.
  */
-export function reorderTab(tabs: WorkspaceProfile[], id: string, index: number) {
-  const tab = tabs.find((item) => item.id === id);
+export function reorderTab(tabs: WorkspaceTab[], key: string, index: number) {
+  const tab = tabs.find((item) => item.key === key);
   if (!tab) return tabs;
-  const others = tabs.filter((item) => item.id !== id);
+  const others = tabs.filter((item) => item.key !== key);
   const at = Math.max(0, Math.min(index, others.length));
   return [...others.slice(0, at), tab, ...others.slice(at)];
 }
 
 /**
- * A workspace dropped into the tabs at `index` (ADR 064); one already open keeps its
- * place and takes the newer profile.
+ * A tab dropped into the strip at `index` (ADR 064). It is a tab of its own even when the
+ * workspace is open here already (ADR 066).
  */
-export function insertTab(tabs: WorkspaceProfile[], profile: WorkspaceProfile, index: number) {
-  if (tabs.some((tab) => tab.id === profile.id)) return replaceTab(tabs, profile);
+export function insertTab(tabs: WorkspaceTab[], tab: WorkspaceTab, index: number) {
+  if (tabs.some((item) => item.key === tab.key)) return openTab(tabs, tab);
   const at = Math.max(0, Math.min(index, tabs.length));
-  return [...tabs.slice(0, at), profile, ...tabs.slice(at)];
+  return [...tabs.slice(0, at), tab, ...tabs.slice(at)];
 }
 
 /**
@@ -99,10 +127,10 @@ export class WindowTabs {
   forget(window: number) {
     this.open.delete(window);
   }
-  /** Whether `workspace` is the one tab `window` has open (ADR 064). */
+  /** Whether `window` has one tab open, of `workspace` (ADR 064). */
   onlyTab(window: number, workspace: string) {
     const tabs = this.open.get(window) ?? [];
-    return tabs.length > 0 && tabs.every((tab) => tab.id === workspace);
+    return tabs.length === 1 && tabs[0].id === workspace;
   }
   /** The tabs the windows other than `window` have open, each workspace once. */
   elsewhere(window: number): OpenTab[] {

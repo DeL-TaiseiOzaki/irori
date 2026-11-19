@@ -1,5 +1,11 @@
 # irori continuation handoff
 
+**A tab's right click, and one workspace in several tabs, 0.2.84**
+([ADR 066](decisions/066-tab-menu-and-duplicate-tabs.md)). Tabs are known by a key
+of their own in the renderer; what a workspace shares stops only when its last tab
+closes, here and in other windows. Run on Linux under Xvfb only. Not covered:
+reopening a closed tab, a new tab to the right, pinning or grouping tabs.
+
 **Keep working while an agent runs, 0.2.81** (see STATUS;
 [ADR 020](decisions/020-parallel-conversations.md) D5,
 [ADR 042](decisions/042-waiting-folders-and-work-folders.md) D2 and D4). The rule
