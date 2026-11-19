@@ -453,6 +453,30 @@ export function run(kind) {
       for (const file of JSON.parse(process.env.OPENCODE_CONFIG_CONTENT ?? '{}').plugin ?? []) {
         const module = await import(pathToFileURL(file).href);
         if (module.IroriSchemaHooks) await module.IroriSchemaHooks({});
+        // OpenCode hands each plugin's `config` hook its configuration before
+        // anything else, then finds skills under every `skills.paths` folder.
+        if (module.IroriSkillPaths) {
+          const config = { skills: { paths: ['person-skills'] } };
+          await (await module.IroriSkillPaths({})).config?.(config);
+          log({
+            type: 'skills',
+            paths: config.skills.paths,
+            found: config.skills.paths.flatMap((dir) =>
+              fs.existsSync(dir)
+                ? fs
+                    .readdirSync(dir)
+                    .filter((name) => fs.existsSync(path.join(dir, name, 'SKILL.md')))
+                : [],
+            ),
+            links: config.skills.paths.flatMap((dir) =>
+              fs.existsSync(dir)
+                ? fs
+                    .readdirSync(dir)
+                    .filter((name) => fs.lstatSync(path.join(dir, name)).isSymbolicLink())
+                : [],
+            ),
+          });
+        }
       }
     console.log('opencode server listening on http://127.0.0.1:' + server.address().port);
   });
@@ -535,6 +559,19 @@ async function antigravity(log) {
   for await (const chunk of process.stdin) input += chunk;
   const message = JSON.parse(input.trim());
   log({ args, prompt: message.message.content, event: message.event });
+  // The CLI reads `.agents/skills` in every workspace folder, `--add-dir` ones too.
+  const skills = args.flatMap((arg, i) => {
+    const dir = arg === '--add-dir' ? path.join(args[i + 1], '.agents', 'skills') : undefined;
+    return dir && fs.existsSync(dir)
+      ? fs.readdirSync(dir).map((name) => ({
+          folder: args[i + 1],
+          name,
+          text: fs.readFileSync(path.join(dir, name, 'SKILL.md'), 'utf8'),
+          link: fs.lstatSync(path.join(dir, name)).isSymbolicLink(),
+        }))
+      : [];
+  });
+  if (skills.length) log({ type: 'skills', skills });
   const prompt = withoutEarlier(message.message.content);
   const send = (value) => process.stdout.write(JSON.stringify(value) + '\n');
   const result = (value) =>

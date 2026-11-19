@@ -1,5 +1,22 @@
 # irori continuation handoff
 
+**Shared skills are every CLI's own skills, 0.2.84** (see STATUS;
+[ADR 066](decisions/066-shared-skills-are-every-clis-own.md)). Every shared
+Schema setting now reaches every CLI as the vault's own does. Next:
+1. Run a real Codex, OpenCode and Antigravity CLI once each with a shared skill
+   and check that it is listed among their skills (`skills/list`, OpenCode's
+   skill tool, `/skills` in agy). Only stand-ins have run it; that the
+   Antigravity CLI reads `.agents/skills` in an `--add-dir` folder is read from
+   its documentation, as its hooks folder was.
+2. Not covered, for every CLI alike: a vault on an SSH host gets no shared
+   Schema at all (ADR 061). Giving it there means carrying the shared Schema to
+   the vault host per run and deciding whether shared hooks may run on the host;
+   that is the owner's decision. A CLI's own sub-agents do not see irori's
+   words, so shared instructions and rules reach them only when the agent passes
+   them on.
+3. Hermes Agent still hears skills listed, and the hook events each CLI cannot
+   run stay as ADR 058 D5 lists them.
+
 **Keep working while an agent runs, 0.2.81** (see STATUS;
 [ADR 020](decisions/020-parallel-conversations.md) D5,
 [ADR 042](decisions/042-waiting-folders-and-work-folders.md) D2 and D4). The rule

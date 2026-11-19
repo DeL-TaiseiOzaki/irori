@@ -470,6 +470,13 @@ require('node:readline').createInterface({ input: process.stdin }).on('line', (l
     send({ id: m.id, result: { data: [{ cwd: process.cwd(), hooks: listed().map(({ event, ...hook }) => ({ ...hook, source: 'sessionFlags' })), warnings: [], errors: [] }] } });
     return;
   }
+  // Each extra root holds skill folders, links followed, as .agents/skills does.
+  if (m.method === 'skills/extraRoots/set') {
+    if (fs.existsSync('codex-no-extra-roots')) { send({ id: m.id, error: { code: -32601, message: 'Method not found' } }); return; }
+    log({ type: 'extra-roots', skills: m.params.extraRoots.flatMap((root) => fs.readdirSync(root).map((name) => ({ name, folder: fs.realpathSync(require('node:path').join(root, name)) }))) });
+    send({ id: m.id, result: {} });
+    return;
+  }
   if (m.method === 'turn/start') {
     if (fs.existsSync('fail-turn')) { send({ id: m.id, error: { code: -1, message: 'turn refused' } }); return; }
     send({ id: m.id, result: { turn: { id: 'turn-1' } } });
@@ -646,6 +653,141 @@ test(
       .at(-1)
       .params.input.find((item: { type: string }) => item.type === 'text').text;
     assert.match(last, /<folder-instructions>\nVAULT-INSTRUCTIONS\n<\/folder-instructions>/);
+  },
+);
+
+test(
+  "the shared Schema's skills are each CLI's own: Codex's extra root, OpenCode's skill paths, copies in an Antigravity workspace folder",
+  posix,
+  async (t) => {
+    const h = await harness(t);
+    await writeFile(path.join(h.bin, 'codex'), codexStandIn, { mode: 0o700 });
+    await writeFile(
+      path.join(h.bin, 'agy'),
+      `#!/usr/bin/env node\nimport(${JSON.stringify(fixture)}).then(m=>m.run('agy'));\n`,
+      { mode: 0o700 },
+    );
+    await h.you.create();
+    for (const [name, words] of [
+      ['weekly', 'SHARED-WEEKLY'],
+      ['digest', 'SHARED-DIGEST'],
+      ['review', 'SHARED-REVIEW'],
+      ['broken', 'SHARED-BROKEN'],
+    ])
+      await h.settings.write(
+        sharedSchemaId,
+        `.agents/skills/${name}/SKILL.md`,
+        skill(name, words),
+        null,
+      );
+    // The vault's own skill of a name wins: the CLI finds it itself, even one irori
+    // reports as malformed. OpenCode also reads the vault's `.claude/skills`.
+    await h.settings.write(
+      h.space.scopeId,
+      '.agents/skills/digest/SKILL.md',
+      skill('digest', 'VAULT-DIGEST'),
+      null,
+    );
+    await mkdir(path.join(h.kb, '.agents', 'skills', 'broken'), { recursive: true });
+    await writeFile(
+      path.join(h.kb, '.agents', 'skills', 'broken', 'SKILL.md'),
+      'No front matter.\n',
+    );
+    await mkdir(path.join(h.kb, '.claude', 'skills', 'review'), { recursive: true });
+    await writeFile(
+      path.join(h.kb, '.claude', 'skills', 'review', 'SKILL.md'),
+      skill('review', 'VAULT-REVIEW'),
+    );
+    const folderOf = async (name: string) =>
+      realpath(
+        path.dirname((await h.you.shared())!.skills.find((item) => item.name === name)!.path),
+      );
+    // Codex: an extra skill root of its app server, set before the thread starts and
+    // again before it resumes. Codex names a skill by its real path: links serve.
+    assert.equal((await h.execute('codex', 'codex words')).at(-1)?.outcome, 'completed');
+    assert.equal((await h.execute('codex', 'codex resumes')).at(-1)?.outcome, 'completed');
+    const log = await h.lines(path.join(h.kb, 'codex-stand-in.jsonl'));
+    const roots = log.filter((m) => m.type === 'extra-roots');
+    assert.equal(roots.length, 2);
+    for (const root of roots)
+      assert.deepEqual(
+        root.skills.sort((a: { name: string }, b: { name: string }) =>
+          a.name.localeCompare(b.name),
+        ),
+        [
+          { name: 'review', folder: await folderOf('review') },
+          { name: 'weekly', folder: await folderOf('weekly') },
+        ],
+      );
+    const order = log.map((m) => m.method).filter(Boolean);
+    assert.deepEqual(
+      order.filter((method) =>
+        ['skills/extraRoots/set', 'thread/start', 'thread/resume'].includes(method),
+      ),
+      ['skills/extraRoots/set', 'thread/start', 'skills/extraRoots/set', 'thread/resume'],
+    );
+    // OpenCode: irori's plugin adds a folder of copies to the person's own skill
+    // paths, at the same place on every run of the conversation.
+    assert.equal((await h.execute('opencode', 'opencode words')).at(-1)?.outcome, 'completed');
+    assert.equal((await h.execute('opencode', 'opencode again')).at(-1)?.outcome, 'completed');
+    const calls = await h.lines(path.join(h.kb, 'fixture-requests.jsonl'));
+    const opencode = calls.filter((call) => call.kind === 'opencode' && call.type === 'skills');
+    assert.equal(opencode.length, 2);
+    assert.equal(opencode[0].paths[0], 'person-skills', "the person's skill paths stay");
+    assert.equal(opencode[0].paths.length, 2);
+    assert.equal(opencode[1].paths[1], opencode[0].paths[1]);
+    assert.deepEqual(opencode[0].found, ['weekly']);
+    assert.deepEqual(opencode[0].links, [], 'copies, not links into the shared Schema');
+    // The Antigravity CLI: copies in a workspace folder, never links to the shared Schema.
+    assert.equal((await h.execute('antigravity', 'agy words')).at(-1)?.outcome, 'completed');
+    const agy = (await h.lines(path.join(h.kb, 'fixture-requests.jsonl'))).find(
+      (call) => call.kind === 'agy' && call.type === 'skills',
+    );
+    const seen = (folder: (dir: string) => boolean) =>
+      agy.skills
+        .filter((item: { folder: string }) => folder(item.folder))
+        .map((item: { name: string; link: boolean; text: string }) => [
+          item.name,
+          item.link,
+          /SHARED|VAULT|No front matter/.exec(item.text)?.[0],
+        ])
+        .sort((a: string[], b: string[]) => a[0].localeCompare(b[0]));
+    assert.deepEqual(
+      seen((dir) => dir === h.kb),
+      [
+        ['broken', false, 'No front matter'],
+        ['digest', false, 'VAULT'],
+      ],
+    );
+    assert.deepEqual(
+      seen((dir) => dir !== h.kb),
+      [
+        ['review', false, 'SHARED'],
+        ['weekly', false, 'SHARED'],
+      ],
+    );
+    // The words stay: the shared skills are still listed in the request.
+    const turn = log.find((m) => m.method === 'turn/start');
+    assert.match(
+      turn.params.input.find((item: { type: string }) => item.type === 'text').text,
+      /- weekly: SHARED-WEEKLY/,
+    );
+    // Nothing is left behind once the runs end.
+    assert.deepEqual(
+      await readdir(path.join(h.base, 'device', 'given-skills')).catch(() => []),
+      [],
+    );
+    // A Codex that refuses an extra root leaves the skills to the words, and says so.
+    await writeFile(path.join(h.kb, 'codex-no-extra-roots'), '');
+    const refused = await h.execute('codex', 'codex again');
+    assert.equal(refused.at(-1)?.outcome, 'completed');
+    assert.ok(
+      refused.some((event) =>
+        /共通 Schema のスキルを Codex に渡せませんでした|Could not give the shared Schema's skills to Codex/.test(
+          event.text,
+        ),
+      ),
+    );
   },
 );
 

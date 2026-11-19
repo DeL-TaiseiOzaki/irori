@@ -103,6 +103,7 @@ import {
   hookEvents,
   informationalHookEvents,
   schemaReach,
+  sharedSkillReach,
   type SchemaReach,
 } from '../domain/schema-reach';
 import { fitParts, readSchemaParts, schemaInline } from '../host/schema-parts';
@@ -117,7 +118,7 @@ import {
   type BridgeEvent,
 } from './hook-bridge';
 import { commentsCount, readNoteComments } from '../host/comments';
-import { findSkill, noSkill, readFolderSkills } from '../host/skills';
+import { findSkill, noSkill, readFolderSkills, skillFolderNames } from '../host/skills';
 import {
   claudeSkillNames,
   linkClaudeSkills,
@@ -125,6 +126,14 @@ import {
   unlinkClaudeSkills,
   type LinkedSkill,
 } from './claude-skills';
+import {
+  giveSkills,
+  openCodeSkillNames,
+  openCodeSkillPaths,
+  pruneGivenSkills,
+  removeGivenSkills,
+  type GivenSkills,
+} from './given-skills';
 import { spaceFolder } from '../host/schema-folder';
 import { t } from '../domain/i18n';
 import type { YourAiService } from '../host/you';
@@ -366,6 +375,8 @@ type Run = {
   commands?: () => void;
   /** For Claude Code: the folder of links to the skills it does not find itself (ADR 049). */
   claudeSkills?: string;
+  /** For Codex, OpenCode and the Antigravity CLI: the shared Schema's skills irori gives it (ADR 066). */
+  givenSkills?: GivenSkills;
   /** The folder's sub-agents this CLI does not load itself, and those it must not use (ADR 050). */
   subAgents?: { foreign: AgentDefinition[]; refused: string[] };
   /** For your AI: its hand-offs' requests still waiting, as its views show them (ADR 050). */
@@ -556,6 +567,9 @@ export class AgentService {
     this.attachments = new AttachmentStore(files.dataDir);
     void this.attachments.prune().catch(() => {});
     void pruneClaudeSkills(files.dataDir, (id) => this.runs.has(id)).catch(() => {});
+    void pruneGivenSkills(files.dataDir, (id) =>
+      [...this.runs.values()].some((run) => run.conversationId === id),
+    ).catch(() => {});
     // Folders of hooks a run that did not end left for the Antigravity CLI (ADR 058).
     void pruneAntigravityHookFolders(files.dataDir, (id) => this.runs.has(id)).catch(() => {});
     void pruneCodexRoles(files.dataDir, (id) => this.runs.has(id)).catch(() => {});
@@ -1405,6 +1419,54 @@ export class AgentService {
     }
   }
   /**
+   * Gives Codex, OpenCode and the Antigravity CLI the shared Schema's skills as
+   * their own (ADR 066). Each finds the folder's `.agents/skills` itself, so a
+   * shared skill goes only where the folder has no skill folder of its name
+   * (a malformed or retired one too), nor, for OpenCode, one in its
+   * `.claude/skills` or `.opencode/skills`. OpenCode and the Antigravity CLI get
+   * copies, as either would change the shared Schema through a link. A failure
+   * leaves the skills to the words, as before, and says so.
+   */
+  private async giveSharedSkills(
+    run: Run,
+    input: StartRun,
+    you: boolean,
+    root: string,
+    shared: Awaited<ReturnType<YourAiService['shared']>>,
+  ) {
+    const reach = sharedSkillReach[input.agent];
+    if (!shared?.skills.length) return;
+    if (reach !== 'extra-root' && reach !== 'config-path' && reach !== 'workspace-copy') return;
+    try {
+      const folder = you
+        ? await this.you!.schemaFolder(input.workspace)
+        : spaceFolder(this.files, input.scopeId);
+      const own = await readFolderSkills(folder);
+      const skip = new Set([
+        ...own.skills.map((skill) => skill.name),
+        ...own.retired.map((skill) => skill.name),
+        ...(await skillFolderNames(folder)),
+        ...(reach === 'config-path' ? await openCodeSkillNames(root) : []),
+      ]);
+      run.givenSkills = await giveSkills(
+        this.files.dataDir,
+        run.conversationId!,
+        shared.skills.map((skill) => ({ name: skill.name, folder: path.dirname(skill.path) })),
+        skip,
+        reach !== 'extra-root',
+      );
+    } catch (error) {
+      this.event(
+        run,
+        'status',
+        t(
+          `共通 Schema のスキルを ${agentNames[input.agent]} に渡せませんでした: ${String(error)}`,
+          `Could not give the shared Schema's skills to ${agentNames[input.agent]}: ${String(error)}`,
+        ),
+      );
+    }
+  }
+  /**
    * What this CLI loads itself of the Schema of `root` (ADR 058): its row of the
    * table, where a file beside AGENTS.md that the CLI reads instead turns
    * AGENTS.md into irori's to give, and, for Claude Code, whether its version
@@ -1764,6 +1826,12 @@ export class AgentService {
       setup.args.push(...lines.args);
       setup.closers.push(lines.close);
     }
+    // The shared Schema's skills (ADR 066): a skill path irori's plugin adds to
+    // OpenCode's own, and a workspace folder whose `.agents/skills` the Antigravity
+    // CLI reads. Codex takes them from its app server (`skills/extraRoots/set`).
+    if (run.givenSkills && agent === 'opencode')
+      env = await openCodeSkillPaths(this.files.dataDir, [run.givenSkills.skills], env);
+    if (run.givenSkills && agent === 'antigravity') setup.folders.push(run.givenSkills.root);
     // Pi finds a folder's skills only in a trusted project; irori names each skill (ADR 058).
     if (agent === 'pi')
       setup.args.push(...(await this.piSkills(input)).flatMap((dir) => ['--skill', dir]));
@@ -2349,7 +2417,10 @@ export class AgentService {
         );
         return undefined;
       });
+      // The skills of the shared Schema, and for Claude Code the folder's too, as the
+      // CLI's own skills (ADR 049, ADR 066); Pi gets them with its other arguments.
       if (input.agent === 'claude') await this.linkSkills(run, input, you, space.root, shared);
+      else await this.giveSharedSkills(run, input, you, space.root, shared);
       await this.prepareSubAgents(run, input.agent, you, space.root);
       // What this CLI loads itself of its folder's Schema, and what irori gives it (ADR 058).
       const reach = await this.reachFor(input.agent, space.root);
@@ -2496,6 +2567,8 @@ export class AgentService {
       // What the session heard, once the CLI is done with it.
       await this.rememberHeard(run).catch(() => {});
       if (run.claudeSkills) await unlinkClaudeSkills(this.files.dataDir, run.id).catch(() => {});
+      if (run.givenSkills)
+        await removeGivenSkills(this.files.dataDir, run.conversationId!).catch(() => {});
       if (run.codexRoles) await removeCodexRoles(this.files.dataDir, run.id).catch(() => {});
       run.rpc?.fail(Error('Run finished'));
       // Words the CLI wrote while being stopped arrived after the flush above; with
@@ -2925,6 +2998,21 @@ export class AgentService {
     );
     run.rpc = rpc;
     await initializeCodex(rpc);
+    // The shared Schema's skills, as skills of Codex's own (ADR 066). One that
+    // refuses them leaves them to the words.
+    if (run.givenSkills)
+      await rpc
+        .request('skills/extraRoots/set', { extraRoots: [run.givenSkills.skills] })
+        .catch((error) =>
+          this.event(
+            run,
+            'status',
+            t(
+              `共通 Schema のスキルを Codex に渡せませんでした: ${String(error)}`,
+              `Could not give the shared Schema's skills to Codex: ${String(error)}`,
+            ),
+          ),
+        );
     // A read-only connection is readable in the sandbox but never a root it may write.
     const folders = [...this.localFolders(run, true), ...(run.work ?? [])];
     const writable = run.access !== 'full-access' && folders.length > 0;
