@@ -169,6 +169,17 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-11-19: **0.2.83** ([#353](https://github.com/DeL-TaiseiOzaki/irori/pull/353),
+each SSH host's vaults in a box of their own on irori mode's mapping, and the view
+renamed from 地図 to マッピング; ADR 061 decision 1 amended) as `00667d6`, by
+`publish.yml` alone (push run `44502783090`). Merged at about 10:08 UTC, the release
+out at 10:09:41, the page deployed by 10:11:52, and the drift check passed at
+10:12:12. Anonymous downloads of the Windows installer, the Mac image and
+`irori-0.2.83-full.nupkg` matched `SHA256SUMS.txt`, the live page links the 0.2.83
+installers, and the live guide says マッピング. CI passed on the head (run
+`44462615008`). Seen on Linux under Xvfb and through CI's packaged-app smokes; not
+by hand on Windows or macOS, or against a real SSH host.
+
 Published 2026-11-19: **0.2.82** ([#351](https://github.com/DeL-TaiseiOzaki/irori/pull/351),
 the agent dock's columns kept per workspace; ADR 021 D2 amended) as `0c994a6`, by
 `publish.yml` alone (push run `44442647421`). Merged at 02:12:51 UTC, the release
