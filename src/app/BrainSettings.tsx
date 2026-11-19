@@ -458,7 +458,7 @@ export function BrainSettings({
               </div>
             </div>
             <div>
-              <span>{t('地図', 'Map')}</span>
+              <span>{t('マッピング', 'Mapping')}</span>
               <div className="preview-map">
                 <BrainTile space={draft} image={image} size={44} radius={13} />
                 <strong>{draft.name}</strong>

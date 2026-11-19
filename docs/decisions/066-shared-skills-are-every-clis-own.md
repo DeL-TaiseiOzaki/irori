@@ -1,6 +1,6 @@
 # 066 — The shared Schema's skills are every CLI's own skills
 
-Date: 2026-11-19. Status: owner request; implemented for 0.2.83.
+Date: 2026-11-19. Status: owner request; implemented for 0.2.84.
 Extends [ADR 058](058-every-schema-setting-reaches-every-cli.md) decision 4 and
 [ADR 049](049-skills-for-claude-code.md) to Codex, OpenCode and the Antigravity
 CLI. Keeps [ADR 027](027-shared-schema.md) decision 8 (the folder's own skill

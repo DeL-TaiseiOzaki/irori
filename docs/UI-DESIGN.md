@@ -82,8 +82,10 @@ Everything below this section is the history of the earlier layout.
   branch, Drive uploads, the AI summary across brains, the terminal toggle and
   the version.
 - **Overview.** The rail's map button shows every brain of the workspace
-  instead of one brain's islands, which stay mounted underneath. **地図** lays
-  brains out in the workspace's order, four to a row (`src/domain/overview.ts`, replaceable; no category areas since 0.1.87) with
+  instead of one brain's islands, which stay mounted underneath. **マッピング**
+  (called **地図** before 0.2.83) lays
+  brains out in the workspace's order, four to a row (`src/domain/overview.ts`, replaceable; no category areas since 0.1.87;
+  each SSH host's vaults in a box of their own below this computer's since 0.2.83) with
   reference lines between brains and a **Brain の AI** island (state, request,
   stop, resume, send); **並列** shows AI / Schema / Knowledge / Contents per
   brain. Each brain's AI runs independently of the one on show.

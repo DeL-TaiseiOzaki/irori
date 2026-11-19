@@ -1,6 +1,6 @@
 # irori continuation handoff
 
-**Shared skills are every CLI's own skills, 0.2.83** (see STATUS;
+**Shared skills are every CLI's own skills, 0.2.84** (see STATUS;
 [ADR 066](decisions/066-shared-skills-are-every-clis-own.md)). Every shared
 Schema setting now reaches every CLI as the vault's own does. Next:
 1. Run a real Codex, OpenCode and Antigravity CLI once each with a shared skill

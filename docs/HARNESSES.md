@@ -149,7 +149,7 @@ CLI was run; the protocol fixtures in `tests/schema-reach.test.ts` follow them.
 | Hermes Agent | Reads one context kind and cuts it (20,000 characters at least). A resumed session keeps its copy. irori gives a changed one, and gives it when `.hermes.md`, `HERMES.md` or `AGENTS.override.md` is present | Appended to tool results there | irori, as words | Only trusted Git projects: irori lists them | Around the run, and PostToolUse after the call | Not reported: words go whole every time |
 | Antigravity CLI | Reads it and cuts at 24,000 bytes; irori says to read the whole file | Never: irori names them | irori, as words | Reads them | `.agents/hooks.json` in irori's `--add-dir` folder | Not reported: words go whole every time |
 
-The shared Schema's skills (ADR 066, 0.2.83) are in the irori agent's folder,
+The shared Schema's skills (ADR 066, 0.2.84) are in the irori agent's folder,
 which no CLI reads, so irori gives them to each as its own skills, beside their
 names in the shared Schema's words (`sharedSkillReach`):
 

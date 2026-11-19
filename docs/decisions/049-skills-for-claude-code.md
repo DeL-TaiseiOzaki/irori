@@ -55,7 +55,7 @@ links out of the vault.
 - *Extended by [ADR 058](058-every-schema-setting-reaches-every-cli.md) (0.2.61):
   Pi is given each skill folder with `--skill`, which it loads whatever the
   project's trust, and Hermes Agent hears the folder's skills listed.*
-- *Extended by [ADR 066](066-shared-skills-are-every-clis-own.md) (0.2.83): Codex,
+- *Extended by [ADR 066](066-shared-skills-are-every-clis-own.md) (0.2.84): Codex,
   OpenCode and the Antigravity CLI are given the shared Schema's skills as their
   own skills too.*
 - The additional directory gives Claude Code access to the linked folders,

@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import {
   Group as PaneGroup,
   Panel as Pane,
@@ -12,7 +20,7 @@ import type { AgentAccess, AgentId, Entry, Space, WorkspaceProfile } from '../do
 import { agentNames } from '../domain/types';
 import { agentAccessLabel, conversationAccess } from '../domain/agent-access';
 import { categoryIcon, categoryName } from '../domain/brains';
-import { board, mapLayout, noteLabel, referenceLinks } from '../domain/overview';
+import { board, mapLayout, noteLabel, referenceLinks, type MapHostArea } from '../domain/overview';
 import { t } from '../domain/i18n';
 import { promptLimit } from '../domain/conversation';
 import { AgentRequest } from './AgentLog';
@@ -217,6 +225,13 @@ const at = (point: { x: number; y: number }): CSSProperties => ({
   left: `${(point.x / board.width) * 100}%`,
   top: `${(point.y / board.height) * 100}%`,
 });
+const areaBox = (area: MapHostArea): CSSProperties => ({
+  ...at(area),
+  width: `${(area.width / board.width) * 100}%`,
+  height: `${(area.height / board.height) * 100}%`,
+});
+/** The least height a row of the map keeps on screen, so its vaults never overlap. */
+const rowPixels = 140;
 
 // Sparks travel along hand-offs unless the reader asks for less motion.
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -261,9 +276,24 @@ function OverviewMap({
   const links = referenceLinks(histories.data ?? {}, ids);
   const node = (id: string) => layout.nodes.find((item) => item.scopeId === id)!;
   const space = (id: string) => spaces.find((item) => item.scopeId === id)!;
+  // A vault on an SSH host is described by its host's area, read with its name.
+  const areaId = `${useId()}-host-`;
   return (
-    <section className="map-board" aria-label={t('vault map', 'Vault map')}>
-      <div className="map-canvas">
+    <section className="map-board" aria-label={t('vault マッピング', 'Vault mapping')}>
+      <div
+        className="map-canvas"
+        // Many rows make the map taller and scroll, rather than pile up.
+        style={{ minHeight: Math.max(420, Math.ceil((rowPixels * board.height) / layout.rowStep)) }}
+      >
+        {layout.hosts.map((area) => (
+          <div key={area.host.id} className="map-host" style={areaBox(area)}>
+            <span id={areaId + area.host.id} className="map-host-name">
+              <Icon name="server" size={12} />
+              <strong>{area.host.name}</strong>
+              <small>{t('SSH ホスト', 'SSH host')}</small>
+            </span>
+          </div>
+        ))}
         <svg
           className="map-lines"
           viewBox={`0 0 ${board.width} ${board.height}`}
@@ -343,6 +373,7 @@ function OverviewMap({
               className={`map-node ${aiState(ai)} ${handed ? 'handed' : ''}`}
               style={at(item)}
               aria-label={t(`${brain.name} を開く`, `Open ${brain.name}`)}
+              aria-describedby={brain.host ? areaId + brain.host.id : undefined}
               onClick={(event) => {
                 // The Overview zooms away around the brain that was chosen.
                 const box = event.currentTarget.getBoundingClientRect();
@@ -372,6 +403,12 @@ function OverviewMap({
           <i className="legend-reference" />
           {t('別の vault のノートを参照', "Read another vault's notes")}
         </span>
+        {!!layout.hosts.length && (
+          <span>
+            <i className="legend-host" />
+            {t('SSH ホスト上の vault', 'Vaults on an SSH host')}
+          </span>
+        )}
       </footer>
     </section>
   );
@@ -862,7 +899,7 @@ export function Overview({
                     label: (
                       <>
                         <Icon name="map" size={14} />
-                        <span className="overview-label">{t('地図', 'Map')}</span>
+                        <span className="overview-label">{t('マッピング', 'Mapping')}</span>
                       </>
                     ),
                   },
