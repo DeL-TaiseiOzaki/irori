@@ -11,7 +11,8 @@ open state and width are unchanged. `scripts/dock-ui-smoke.ts` splits the dock i
 workspace, opens a second from the tab strip and returns; it fails before the change
 with two columns in the second workspace.
 
-Keep working while an agent runs, 2026-11-18 (**0.2.81**;
+Keep working while an agent runs, 2026-11-18 (**0.2.81**,
+[#349](https://github.com/DeL-TaiseiOzaki/irori/pull/349), published as `v0.2.81-preview.1`;
 [ADR 020](decisions/020-parallel-conversations.md) D5 and
 [ADR 042](decisions/042-waiting-folders-and-work-folders.md) D2 and D4 amended):
 the owner found contents connections showing 未接続 that could be neither
@@ -37,6 +38,11 @@ reconnected nor removed, and asked for a full review of what a run holds back.
   after cloning. A link that leads nowhere now gives way (`makeWay`), one to a
   folder is named in the refusal, 取得 checks before cloning, and the sheet
   shows a note while a clone runs.
+- `publish.yml` published
+  [v0.2.81-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.81-preview.1)
+  from `8dcee2e` (push run `44438407573`). Anonymous downloads matched
+  `SHA256SUMS.txt`: Windows 179,418,624 bytes, Mac 145,740,403 bytes and
+  `irori-0.2.81-full.nupkg` 178,587,315 bytes.
 
 CI's intermittent failures traced, 2026-11-17 (**0.2.80**,
 [#344](https://github.com/DeL-TaiseiOzaki/irori/pull/344), published as `v0.2.80-preview.1`): the owner asked why CI
