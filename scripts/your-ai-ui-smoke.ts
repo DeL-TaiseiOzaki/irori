@@ -211,12 +211,13 @@ try {
   // The map draws the hand-off, and the brains are held while your AI works.
   await expect(map.locator('.map-pill.hand-off')).toContainText('Write a note in Product');
   await expect(map.getByRole('button', { name: 'Product を開く' })).toHaveClass(/handed/);
-  // Its Schema waits while it runs, as a vault's does during its run.
+  // Its Schema is edited while it runs, as a vault's is during its run (ADR 020 D5).
   await map.getByRole('button', { name: 'irori agent の Schema を開く' }).click();
-  await expect(page.getByRole('region', { name: 'Schema の設定' })).toContainText(
-    'irori agent の実行中は変更できません。',
+  await expect(page.getByRole('region', { name: 'Schema の設定' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Schema の設定' })).not.toContainText(
+    '変更できません',
   );
-  await expect(youPanel.getByRole('button', { name: 'ルールを追加', exact: true })).toBeDisabled();
+  await expect(youPanel.getByRole('button', { name: 'ルールを追加', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'irori mode に戻る' }).click();
   await page.screenshot({ path: 'test-results/irori-your-ai.png' });
   await rail.getByRole('button', { name: /^Research・AI/ }).click();
@@ -400,7 +401,7 @@ try {
   await expect(composer).toBeVisible();
   expect(errors).toEqual([]);
   console.log(
-    'Your-AI UI passed: setup from the Overview, an error shown over the window in irori mode, a hand-off to a vault agent with irori call, its request answered from irori mode after a view change, and its report, the map’s hand-off line, vaults held while your AI works, your AI kept out of the vaults, no definitions written and each vault agent named on the Your AI screen, the irori agent’s Schema settings (instructions, a rule, a skill, locked while it runs) and its files, your AI on Pi with a listed model handing a brain to its vault agent with irori call, the standard skills offered again when one is missing, and a folder registered with the irori command joining the workspace, the irori agent island widened by its handle, paths in its reply opened where they are rather than in the vault on show, and a folder chosen for the workspace, a folder already holding files refused beside the button. Protocol fixtures only.',
+    'Your-AI UI passed: setup from the Overview, an error shown over the window in irori mode, a hand-off to a vault agent with irori call, its request answered from irori mode after a view change, and its report, the map’s hand-off line, vaults held while your AI works, your AI kept out of the vaults, no definitions written and each vault agent named on the Your AI screen, the irori agent’s Schema settings (instructions, a rule, a skill, editable while it runs) and its files, your AI on Pi with a listed model handing a brain to its vault agent with irori call, the standard skills offered again when one is missing, and a folder registered with the irori command joining the workspace, the irori agent island widened by its handle, paths in its reply opened where they are rather than in the vault on show, and a folder chosen for the workspace, a folder already holding files refused beside the button. Protocol fixtures only.',
   );
 } finally {
   const [first] = app.windows();

@@ -948,7 +948,7 @@ export const BrainPanel = memo(function BrainPanel({
         <SectionAction
           icon="graph"
           label={t('オントロジー', 'Ontology')}
-          disabled={locked || held || dirty}
+          disabled={locked || dirty}
           onClick={onGraph}
         />
         <VaultRepositories space={space} connections={connections} className="section-action" />
@@ -1052,17 +1052,19 @@ export const BrainPanel = memo(function BrainPanel({
             <Menu.Portal>
               <Menu.Positioner side="bottom" align="end" sideOffset={4}>
                 <Menu.Popup className="menu">
-                  <Menu.Item disabled={locked || held} onClick={onSettings}>
+                  {/* Views and additions stay open during a run; what would move its
+                      files waits inside them (ADR 020 D5). */}
+                  <Menu.Item disabled={locked || (remote && held)} onClick={onSettings}>
                     <Icon name={remote ? 'close' : 'penLine'} size={14} />
                     {remote
                       ? t('一覧から外す', 'Take off the list')
                       : t('vault の設定', 'vault settings')}
                   </Menu.Item>
-                  <Menu.Item disabled={locked || held} onClick={onMaterials}>
+                  <Menu.Item disabled={locked} onClick={onMaterials}>
                     <Icon name="archive" size={14} />
                     {t('資料と成果物', 'Materials and outputs')}
                   </Menu.Item>
-                  <Menu.Item disabled={locked || held} onClick={onGraph}>
+                  <Menu.Item disabled={locked} onClick={onGraph}>
                     <Icon name="graph" size={14} />
                     {t('オントロジー', 'Ontology')}
                   </Menu.Item>
@@ -1073,7 +1075,7 @@ export const BrainPanel = memo(function BrainPanel({
                     </Menu.Item>
                   )}
                   {!remote && (
-                    <Menu.Item disabled={locked || held} onClick={onTrash}>
+                    <Menu.Item disabled={locked} onClick={onTrash}>
                       <Icon name="trash" size={14} />
                       {t('削除したノートを復元', 'Restore deleted notes')}
                     </Menu.Item>

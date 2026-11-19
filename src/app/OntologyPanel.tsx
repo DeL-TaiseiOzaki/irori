@@ -410,6 +410,7 @@ export function OntologyPanel({
   onClose,
   onOpen,
   onConfigure,
+  held = false,
 }: {
   space: Space;
   revision: number;
@@ -417,6 +418,11 @@ export function OntologyPanel({
   onOpen: (path: string) => void;
   /** Asks the vault agent to review the ontology; absent while it is off. */
   onConfigure?: () => void;
+  /**
+   * A run works in the vault: the ontology shows, but the indexes, which the run's
+   * agent may be writing too, are rewritten after it (ADR 020 D5).
+   */
+  held?: boolean;
 }) {
   const [refresh, setRefresh] = useState(0);
   const { busy, error: failure, run } = useAction();
@@ -473,7 +479,19 @@ export function OntologyPanel({
             </span>
           )}
           {indexes && (
-            <button className="stage-text-button framed" disabled={busy} onClick={updateIndexes}>
+            <button
+              className="stage-text-button framed"
+              disabled={busy || held}
+              title={
+                held
+                  ? t(
+                      'エージェントの実行中は、索引を書き換えられません。実行が終わると更新できます。',
+                      'While an agent runs, the indexes cannot be rewritten. They can once the run ends.',
+                    )
+                  : undefined
+              }
+              onClick={updateIndexes}
+            >
               <Icon name="refresh" size={14} />
               {updateLabel}
             </button>

@@ -2270,7 +2270,6 @@ function App() {
   const brainLocked = brainHeld || connecting;
   // Other brains stay open to choose while this one's AI runs.
   const switchLocked = sending || connecting;
-  const anyRunning = runningScopes.length > 0;
   const docSpace = doc ? spaces.find((s) => s.scopeId === doc.scopeId) : undefined;
   const docLayer = doc?.cloud
     ? 'contents'
@@ -2595,9 +2594,11 @@ function App() {
     openSchemaFile: (entry: Entry) => {
       if (active) void open(active, entry);
     },
+    // A run holds only the Git operations that change its vault's files; the host
+    // refuses those, and the panel greys out Pull and merge (ADR 020 D5).
     gitBeforeAction: async () => {
-      if (brainLocked) {
-        report(t('実行中は Git を操作できません。', "Can't operate Git while running."));
+      if (connecting) {
+        report(t('接続の準備中は Git を操作できません。', "Can't operate Git while connecting."));
         return false;
       }
       return save();
@@ -2870,12 +2871,12 @@ function App() {
           scopeId={active.scopeId}
           revision={revision}
           selected={schemaSelected}
-          locked={brainLocked || gitBusy || !!active.host}
+          locked={connecting || gitBusy || !!active.host}
           onSelect={act.selectSchema}
           onOpenFile={act.openSchemaFile}
         />
       ) : undefined,
-    [vaultAgent, active, revision, schemaSelected, brainLocked, gitBusy, act, language],
+    [vaultAgent, active, revision, schemaSelected, connecting, gitBusy, act, language],
   );
   const gitPanel = useMemo(
     () =>
@@ -2888,9 +2889,10 @@ function App() {
           revision={revision}
           beforeAction={act.gitBeforeAction}
           onChanged={act.gitChanged}
+          held={running || heldHere}
         />
       ),
-    [active, gitDetailTarget, revision, act, language],
+    [active, gitDetailTarget, revision, act, language, running, heldHere],
   );
   /** Shows a brain, from the rail or the Overview: its note, or its vault agent. */
   async function enterBrain(
@@ -3263,7 +3265,7 @@ function App() {
           aiState={aiState}
           locked={switchLocked || gitBusy}
           homeDisabled={connecting || gitBusy}
-          addDisabled={anyRunning || dirty || connecting}
+          addDisabled={dirty || connecting}
           searchDisabled={!workspaceSpaces.length || connecting}
           onHome={act.leaveWorkspace}
           onOverview={act.showOverview}
@@ -3290,7 +3292,7 @@ function App() {
               spaces={workspaceSpaces}
               view={overviewView}
               revisions={revisions}
-              addDisabled={anyRunning || dirty || connecting}
+              addDisabled={dirty || connecting}
               agentFor={agentFor}
               accessChoice={accessChoice}
               preferredAccess={agentAccess}
@@ -3376,7 +3378,7 @@ function App() {
                 mode={brainMode}
                 onModeChange={act.changeBrainMode}
                 filesDisabled={gitBusy}
-                changesDisabled={brainLocked || gitBusy}
+                changesDisabled={connecting || gitBusy}
                 changes={gitRead.data?.available ? gitRead.data.changes.length : undefined}
                 selected={doc}
                 revision={revision}
@@ -3818,7 +3820,7 @@ function App() {
                         scopeId={active.scopeId}
                         space={active}
                         target={schemaTarget}
-                        locked={brainLocked || gitBusy || !!active.host}
+                        locked={connecting || gitBusy || !!active.host}
                         revision={revision}
                         onSelect={(target) => {
                           if (target) setSchemaTarget({ ...target, scopeId: active.scopeId });
@@ -3838,6 +3840,7 @@ function App() {
                       <OntologyPanel
                         space={active}
                         revision={revision}
+                        held={brainHeld}
                         onClose={() => setView('note')}
                         onConfigure={
                           vaultAgent
@@ -3991,7 +3994,7 @@ function App() {
                               )}
                               <div className="welcome-actions">
                                 <ArrowFillButton
-                                  disabled={!active || running || connecting}
+                                  disabled={!active || connecting}
                                   onClick={() => {
                                     setNoteDirectory(defaultNoteDirectory);
                                     setNewNote(true);
@@ -4002,7 +4005,7 @@ function App() {
                                 {notesDeclared?.daily && (
                                   <button
                                     className="stage-text-button framed"
-                                    disabled={!active || running || connecting}
+                                    disabled={!active || connecting}
                                     onClick={openDaily}
                                   >
                                     <Icon name="calendar" size={15} />
@@ -4225,6 +4228,7 @@ function App() {
           spaces={workspaceSpaces}
           onClose={() => setBrainSettings(false)}
           beforeRename={save}
+          running={brainHeld}
           onRemoved={() => {
             setBrainSettings(false);
             void vaultRemoved(
@@ -4349,12 +4353,9 @@ function App() {
           spaces={vaultAgent ? workspaceSpaces : []}
           // It shows the shared Schema, the irori agent's and every vault's: a change in any of them.
           revision={anyRevision(revisions) + youRevision}
+          // A Schema is edited as a note is, during runs too (ADR 020 D5).
           locked={(scopeId) =>
-            connecting ||
-            (scopeId === you?.id
-              ? yourAiRunning
-              : scopeId !== sharedSchemaId &&
-                (gitBusy || runningScopes.includes(scopeId) || heldByYou(scopeId)))
+            connecting || (scopeId !== you?.id && scopeId !== sharedSchemaId && gitBusy)
           }
           onClose={() => setSchemaOpen(undefined)}
         />

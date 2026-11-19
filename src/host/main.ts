@@ -354,16 +354,23 @@ app
       ),
     );
     const github = new GitHubCli();
+    // A run holds only the Git operations that change its vault's files; one that only
+    // records (stage, commit, push, fetch) goes on beside it (ADR 020 D5). A routine
+    // holds every one, since its change record compares Git's status before and after.
     const git = new GitService(
       files,
-      () => !agents.anyBusy && !cloud.busy && fileMutations === 0 && !routines.busy,
+      (scopeId, tree) =>
+        !cloud.busy &&
+        fileMutations === 0 &&
+        !routines.busy &&
+        !(tree && scopeId !== undefined && agents.busy(scopeId)),
       authorship,
       undefined,
       github,
     );
-    // A folder waited for or lost is linked again by itself only while no run or
-    // Git operation works in the vault.
-    cloud.mayLink = (scopeId) => !agents.busy(scopeId) && !git.busy;
+    // A folder waited for or lost is linked again by itself, during runs too, but not
+    // under a Git operation (ADR 042 D2).
+    cloud.mayLink = () => !git.busy;
     cloud.onLinked = (scopeId) => emit({ type: 'files', scopeId });
     // Some places have no system trash, such as Google Drive for desktop's drive on
     // Windows. Deleting there cannot be undone on this device, so the person decides.
@@ -666,7 +673,23 @@ app
         emit({ type: 'files', scopeId });
       }
     }
-    /** A change to a vault's files that waits for its runs and for connection setup. */
+    /**
+     * A change to a vault's files that adds or edits, as a save does: it goes on during
+     * the vault's runs, which keep the files they work on where they are, and waits for
+     * connection setup (ADR 020 D5).
+     */
+    function addToVault<T>(scopeId: string, refusal: string, operation: () => Promise<T>) {
+      return changeFiles(() =>
+        changed(scopeId, async () => {
+          if (cloud.busy) throw Error(refusal);
+          return operation();
+        }),
+      );
+    }
+    /**
+     * A change that moves or removes a vault's files, or renames its folders: it waits
+     * for the vault's runs, which would find their files gone, and for connection setup.
+     */
     function changeVault<T>(scopeId: string, refusal: string, operation: () => Promise<T>) {
       return changeFiles(() =>
         changed(scopeId, async () => {
@@ -871,13 +894,17 @@ app
         }),
       );
     }
-    /** A Schema setting changes what the brain's AI reads, so it waits for runs, Git and connections. */
+    /**
+     * A Schema setting is the person's instructions, edited as a note is: it goes on
+     * during runs, which read what they need when they start or when they use it, and
+     * waits for Git and connection setup (ADR 020 D5).
+     */
     function changeSchema<T>(scopeId: string, operation: () => Promise<T>) {
-      return changeVault(
+      return addToVault(
         scopeId,
         t(
-          '実行と接続の準備が終わってから Schema を変更してください。',
-          'Wait for runs and connection setup to finish before changing the Schema.',
+          '接続の準備が終わってから Schema を変更してください。',
+          'Wait for connection setup to finish before changing the Schema.',
         ),
         operation,
       );
@@ -891,6 +918,14 @@ app
     function whenIdle(refusal: string) {
       if (agents.anyBusy || cloud.busy || git.busy) throw Error(refusal);
     }
+    /**
+     * Refuses a new vault while a connection or Git operation is under way. A run does
+     * not hold it: a new vault is out of every run's reach, as the irori agent's own
+     * `irori add` is during its run.
+     */
+    function whenSettled(refusal: string) {
+      if (cloud.busy || git.busy) throw Error(refusal);
+    }
     function changeCloud<T>(scopeId: string, operation: () => Promise<T>) {
       if (agents.busy(scopeId) || git.busy)
         throw Error(
@@ -901,7 +936,12 @@ app
         );
       return changed(scopeId, operation);
     }
-    /** A new connection only adds to the vault's contents, so it does not wait for its runs. */
+    /**
+     * A change that leaves the vault's connected folders as its runs were given them:
+     * a folder connected, connected again or chosen only adds to contents, and a
+     * connection not connected is only a record. It does not wait for the runs
+     * (ADR 042 D2); the service refuses one that would change a connected folder.
+     */
     function addCloud<T>(scopeId: string, operation: () => Promise<T>) {
       if (git.busy)
         throw Error(
@@ -911,6 +951,20 @@ app
           ),
         );
       return changed(scopeId, operation);
+    }
+    /**
+     * Takes a folder out of the vault, or changes what may be done in it: waits for the
+     * vault's runs when the folder is connected, since they may have been given it.
+     */
+    function takeCloud<T>(scopeId: string, mountId: string, operation: () => Promise<T>) {
+      if (agents.busy(scopeId) && cloud.isLinked(scopeId, mountId))
+        throw Error(
+          t(
+            '実行中のエージェントが使っている接続です。実行が終わってから解除・変更してください。',
+            'A running agent uses this connection. Disconnect or change it after the run ends.',
+          ),
+        );
+      return addCloud(scopeId, operation);
     }
     async function openFile(filename: string) {
       // A program, script or shortcut would run, not open: irori shows where it is instead.
@@ -961,12 +1015,13 @@ app
       moveNote: (ref, destination, links) =>
         changeVault(ref.scopeId, organizing(), () => moveNoteCarrying(ref, destination, links)),
       trashNote: (ref) => changeVault(ref.scopeId, organizing(), () => files.trashNote(ref)),
+      // A restored note only comes back where nothing stands now.
       restoreNote: (id, trashId) =>
-        changeVault(
+        addToVault(
           id,
           t(
-            '実行と接続の準備が終わってから復元してください。',
-            'Wait for runs and connection setup to finish before restoring.',
+            '接続の準備が終わってから復元してください。',
+            'Wait for connection setup to finish before restoring.',
           ),
           () => files.restoreNote(id, trashId),
         ),
@@ -1089,13 +1144,13 @@ app
       moveSkill: (id, name, to) => changeSchema(id, () => schemaSettings.moveSkill(id, name, to)),
       cloudConnections: (id) => cloud.connections(id),
       connectCloud: (...args) => addCloud(args[0], () => cloud.connect(...args)),
-      disconnectCloud: (...args) => changeCloud(args[0], () => cloud.disconnect(...args)),
-      renameCloud: (...args) => changeCloud(args[0], () => cloud.edit(...args)),
-      removeCloud: (...args) => changeCloud(args[0], () => cloud.edit(...args)),
+      disconnectCloud: (...args) => takeCloud(args[0], args[1], () => cloud.disconnect(...args)),
+      renameCloud: (...args) => addCloud(args[0], () => cloud.edit(...args)),
+      removeCloud: (...args) => addCloud(args[0], () => cloud.edit(...args)),
       contentsStrays: (id) => cloud.strays(id),
       adoptStray: (...args) => addCloud(args[0], () => cloud.adoptStray(...args)),
       removeStray: (...args) => changeCloud(args[0], () => cloud.removeStray(...args)),
-      setCloudAccess: (...args) => changeCloud(args[0], () => cloud.setAccess(...args)),
+      setCloudAccess: (...args) => takeCloud(args[0], args[1], () => cloud.setAccess(...args)),
       openCloudFolder: async (...args) => {
         const error = await shell.openPath(await cloud.folder(...args));
         if (error) throw Error(error);
@@ -1156,10 +1211,10 @@ app
         ),
       addLocalFolder: (input) => addCloud(input.scopeId, () => cloud.addLocal(input)),
       addRepository: (input) => addCloud(input.scopeId, () => cloud.addRepository(input)),
-      cloneRepository: (...args) => changeCloud(args[0], () => cloud.cloneRepository(...args)),
+      cloneRepository: (...args) => addCloud(args[0], () => cloud.cloneRepository(...args)),
       updateRepository: (...args) => changeCloud(args[0], () => cloud.updateRepository(...args)),
-      bindLocalFolder: (...args) => changeCloud(args[0], () => cloud.bindLocal(...args)),
-      switchCloudToLocal: (...args) => changeCloud(args[0], () => cloud.switchToLocal(...args)),
+      bindLocalFolder: (...args) => addCloud(args[0], () => cloud.bindLocal(...args)),
+      switchCloudToLocal: (...args) => addCloud(args[0], () => cloud.switchToLocal(...args)),
       spaces: () => [...files.list(), ...remote.list()],
       remoteHosts: () => remote.hosts(),
       answerRemoteHost: (hostId, questionId, answer) => remote.answer(hostId, questionId, answer),
@@ -1187,7 +1242,7 @@ app
         return choice.canceled ? null : choice.filePaths[0];
       },
       register: async (root, name, category) => {
-        whenIdle(
+        whenSettled(
           t(
             '実行中の処理を止めてから登録してください。',
             'Stop ongoing operations before registering a space.',
@@ -1198,7 +1253,7 @@ app
         return registerWatched(root, name, category);
       },
       createSpace: async (input) => {
-        whenIdle(
+        whenSettled(
           t(
             '実行中の処理の完了後に作成してください。',
             'Create it after the operation in progress finishes.',
@@ -1215,12 +1270,13 @@ app
         watch(space);
         return { space, notice: await git.firstCommit(space.scopeId) };
       },
+      // A vault's name, category, look and layer names: a run keeps what it was told.
       updateSpace: async (scopeId, change) => {
-        if (agents.busy(scopeId) || cloud.busy || git.busy)
+        if (cloud.busy || git.busy)
           throw Error(
             t(
-              '実行・Git 操作・接続が終わってから vault の設定を変えてください。',
-              "Change the vault's settings after the run, Git operation and connection finish.",
+              'Git 操作・接続が終わってから vault の設定を変えてください。',
+              "Change the vault's settings after the Git operation and connection finish.",
             ),
           );
         return changeFiles(() => files.update(scopeId, change));

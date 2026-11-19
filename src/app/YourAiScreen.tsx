@@ -279,7 +279,7 @@ export function YourAiScreen({
             {missingSkills.length > 0 && (
               <button
                 className="you-action"
-                disabled={running || adding}
+                disabled={adding}
                 aria-label={t('標準スキルを追加', 'Add the standard skills')}
                 title={`${t('標準スキルを追加', 'Add the standard skills')}: ${missingSkills.join(', ')}`}
                 onClick={() => {
@@ -326,7 +326,9 @@ export function YourAiScreen({
                 scopeId={you.id}
                 revision={reads}
                 selected={target}
-                locked={running}
+                // Edited as a vault's Schema is, during runs too (ADR 020 D5); a save
+                // the agent's own write overtook is refused, not lost.
+                locked={false}
                 onSelect={setTarget}
                 onOpenFile={(entry) => show(entry.path)}
               />
@@ -339,7 +341,7 @@ export function YourAiScreen({
           <SchemaEditor
             scopeId={you.id}
             target={target}
-            locked={running}
+            locked={false}
             revision={reads}
             onSelect={(next) => (next ? setTarget(next) : show(file))}
             onClose={() => show(file)}

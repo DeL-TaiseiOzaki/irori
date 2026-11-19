@@ -15,6 +15,8 @@ A commit records local history; it has not been sent to a remote yet. Partial st
 
 **Push** asks you to confirm the vault, branch, remote, and exact commit being sent. Git uses your existing authentication. Each vault keeps its own independent history.
 
+While an agent runs, you can still stage, commit, push, and fetch. **Pull**, **Merge history**, resolving a conflict, and fetching a submodule change the vault's files, so they wait until runs in that vault end; runs in other vaults do not hold them. While a routine runs, every Git operation waits so that its record of changes stays right.
+
 ## Review history and conflicts
 
 Open earlier commits and diffs in **History**. To integrate diverged history, choose **More Git actions → Merge history**.

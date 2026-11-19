@@ -1,7 +1,7 @@
 # 021 — The hibachi agent is optional; agents sit in a dock of columns
 
 Date: 2026-10-02. Status: owner decision; implemented for 0.1.65. D2 amended
-on 2026-11-19 for 0.2.81.
+on 2026-11-19 for 0.2.82.
 Builds on [ADR 017](017-conversation-history.md) and
 [ADR 020](020-parallel-conversations.md).
 
@@ -55,7 +55,7 @@ agent's sessions show.
 - The dock has no maximum width; the columns divide it and remember their
   widths per set of columns.
 
-  *Amended 2026-11-19 (0.2.81), owner report.* The dock's columns were the
+  *Amended 2026-11-19 (0.2.82), owner report.* The dock's columns were the
   window's: splitting it in one workspace showed the same columns in every
   workspace opened after it. Now each workspace keeps its own set of columns,
   each with the agent it shows, while irori runs, as irori mode's columns are

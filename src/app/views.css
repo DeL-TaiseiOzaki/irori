@@ -1297,6 +1297,13 @@ button.home-row:hover {
   flex-wrap: wrap;
   gap: 8px;
 }
+/* Why the folders cannot change now: a run works in the vault. */
+.brain-sheet-note {
+  margin: 0 0 8px;
+  color: var(--ink-3);
+  font-size: 12px;
+  line-height: 1.5;
+}
 .brain-sheet-layers h3 {
   margin: 0 0 12px;
   font-size: 14px;
