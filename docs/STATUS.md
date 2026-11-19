@@ -36,7 +36,8 @@ them listed.
   order, stable OpenCode place, copies, malformed and `.claude/skills` names).
   Each fix was checked to fail the test without it. No real CLI was run.
 
-Vaults on SSH hosts boxed on the mapping, 2026-11-19 (**0.2.83**;
+Vaults on SSH hosts boxed on the mapping, 2026-11-19 (**0.2.83**,
+[#353](https://github.com/DeL-TaiseiOzaki/irori/pull/353), published as `v0.2.83-preview.1`;
 [ADR 061](decisions/061-vaults-on-ssh-hosts.md) decision 1, amended): the owner
 found a vault on an SSH host drawn on irori mode's map like one of this computer's
 and asked for a rectangle that says it is on another machine, and for the view not
@@ -51,6 +52,11 @@ the vault settings' preview are renamed; the view's id stays `map`, so a tab sav
 on the map comes back to it. `tests/overview.test.ts` covers the boxes;
 `scripts/remote-hosts-ui-smoke.ts` checks the box around the host's vault in the real
 window (`test-results/remote-hosts-mapping.png`).
+- `publish.yml` published
+  [v0.2.83-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.83-preview.1)
+  from `00667d6` (push run `44502783090`). Anonymous downloads matched
+  `SHA256SUMS.txt`: Windows 179,416,064 bytes, Mac 145,749,221 bytes and
+  `irori-0.2.83-full.nupkg` 178,586,128 bytes.
 
 The agent dock's columns kept per workspace, 2026-11-19 (**0.2.82**,
 [#351](https://github.com/DeL-TaiseiOzaki/irori/pull/351), published as `v0.2.82-preview.1`;
