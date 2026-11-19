@@ -1,5 +1,11 @@
 # irori continuation handoff
 
+**A tab's right click, and one workspace in several tabs, 0.2.85**
+([ADR 067](decisions/067-tab-menu-and-duplicate-tabs.md)). Tabs are known by a key
+of their own in the renderer; what a workspace shares stops only when its last tab
+closes, here and in other windows. Run on Linux under Xvfb only. Not covered:
+reopening a closed tab, a new tab to the right, pinning or grouping tabs.
+
 **Shared skills are every CLI's own skills, 0.2.84** (see STATUS;
 [ADR 066](decisions/066-shared-skills-are-every-clis-own.md)). Every shared
 Schema setting now reaches every CLI as the vault's own does. Next:

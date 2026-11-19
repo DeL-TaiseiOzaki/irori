@@ -1,5 +1,21 @@
 # Implementation status — notes, native agents and connection onboarding
 
+A tab's right click, and one workspace in several tabs, 2026-11-19 (**0.2.85**,
+[ADR 067](decisions/067-tab-menu-and-duplicate-tabs.md)): the owner asked to open
+the same workspace more than once in a window, with a browser's tab menu.
+- The renderer knows a tab by a key (`WorkspaceTab` in
+  `src/domain/workspace-tabs.ts`); `shownTab` is the key on show and `tabViews`
+  keeps each tab's place. `openTab`, `closeTabs`, `onlyIn`, `insertTab` and
+  `reorderTab` work on keys; `replaceTab` updates every tab of a workspace.
+- `WorkspaceTabs` wraps each tab in a Base UI context menu: duplicate, move to a
+  new window (`moveOut` without a point), close, close others, close to the right.
+  `closeTabsOf` closes several tabs, asking once for what would stop; a workspace's
+  agents stop only when no tab here or in another window shows it.
+- A tab dropped from another window is always a new tab (ADR 064 D3 changed), and
+  the host's `WindowTabs.onlyTab` counts tabs, not workspaces.
+- `scripts/tab-menu-ui-smoke.ts` (added to `test:ui`) and
+  `tests/workspace-tabs.test.ts` cover it. Linux under Xvfb only.
+
 Shared skills are every CLI's own skills, 2026-11-19 (**0.2.84**,
 [#356](https://github.com/DeL-TaiseiOzaki/irori/pull/356), published as `v0.2.84-preview.1`;
 [ADR 066](decisions/066-shared-skills-are-every-clis-own.md)): the
