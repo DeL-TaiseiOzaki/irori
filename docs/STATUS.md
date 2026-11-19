@@ -1,6 +1,7 @@
 # Implementation status — notes, native agents and connection onboarding
 
 The agent dock's columns kept per workspace, 2026-11-19 (**0.2.82**,
+[#351](https://github.com/DeL-TaiseiOzaki/irori/pull/351), published as `v0.2.82-preview.1`;
 [ADR 021](decisions/021-optional-hibachi-agent-and-agent-dock.md) D2, amended): the
 owner reported that splitting the dock in one workspace or vault showed the same split
 in every other workspace. `main.tsx` held the dock's `columns` as one window-wide
@@ -10,6 +11,11 @@ on show. Column ids, drafts (per vault and column number), tab slots and the doc
 open state and width are unchanged. `scripts/dock-ui-smoke.ts` splits the dock in one
 workspace, opens a second from the tab strip and returns; it fails before the change
 with two columns in the second workspace.
+- `publish.yml` published
+  [v0.2.82-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.82-preview.1)
+  from `0c994a6` (push run `44442647421`). Anonymous downloads matched
+  `SHA256SUMS.txt`: Windows 179,416,576 bytes, Mac 145,738,111 bytes and
+  `irori-0.2.82-full.nupkg` 178,585,457 bytes.
 
 Keep working while an agent runs, 2026-11-18 (**0.2.81**,
 [#349](https://github.com/DeL-TaiseiOzaki/irori/pull/349), published as `v0.2.81-preview.1`;

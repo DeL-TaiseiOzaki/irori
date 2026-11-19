@@ -163,6 +163,15 @@ published preview, and two open ones need distinct versions: renumber the later
 one after the first is published. main's `app.yml` runs are no longer cancelled,
 so pushing to main during a release is safe.
 
+Published 2026-11-19: **0.2.82** ([#351](https://github.com/DeL-TaiseiOzaki/irori/pull/351),
+the agent dock's columns kept per workspace; ADR 021 D2 amended) as `0c994a6`, by
+`publish.yml` alone (push run `44442647421`). Merged at 02:12:51 UTC, the release
+out at 02:14:31 (1:40), the page deployed by 02:16:46 (3:55), and the drift check
+passed at 02:17:12. Anonymous downloads of the Windows installer, the Mac image
+and `irori-0.2.82-full.nupkg` matched `SHA256SUMS.txt`, and the live page links
+the 0.2.82 installers. CI passed on the head (run `44441044825`). Seen on Linux
+under Xvfb and through CI's packaged-app smokes; not by hand on Windows or macOS.
+
 Published 2026-11-19: **0.2.81** ([#349](https://github.com/DeL-TaiseiOzaki/irori/pull/349),
 keep working while an agent runs: a run holds only what would move its files, in
 its own vault; ADR 020 D5 and ADR 042 D2 and D4 amended) as `8dcee2e`, by
