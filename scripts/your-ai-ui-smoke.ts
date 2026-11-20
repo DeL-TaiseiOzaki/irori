@@ -244,10 +244,21 @@ try {
   await replyPaths.filter({ hasText: 'plans/next.md' }).click();
   await expect(page.getByRole('region', { name: 'ファイルの内容' })).toContainText('# Next');
   await page.getByRole('button', { name: 'irori mode に戻る' }).click();
+  // A vault's file is read in irori mode, beside the columns (ADR 068), and edited in its vault.
   await replyPaths.filter({ hasText: 'from-your-ai.md' }).click();
+  const reading = page.getByRole('region', { name: 'ファイル', exact: true });
+  await expect(reading.locator('.ProseMirror')).toContainText('From your AI');
+  await expect(page.getByRole('region', { name: 'Product のファイル' })).toBeVisible();
+  await expect(island).toBeVisible();
+  await reading.getByRole('button', { name: 'vault で編集' }).click();
+  await expect(page.locator('.overview')).toHaveCount(0);
   await expect(page.locator('.brain-names strong')).toHaveText('Product');
-  await expect(page.locator('.ProseMirror')).toContainText('From your AI');
+  await expect(page.locator('.stage .ProseMirror')).toContainText('From your AI');
   await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
+  await page
+    .getByRole('group', { name: 'irori mode の表示' })
+    .getByRole('button', { name: 'マッピング', exact: true })
+    .click();
   await expect(map.locator('.map-pill.hand-off')).toHaveCount(0);
 
   // Your AI's own write in a vault is refused: the work goes with `irori call`.

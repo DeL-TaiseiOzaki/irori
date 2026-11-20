@@ -69,6 +69,7 @@ const movedTab = z
         overviewView: z.enum(overviewViews),
         scopeId: id.optional(),
         side: id.optional(),
+        overviewFile: z.object({ scopeId: id, path }).strict().optional(),
       })
       .strict()
       .optional(),

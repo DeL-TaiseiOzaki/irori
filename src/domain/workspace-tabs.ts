@@ -77,7 +77,7 @@ export function onlyIn(tabs: WorkspaceTab[], keys: string[]) {
 export type OpenTab = Pick<WorkspaceProfile, 'id' | 'scopeIds'>;
 
 export const tabLevels = ['overview', 'routines', 'brain', 'you'] as const;
-export const overviewViews = ['map', 'columns'] as const;
+export const overviewViews = ['map', 'columns', 'files'] as const;
 /** Where a tab was left, to come back to (ADR 037 D6). */
 export type TabPlace = {
   level: (typeof tabLevels)[number];
@@ -86,6 +86,8 @@ export type TabPlace = {
   scopeId?: string;
   /** The vault beside, when one was open (ADR 038). */
   side?: string;
+  /** The file irori mode's files view showed (ADR 068). */
+  overviewFile?: { scopeId: string; path: string };
 };
 /**
  * A tab dragged out of its window, on its way to a window of its own (ADR 063) or to

@@ -113,6 +113,15 @@ test('A tab dragged out takes its place along, and nothing else, to its new wind
   assert.ok(accepts({ id: workspace, place }, { x: -1280, y: 40 }));
   assert.ok(!accepts({ id: workspace, place: { ...place, level: 'settings' } }));
   assert.ok(!accepts({ id: workspace, place: { ...place, scopeId: '../vault' } }));
+  // irori mode's files view goes along with the file it showed (ADR 068).
+  const reading = { scopeId: vault, path: 'Knowledge_Base/Note.md' };
+  assert.ok(
+    accepts({ id: workspace, place: { ...place, overviewView: 'files', overviewFile: reading } }),
+  );
+  assert.ok(!accepts({ id: workspace, place: { ...place, overviewFile: { path: 'Note.md' } } }));
+  assert.ok(
+    !accepts({ id: workspace, place: { ...place, overviewFile: { ...reading, line: 3 } } }),
+  );
   assert.ok(!accepts({ id: workspace, profile: { name: 'other' } }));
   assert.ok(!accepts({ id: workspace }, { x: 10.5, y: 0 }));
   assert.ok(hostArguments.movedTab.safeParse([]).success);
