@@ -1,6 +1,8 @@
 # Implementation status — notes, native agents and connection onboarding
 
-The session board, 2026-11-20 (**0.2.88**, [ADR 069](decisions/069-session-board.md)):
+The session board, 2026-11-20 (**0.2.88**,
+[#363](https://github.com/DeL-TaiseiOzaki/irori/pull/363), published as `v0.2.88-preview.1`;
+[ADR 069](decisions/069-session-board.md)):
 the owner asked for a kanban of sessions modelled on Orca, a column left of the
 agents' columns with a small card per conversation however many run, and the
 work of sub-agents and sub-sessions as cards framed in another colour.
@@ -25,7 +27,16 @@ work of sub-agents and sub-sessions as cards framed in another colour.
   (SSH key permissions), which fail the same way on `main` on that machine.
   `your-ai` and `routines` smokes caught the board taking a share of a widened
   side; the board now keeps its pixel width. macOS and Windows not tried.
-  Merged after 0.2.87 (#361), so it takes 0.2.88.
+  Merged after 0.2.87 (#361), so it takes 0.2.88. After merging main, the whole
+  `npm test` and `test:ui` ran again with the same three exceptions, and the
+  pull request's CI run `44688971716` (verify, and packages for Linux, macOS and
+  Windows) passed.
+- `publish.yml` published
+  [v0.2.88-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.88-preview.1)
+  from `86483ea` (publish run `44690241636`: release, website and drift).
+  Anonymous downloads matched `SHA256SUMS.txt`: Windows 179,422,720 bytes, Mac
+  145,740,526 bytes and `irori-0.2.88-full.nupkg` 178,592,803 bytes; the live
+  page links v0.2.88-preview.1.
 
 Reading files in irori mode, 2026-11-20 (**0.2.87**,
 [#361](https://github.com/DeL-TaiseiOzaki/irori/pull/361), published as `v0.2.87-preview.1`;
