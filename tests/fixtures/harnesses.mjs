@@ -255,6 +255,14 @@ export function run(kind) {
         send({ type: 'agent_start' });
         send({ type: 'response', id: message.id, command: 'prompt', success: true });
         send({ type: 'tool_execution_start', toolName: 'read', args: { path: 'note.md' } });
+        // A sub-agent started with Pi's sub-agent extension's tool (ADR 069).
+        if (withoutEarlier(message.message).includes('subagent'))
+          send({
+            type: 'tool_execution_start',
+            toolName: 'subagent',
+            toolCallId: 'sub-1',
+            args: { agent: 'scout', task: 'Find the notes' },
+          });
         // A line "run: <command>" runs it in a shell, as Pi's bash tool would,
         // and answers with what it printed.
         const command = /^run: (.+)$/m.exec(message.message)?.[1];

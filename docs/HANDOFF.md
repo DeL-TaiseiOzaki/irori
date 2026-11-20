@@ -1,5 +1,15 @@
 # irori continuation handoff
 
+**The session board, 0.2.88** ([ADR 069](decisions/069-session-board.md)). Next:
+1. Run a real Claude Code and Codex request that starts a sub-agent and check
+   its dashed card appears and ends: only the Pi fixture's `subagent` tool and
+   the recorded protocol shapes were exercised.
+2. Not covered: a sub-agent's own steps, moving cards by hand, the board in its
+   own window, keeping what was looked at across restarts. A vault on an SSH
+   host whose list cannot be read keeps its last cards silently.
+3. 0.2.87 is taken by the open irori-mode files pull request (#361, ADR 068);
+   whichever merges second advances past the other's published version.
+
 **A tab's right click, and one workspace in several tabs, 0.2.85**
 ([ADR 067](decisions/067-tab-menu-and-duplicate-tabs.md)). Tabs are known by a key
 of their own in the renderer; what a workspace shares stops only when its last tab

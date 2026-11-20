@@ -1,5 +1,28 @@
 # Implementation status — notes, native agents and connection onboarding
 
+The session board, 2026-11-20 (**0.2.88**, [ADR 069](decisions/069-session-board.md)):
+the owner asked for a kanban of sessions modelled on Orca, a column left of the
+agents' columns with a small card per conversation however many run, and the
+work of sub-agents and sub-sessions as cards framed in another colour.
+- `src/domain/session-board.ts` folds each conversation's events into a card
+  (its request, step, last reply, open requests, outcome) and puts it in Orca's
+  lanes: 要対応, 実行中, 完了 (ended since last looked at), 開いている. Hand-offs
+  nest under the irori agent's conversation by the new
+  `ConversationSummary.handedBy`; a CLI's own sub-agent is recognised from its
+  tool call (`Task`/`Agent`, Codex `spawnAgent`, OpenCode `task`, Pi's
+  `subagent`, Hermes Agent `delegate_task`) and ends with its result or its run.
+- `useSessionBoard` reads the workspace owners' lists when a run begins or ends
+  and follows events between reads; `SessionBoard` is the first pane of the
+  dock and of irori mode. Window item `sessions`, on by default. Sub-session
+  frames use `--schema` (ADR 053's Identity role, amended).
+- Verified on Linux under Xvfb: `npm run build`; `npm test` and `npm run test:ui`
+  with the new `session-board-ui-smoke.ts` (Pi protocol fixtures) pass except
+  `explorer-ui-smoke` (system trash), `ssh-config` and one `remote-hosts` test
+  (SSH key permissions), which fail the same way on `main` on that machine.
+  `your-ai` and `routines` smokes caught the board taking a share of a widened
+  side; the board now keeps its pixel width. No real CLI ran; macOS and Windows
+  not tried.
+
 The Schema checked on real CLIs, 2026-11-19 (**0.2.86**,
 [#359](https://github.com/DeL-TaiseiOzaki/irori/pull/359), published as `v0.2.86-preview.1`;
 [ADR 058](decisions/058-every-schema-setting-reaches-every-cli.md) revised): the

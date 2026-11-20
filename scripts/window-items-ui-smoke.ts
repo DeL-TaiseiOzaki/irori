@@ -104,21 +104,22 @@ try {
     await expect(sheet).toHaveCount(0);
   };
   await openItems();
-  await expect(entry).toContainText('表示中 3 / 8');
+  await expect(entry).toContainText('表示中 4 / 9');
   for (const group of [
     'エージェントへの指示の入力欄',
     '会話の上部',
+    'エージェントの列の左',
     'ステータスバー（ウィンドウの下端）',
   ])
     await expect(sheet.getByRole('heading', { name: group, exact: true })).toBeVisible();
   const item = (name: string) => sheet.getByRole('switch', { name, exact: true });
-  for (const name of ['アクセス', 'モデルと思考量', 'スキル'])
+  for (const name of ['アクセス', 'モデルと思考量', 'スキル', 'セッションボード'])
     await expect(item(name)).toBeChecked();
   for (const name of ['人の行を伝える', '列の操作', 'ブランチ', 'ターミナル', 'バージョン'])
     await expect(item(name)).not.toBeChecked();
   await expect(sheet.getByRole('button', { name: '既定に戻す', exact: true })).toBeDisabled();
   await item('ターミナル').check();
-  await expect(entry).toContainText('表示中 4 / 8');
+  await expect(entry).toContainText('表示中 5 / 9');
   // The window is behind the sheet, so its button is counted rather than seen.
   await expect(terminalButton).toHaveCount(1);
   await expect.poll(record).toEqual({ terminal: true });
@@ -129,7 +130,7 @@ try {
 
   // Everything at once, for a person who wants the whole window back.
   await sheet.getByRole('button', { name: 'すべて出す', exact: true }).click();
-  await expect(entry).toContainText('表示中 8 / 8');
+  await expect(entry).toContainText('表示中 9 / 9');
   await expect(sheet.getByRole('button', { name: 'すべて出す', exact: true })).toBeDisabled();
   await close();
   await expect(run.button).toBeVisible();
@@ -142,7 +143,7 @@ try {
   // And back to what a new device shows.
   await openItems();
   await sheet.getByRole('button', { name: '既定に戻す', exact: true }).click();
-  await expect(entry).toContainText('表示中 3 / 8');
+  await expect(entry).toContainText('表示中 4 / 9');
   await expect(item('スキル')).toBeChecked();
   await close();
   for (const hidden of [addColumn, terminalButton]) await expect(hidden).toHaveCount(0);
@@ -153,7 +154,7 @@ try {
   // Each part of the menu leaves the window on its own; with neither, the button goes too.
   await openItems();
   await item('モデルと思考量').uncheck();
-  await expect(entry).toContainText('表示中 2 / 8');
+  await expect(entry).toContainText('表示中 3 / 9');
   await close();
   await expect(run.button).not.toHaveAccessibleName(/モデル/);
   await run.access('default');

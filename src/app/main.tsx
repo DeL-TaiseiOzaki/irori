@@ -61,6 +61,10 @@ import {
   type Tab,
 } from './AgentColumn';
 import { Menu } from '@base-ui/react/menu';
+import { SessionBoard } from './SessionBoard';
+import { useSessionBoard, type BoardOwner } from './useSessionBoard';
+import type { SessionCard } from '../domain/session-board';
+import { useWindowItems } from './useWindowItems';
 import {
   applyLanguage,
   applyMarkdownFont,
@@ -276,6 +280,9 @@ function savedAgentChoice(): AgentChoice {
  */
 const yourFirst = 'you';
 const yourColumnLimit = 4;
+/** The session board's width beside the agents' columns, and the least it takes (ADR 069). */
+const boardWidth = 212;
+const boardMinimum = 176;
 const isYourColumn = (columnId: string) =>
   columnId === yourFirst || columnId.startsWith(`${yourFirst}-`);
 /** A column's number: 1 for the first, the dock's or irori mode's. */
@@ -2248,7 +2255,13 @@ function App() {
     storage: layoutStorage,
   });
   // The dock's columns keep their widths per set of columns.
-  const dockPanes = useMemo(() => columns.map((column) => column.id), [columns]);
+  // The session board stands first in the dock and in irori mode, when shown (ADR 069).
+  const windowItems = useWindowItems();
+  const boardShown = windowItems.sessions && !!workspace;
+  const dockPanes = useMemo(
+    () => [...(boardShown ? ['sessions'] : []), ...columns.map((column) => column.id)],
+    [columns, boardShown],
+  );
   const dockLayout = useDefaultLayout({
     id: 'irori-dock',
     panelIds: dockPanes,
@@ -2263,7 +2276,10 @@ function App() {
     onlySaveAfterUserInteractions: true,
     storage: layoutStorage,
   });
-  const yourPanes = useMemo(() => yourColumns.map((column) => column.id), [yourColumns]);
+  const yourPanes = useMemo(
+    () => [...(boardShown ? ['sessions'] : []), ...yourColumns.map((column) => column.id)],
+    [yourColumns, boardShown],
+  );
   const yourLayout = useDefaultLayout({
     id: 'irori-your-columns',
     panelIds: yourPanes,
@@ -2303,6 +2319,15 @@ function App() {
         all.map((column) => (column.id === 'main' ? { ...column, owner } : column)),
       );
   }
+  // The board coming or going while the dock is open widens or narrows it by as much.
+  const boardBefore = useRef(boardShown);
+  useEffect(() => {
+    const before = boardBefore.current;
+    boardBefore.current = boardShown;
+    const width = dockPanel.current?.getSize().inPixels;
+    if (before === boardShown || !width) return;
+    dockPanel.current?.resize(width + (boardShown ? boardWidth : -boardWidth));
+  }, [boardShown]);
   function closeDock() {
     stagePanel.current?.expand();
     setPanel(false);
@@ -2375,6 +2400,7 @@ function App() {
   // identities that never change; each still does what the latest render's would.
   const act = useStableFunctions({
     report,
+    openSession,
     joinVault: (space: Space) => void joinVault(space).catch(report),
     remoteVaultRemoved: (scopeId: string) =>
       void vaultRemoved(
@@ -2795,6 +2821,94 @@ function App() {
     ],
     [yourKey, yourColumns, shown, yourRows.data],
   );
+  // The session board (ADR 069): every conversation of the workspace that is doing
+  // something, as a card left of the agents' columns.
+  const boardOwners = useMemo<BoardOwner[]>(
+    () => [
+      ...(you?.state === 'ready' ? [{ scopeId: you.id, irori: true }] : []),
+      ...workspaceScopeIds.map((scopeId) => ({ scopeId })),
+    ],
+    [you?.id, you?.state, workspaceScopeIds],
+  );
+  const openConversations = useMemo(
+    () =>
+      new Set([
+        ...Object.values(tabs).flatMap((open) => open.map((tab) => tab.id)),
+        ...Object.values(shown).map((tab) => tab.id),
+      ]),
+    [tabs, shown],
+  );
+  // The conversations on show in the columns on screen now.
+  const onScreen = useMemo(() => {
+    const ids: string[] = [];
+    const add = (key: string | undefined) => {
+      const id = key && shown[key]?.id;
+      if (id && !ids.includes(id)) ids.push(id);
+    };
+    if ((level === 'overview' || level === 'routines') && yourKey)
+      for (const column of yourColumns) add(slot(column.id, yourKey));
+    if (level === 'brain' && panel)
+      for (const column of columns)
+        add(
+          ownerOf(column) === 'irori'
+            ? yourKey && slot(column.id, yourKey)
+            : active && slot(column.id, active.scopeId),
+        );
+    return ids;
+  }, [level, panel, yourKey, yourColumns, columns, shown, active?.scopeId, vaultAgent]);
+  const board = useSessionBoard({
+    enabled: boardShown && !startup,
+    owners: boardOwners,
+    workspaceId: workspace?.id,
+    open: openConversations,
+    visible: onScreen,
+  });
+  /** Shows a card's conversation in a column, going where its owner's columns are. */
+  function openSession(card: SessionCard) {
+    board.acknowledge(card.id);
+    if (you && card.scopeId === you.id) {
+      void showOwnerConversation(card.scopeId, card.id, card.agent)
+        .then(() => {
+          if (level === 'brain') openDock('irori');
+          else if (level !== 'overview' && level !== 'routines') goToLevel('overview');
+        })
+        .catch(report);
+      return;
+    }
+    const space = workspaceSpaces.find((item) => item.scopeId === card.scopeId);
+    if (!space) return;
+    void showOwnerConversation(card.scopeId, card.id, card.agent).catch(report);
+    if (level === 'brain' && active?.scopeId === card.scopeId)
+      openDock(vaultAgent ? 'vault' : 'irori');
+    else void enterBrain(space, { ai: true }).catch(report);
+  }
+  const sessionPane = boardShown && (
+    <Pane
+      key="sessions"
+      id="sessions"
+      className="session-board-pane"
+      // The board keeps its width as the dock or irori mode's side widens; the columns take it.
+      groupResizeBehavior="preserve-pixel-size"
+      defaultSize={boardWidth}
+      minSize={boardMinimum}
+      maxSize={360}
+    >
+      <SessionBoard
+        lanes={board.lanes}
+        spaces={workspaceSpaces}
+        youId={you?.id}
+        current={onScreen}
+        onOpen={act.openSession}
+      />
+    </Pane>
+  );
+  const sessionHandle = boardShown && (
+    <PaneSeparator
+      key="sessions-handle"
+      className="island-handle dock-handle"
+      aria-label={t('セッションボードの幅', 'Session board width')}
+    />
+  );
   const yourDock = (
     <PaneGroup
       className="agent-dock your-dock"
@@ -2802,6 +2916,8 @@ function App() {
       defaultLayout={yourLayout.defaultLayout}
       onLayoutChanged={yourLayout.onLayoutChanged}
     >
+      {sessionPane}
+      {sessionHandle}
       {yourColumns.map((column, index) => [
         index > 0 && (
           <PaneSeparator
@@ -3364,6 +3480,7 @@ function App() {
               onShowYou={act.showYou}
               yourDock={yourDock}
               yourColumnCount={yourColumns.length}
+              yourBoard={boardShown ? { width: boardWidth, minimum: boardMinimum } : undefined}
               yourWatched={yourWatched}
               onAskYou={(text) => setYourSeed((seed) => ({ text, key: (seed?.key ?? 0) + 1 }))}
               onShowConversation={(scopeId, id, next) =>
@@ -4115,8 +4232,8 @@ function App() {
                 id="assistant"
                 className="assistant-pane"
                 panelRef={dockPanel}
-                defaultSize={352}
-                minSize={300}
+                defaultSize={352 + (boardShown ? boardWidth : 0)}
+                minSize={300 + (boardShown ? boardMinimum : 0)}
               >
                 <PaneGroup
                   className="agent-dock"
@@ -4124,6 +4241,8 @@ function App() {
                   defaultLayout={dockLayout.defaultLayout}
                   onLayoutChanged={dockLayout.onLayoutChanged}
                 >
+                  {sessionPane}
+                  {sessionHandle}
                   {columns.map((column, index) => {
                     const owner = ownerOf(column);
                     return [

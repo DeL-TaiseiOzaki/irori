@@ -40,6 +40,10 @@ conversation.
    | Attention | `--attn*` (`--warn-*` aliases) | waits for the person: approval, conflict, warning                       |
    | Danger    | `--danger*`                    | failed, or cannot be undone                                             |
    | Identity  | `--schema`, `--cont`, `--t-*`  | which layer or which vault; never a state                               |
+
+   Since 0.2.88 the Identity role also frames a sub-session's card on the
+   session board in `--schema`: a hand-off or a CLI's own sub-agent, which a
+   folder's Schema declares ([ADR 069](069-session-board.md)).
    | Diff      | `--add-*`, `--del-*`           | added and removed, inside a diff or change list only                    |
 
    A normal outcome — saved, mounted, succeeded, done — takes no colour.

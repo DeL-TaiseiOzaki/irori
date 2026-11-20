@@ -1,0 +1,289 @@
+/*
+ * The session board (ADR 069): a narrow column of small cards left of the agents'
+ * columns. A card is framed by its state as ADR 053 colours states (attention,
+ * danger; running is neutral and told by motion); a sub-session (a hand-off or a
+ * CLI's own sub-agent) is framed in the Schema's identity colour, since a
+ * folder's sub-agents are declared in its Schema and a hand-off runs as the vault
+ * agent its Schema defines.
+ */
+.session-board-pane {
+  min-width: 0;
+}
+.session-board {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-right: 1px solid var(--hair);
+  color: var(--tx);
+}
+.session-board-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tx-2);
+  border-bottom: 1px solid var(--hair);
+}
+.session-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--chip);
+  color: var(--tx-3);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.session-lanes {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.session-empty {
+  margin: 8px 4px;
+  color: var(--tx-3);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.session-lane > h3 {
+  margin: 4px 2px 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  color: var(--tx-3);
+}
+.session-lane > h3 > span:first-child,
+.session-lane > h3 > button {
+  flex: 1;
+  min-width: 0;
+}
+.session-lane > h3 > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.session-lane > h3 > button:hover {
+  color: var(--tx-2);
+}
+.session-lane-chevron {
+  transition: transform 0.12s ease;
+}
+.session-lane > h3 > button[aria-expanded='true'] .session-lane-chevron {
+  transform: rotate(90deg);
+}
+.session-lane.attention > h3 {
+  color: var(--attn-tx);
+}
+.session-lane ul,
+.session-subs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.session-subs {
+  margin: 5px 0 0 9px;
+  padding-left: 8px;
+  border-left: 1px solid color-mix(in srgb, var(--schema) 45%, transparent);
+  gap: 5px;
+}
+
+.session-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 7px 8px 6px;
+  border: 1px solid var(--hair);
+  border-radius: 7px;
+  background: var(--raised);
+  color: var(--tx);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+.session-card:hover {
+  background: var(--raised-2);
+}
+.session-card:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.session-card.current {
+  border-color: var(--act-line);
+  box-shadow: inset 2px 0 0 var(--focus);
+}
+.session-card.waiting,
+.session-card.failed {
+  border-color: var(--attn-line);
+  background: color-mix(in srgb, var(--attn) 7%, var(--raised));
+}
+.session-card.failed {
+  border-color: var(--danger-line);
+  background: color-mix(in srgb, var(--danger-tx) 7%, var(--raised));
+}
+.session-card.idle {
+  background: transparent;
+}
+.session-card.idle:hover {
+  background: var(--raised);
+}
+/* A sub-session: a hand-off (a conversation of its own) is a solid frame, a
+   CLI's sub-agent (a step of its parent's run) a dashed one, as ADR 053 draws a
+   hand-off solid and a reference dashed. */
+.session-card.sub {
+  border-color: color-mix(in srgb, var(--schema) 60%, transparent);
+  background: color-mix(in srgb, var(--schema) 6%, var(--raised));
+  padding: 5px 7px;
+}
+.session-card.sub.sub-agent {
+  border-style: dashed;
+  gap: 2px;
+}
+.session-card.sub.waiting {
+  border-color: var(--attn-line);
+}
+.session-card.sub.failed {
+  border-color: var(--danger-line);
+}
+.session-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.session-owner-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  background: var(--chip);
+  color: var(--tx-2);
+}
+.session-sub-mark {
+  flex: none;
+  color: var(--schema);
+}
+.session-card-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+}
+.session-card.idle .session-card-title,
+.session-card.sub-agent .session-card-title {
+  font-weight: 500;
+  color: var(--tx-2);
+}
+.session-card-prompt,
+.session-card-line {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.session-card-prompt {
+  -webkit-line-clamp: 1;
+  color: var(--tx-3);
+}
+.session-card-line {
+  -webkit-line-clamp: 2;
+  color: var(--tx-2);
+}
+.session-card.waiting .session-card-line {
+  color: var(--attn-tx);
+}
+.session-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--tx-3);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+.session-card-owner {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.session-card-time {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.session-kind {
+  flex: none;
+  color: var(--schema);
+  font-weight: 600;
+}
+
+/* The state dot: running blinks, neutral; waiting is the attention colour with its
+   halo; a failure is the danger colour; an ended run is hollow; idle is faint. */
+.session-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tx-3);
+  opacity: 0.45;
+}
+.session-dot.running,
+.session-dot.working {
+  background: var(--run);
+  opacity: 1;
+  animation: irori-blink 1.4s ease-in-out infinite;
+}
+.session-dot.waiting {
+  background: var(--attn);
+  opacity: 1;
+  animation: irori-halo 2.2s ease-out infinite;
+}
+.session-dot.queued {
+  background: none;
+  box-shadow: inset 0 0 0 1.5px var(--run);
+  opacity: 1;
+}
+.session-dot.failed {
+  background: var(--danger-tx);
+  opacity: 1;
+}
+.session-dot.done,
+.session-dot.stopped {
+  background: none;
+  box-shadow: inset 0 0 0 1.5px var(--tx-2);
+  opacity: 1;
+}

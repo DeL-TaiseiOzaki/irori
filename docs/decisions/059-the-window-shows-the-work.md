@@ -41,6 +41,7 @@ control panel.
    | スキル (`skill`) | instruction box | on |
    | 人の行を伝える (`personLines`) | instruction box | off |
    | 列の操作 (`columns`): add a column, hide the page | top of a conversation | off |
+   | セッションボード (`sessions`), from 0.2.88 ([ADR 069](069-session-board.md)) | left of the agents' columns | on |
    | ブランチ (`branch`) | status bar | off |
    | ターミナル (`terminal`) | status bar and a vault's home | off |
    | バージョン (`version`) | status bar | off |

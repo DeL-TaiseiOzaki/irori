@@ -153,7 +153,7 @@ test('the window leaves its optional controls out until the person shows them', 
   assert.deepEqual(windowItemsShown(), windowItemDefaults);
   assert.deepEqual(
     windowItems.filter((item) => windowItemDefaults[item]),
-    ['access', 'model', 'skill'],
+    ['access', 'model', 'skill', 'sessions'],
   );
   // An item never chosen follows its default, whatever else was chosen.
   assert.deepEqual(windowItemsShown({ terminal: true, skill: false }), {
