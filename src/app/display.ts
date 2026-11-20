@@ -39,6 +39,17 @@ export function shortWhen(iso: string) {
   });
 }
 
+/** How long ago, in the fewest words: now, minutes, hours or days. A broken time is a dash. */
+export function sinceWords(at: number, now = Date.now()) {
+  if (!Number.isFinite(at) || at <= 0) return '—';
+  const minutes = Math.floor(Math.max(0, now - at) / 60000);
+  if (minutes < 1) return t('今', 'now');
+  if (minutes < 60) return t(`${minutes}分`, `${minutes}m`);
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return t(`${hours}時間`, `${hours}h`);
+  return t(`${Math.floor(hours / 24)}日`, `${Math.floor(hours / 24)}d`);
+}
+
 /** Sends on Enter; Shift+Enter breaks the line, and Enter that ends IME composition only confirms it. */
 export const sendOnEnter = (send: () => void) => (event: KeyboardEvent<HTMLTextAreaElement>) => {
   if (

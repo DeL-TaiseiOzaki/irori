@@ -12,6 +12,7 @@ export const windowItems = [
   'skill',
   'personLines',
   'columns',
+  'sessions',
   'branch',
   'terminal',
   'version',
@@ -40,7 +41,8 @@ export const windowItemChoices = z.object(
  * from its column: the model with its thinking level, and the access, share one
  * menu under the instruction box. The skill picker stays as well: it says which
  * skill one request uses, as an attachment does, and only a vault that has
- * skills shows it. The rest are a developer's tools.
+ * skills shows it. The session board shows what every conversation is doing
+ * (ADR 069). The rest are a developer's tools.
  */
 export const windowItemDefaults: WindowItems = {
   access: true,
@@ -48,6 +50,7 @@ export const windowItemDefaults: WindowItems = {
   skill: true,
   personLines: false,
   columns: false,
+  sessions: true,
   branch: false,
   terminal: false,
   version: false,
@@ -57,6 +60,7 @@ export const windowItemDefaults: WindowItems = {
 export const windowItemAreas = [
   { id: 'composer', items: ['access', 'model', 'skill', 'personLines'] },
   { id: 'conversation', items: ['columns'] },
+  { id: 'beside', items: ['sessions'] },
   { id: 'status', items: ['branch', 'terminal', 'version'] },
 ] as const satisfies readonly { id: string; items: readonly WindowItem[] }[];
 export type WindowItemArea = (typeof windowItemAreas)[number]['id'];

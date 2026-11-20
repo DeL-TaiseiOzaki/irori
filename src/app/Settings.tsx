@@ -153,6 +153,7 @@ const accessDetails: Record<AgentAccess, () => string> = {
 const windowAreaLabels: Record<WindowItemArea, () => string> = {
   composer: () => t('エージェントへの指示の入力欄', 'Under the instruction box'),
   conversation: () => t('会話の上部', "At the top of an agent's column"),
+  beside: () => t('エージェントの列の左', "Left of the agents' columns"),
   status: () => t('ステータスバー（ウィンドウの下端）', "The status bar, along the window's foot"),
 };
 
@@ -162,6 +163,7 @@ const windowItemLabels: Record<WindowItem, () => string> = {
   skill: () => t('スキル', 'Skill'),
   personLines: () => t('人の行を伝える', "Share the person's lines"),
   columns: () => t('列の操作', 'Columns'),
+  sessions: () => t('セッションボード', 'Session board'),
   branch: () => t('ブランチ', 'Branch'),
   terminal: () => t('ターミナル', 'Terminal'),
   version: () => t('バージョン', 'Version'),
@@ -193,6 +195,11 @@ const windowItemNotes: Record<WindowItem, () => string> = {
     t(
       '会話の列を増やすボタンと、本文を隠すボタンを出します。本文を隠しているあいだは、オフでも戻すボタンが表示されます。',
       'Shows the buttons that add a column and hide the page. While the page is hidden, the button that shows it stays even when this is off.',
+    ),
+  sessions: () =>
+    t(
+      'ワークスペースの会話を、要対応・実行中・完了・開いている の小さなカードで並べる列を、エージェントの列の左に出します。引き継ぎと CLI のサブエージェントは、枠の色が違うカードで親の会話の下に出ます。オフでも会話はタブと列で開けます。',
+      "Shows a column left of the agents' columns that lists the workspace's conversations as small cards: needs you, working, done and open. Hand-offs and a CLI's own sub-agents show under their conversation, framed in another colour. Off, conversations still open as tabs and columns.",
     ),
   branch: () =>
     t(

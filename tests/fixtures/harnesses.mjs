@@ -255,6 +255,14 @@ export function run(kind) {
         send({ type: 'agent_start' });
         send({ type: 'response', id: message.id, command: 'prompt', success: true });
         send({ type: 'tool_execution_start', toolName: 'read', args: { path: 'note.md' } });
+        // A sub-agent started with Pi's sub-agent extension's tool (ADR 069).
+        if (withoutEarlier(message.message).includes('subagent'))
+          send({
+            type: 'tool_execution_start',
+            toolName: 'subagent',
+            toolCallId: 'sub-1',
+            args: { agent: 'scout', task: 'Find the notes' },
+          });
         // A line "run: <command>" runs it in a shell, as Pi's bash tool would,
         // and answers with what it printed.
         const command = /^run: (.+)$/m.exec(message.message)?.[1];
@@ -643,6 +651,19 @@ async function antigravity(log) {
   if (prompt.includes('fail')) {
     result({ status: 'ERROR', response: '', error: 'Fixture provider error' });
     process.exit(3);
+  }
+  if (prompt.includes('subagent')) {
+    // As 1.5.12 launches one: the step is done once launched, carries no `tool_info`,
+    // and the sub-agent's report comes back as a system message naming no one.
+    const sub = { type_name: 'research', role: 'Note Reader', initial_prompt: 'Read note.md' };
+    const launch = { state: 'ACTIVE', step_type: 'subagent', tool_name: 'invoke_subagent' };
+    step(2, { ...launch, subagent_info: { subagents: [sub] } });
+    step(2, {
+      ...launch,
+      state: 'DONE',
+      subagent_info: { subagents: [{ ...sub, conversation_id: 'sub-conversation' }] },
+    });
+    step(4, { state: 'DONE', step_type: 'system_message' });
   }
   const text = '日本語\u2028の応答';
   if (prompt.includes('denied')) {

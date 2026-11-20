@@ -727,6 +727,17 @@ test(
       'what it was not allowed to do is said',
     );
 
+    // A sub-agent's launch is a call naming the sub-agents, though it has no `tool_info`.
+    const launched = (
+      await execute('antigravity', 'subagent', false, { access: 'full-access' })
+    ).events.filter((e) => e.type === 'tool' && e.text === 'invoke_subagent');
+    assert.deepEqual(
+      launched.map((e) => [e.call, !!e.result, JSON.parse(e.details!).subagents[0].role]),
+      [
+        ['step-2', false, 'Note Reader'],
+        ['step-2', true, 'Note Reader'],
+      ],
+    );
     assert.equal(
       (await execute('antigravity', 'fail', false, { access: 'full-access' })).events.at(-1)
         ?.outcome,

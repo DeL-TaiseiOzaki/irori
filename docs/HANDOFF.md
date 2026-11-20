@@ -1,5 +1,14 @@
 # irori continuation handoff
 
+**The session board, 0.2.88** ([ADR 069](decisions/069-session-board.md)). Next:
+1. Real Claude Code, Codex and Antigravity CLI sub-agents were checked in the
+   app on 2026-11-20. OpenCode, Pi's extension and Hermes Agent are recognised
+   from their protocol only. Antigravity's sub-agent shows working until its run
+   ends, as nothing later names it.
+2. Not covered: a sub-agent's own steps, moving cards by hand, the board in its
+   own window, keeping what was looked at across restarts. A vault on an SSH
+   host whose list cannot be read keeps its last cards silently.
+
 **Reading files in irori mode, 0.2.87**
 ([ADR 068](decisions/068-reading-files-in-irori-mode.md)). Next:
 Published as `v0.2.87-preview.1`; its UI smokes passed in CI only, on Linux.

@@ -742,6 +742,7 @@ export function Overview({
   onShowYou,
   yourDock,
   yourColumnCount,
+  yourBoard,
   yourWatched,
   files,
   onAskYou,
@@ -777,6 +778,8 @@ export function Overview({
   /** The irori agent's columns in this workspace (ADR 034). */
   yourDock: ReactNode;
   yourColumnCount: number;
+  /** The session board before the irori agent's columns, when shown (ADR 069). */
+  yourBoard?: { width: number; minimum: number };
   /** The irori agent's conversations the map follows: those on show and those running. */
   yourWatched: string[];
   /** The files view: a vault's trees and the file read beside the columns (ADR 068). */
@@ -805,6 +808,15 @@ export function Overview({
     const width = aiPane.current?.getSize().inPixels;
     if (added > 0 && width) aiPane.current?.resize(width + 340 * added);
   }, [yourColumnCount]);
+  // The session board coming or going widens or narrows the island by its width.
+  const boardWidth = yourBoard?.width ?? 0;
+  const shownBoard = useRef(boardWidth);
+  useEffect(() => {
+    const change = boardWidth - shownBoard.current;
+    shownBoard.current = boardWidth;
+    const width = aiPane.current?.getSize().inPixels;
+    if (change && width) aiPane.current?.resize(width + change);
+  }, [boardWidth]);
   // What the Overview itself did (a send, a resume) is read back at once.
   const [acted, setActed] = useState(0);
   const reread =
@@ -1044,8 +1056,8 @@ export function Overview({
               id="overview-ai"
               className="overview-ai-pane"
               panelRef={aiPane}
-              defaultSize={360}
-              minSize={300}
+              defaultSize={360 + boardWidth}
+              minSize={300 + (island === 'you' ? (yourBoard?.minimum ?? 0) : 0)}
             >
               {island === 'you' ? (
                 // Each column is the irori agent's own landmark; this one holds them.

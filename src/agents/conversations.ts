@@ -779,7 +779,7 @@ export class ConversationStore {
       ...(meta.routine
         ? { origin: 'routine' as const }
         : meta.handedBy
-          ? { origin: 'hand-off' as const }
+          ? { origin: 'hand-off' as const, handedBy: meta.handedBy.conversationId }
           : {}),
       running: !!state?.active,
       queued: state?.queued.length ?? 0,

@@ -159,6 +159,8 @@ export interface ConversationSummary {
   archived: boolean;
   /** A routine's agent step or the irori agent's hand-off. */
   origin?: 'routine' | 'hand-off';
+  /** For a hand-off: the irori agent's conversation that handed it (ADR 069). */
+  handedBy?: string;
   running: boolean;
   queued: number;
 }
