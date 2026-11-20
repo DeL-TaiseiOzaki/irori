@@ -1,5 +1,13 @@
 # irori continuation handoff
 
+**Reading files in irori mode, 0.2.87**
+([ADR 068](decisions/068-reading-files-in-irori-mode.md)). Next:
+1. The UI smokes for it (`overview-ui-smoke`, `your-ai-ui-smoke`) have run only
+   in CI; if they fail there, look first at the files view's selectors and at
+   the narrow-header check, which now holds a third layout button.
+2. Not covered: the irori agent's own folder in the files view, find (Ctrl+F)
+   and comments there, more than one file at a time.
+
 **A tab's right click, and one workspace in several tabs, 0.2.85**
 ([ADR 067](decisions/067-tab-menu-and-duplicate-tabs.md)). Tabs are known by a key
 of their own in the renderer; what a workspace shares stops only when its last tab

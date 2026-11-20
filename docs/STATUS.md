@@ -1,5 +1,20 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Reading files in irori mode, 2026-11-20 (**0.2.87**, not yet merged or published;
+[ADR 068](decisions/068-reading-files-in-irori-mode.md)): the owner asked to read
+files in irori mode while going on working there.
+- `VaultFiles` is irori mode's third layout, **ファイル**: a vault's trees
+  (`VaultSections`, shared with the vault beside) and the file read through
+  `StagePreview`, whose `target` brings a line or hit into view once.
+- `openPath` and the search's `onOpen` read a vault's file there while irori mode
+  or the routines page is on show (`readInIrori`); `openInVault` keeps the old
+  path for the vault, and **vault で編集** uses it. `TabPlace.overviewFile` keeps
+  the file with the tab.
+- Verified by `npm run build` and `npm test`. `overview-ui-smoke` and
+  `your-ai-ui-smoke` were updated for the new behavior but could not run on the
+  development machine (no display server; Electron lacks `libgbm`), so CI is
+  their first run.
+
 The Schema checked on real CLIs, 2026-11-19 (**0.2.86**,
 [#359](https://github.com/DeL-TaiseiOzaki/irori/pull/359), published as `v0.2.86-preview.1`;
 [ADR 058](decisions/058-every-schema-setting-reaches-every-cli.md) revised): the

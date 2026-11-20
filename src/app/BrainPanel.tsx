@@ -42,6 +42,8 @@ import './brain-panel.css';
 
 const host = window.irori;
 export type Listing = { entries: Entry[]; error?: string };
+/** The file a tree follows and marks: only where it is. */
+type Selected = Pick<Document, 'scopeId' | 'path'>;
 export type BrainMode = 'files' | 'changes';
 
 const layerIcons: Record<Layer, IconName> = {
@@ -181,7 +183,7 @@ export function Tree({
   depth?: number;
   roots?: Listing;
   revision: number;
-  selected?: Document;
+  selected?: Selected;
   connections?: CloudConnection[];
   /** Creating, renaming, moving and deleting, where the person may. */
   explorer?: Explorer;
@@ -637,6 +639,89 @@ const editorSections: { layer: Layer; defaultSize: string }[] = [
 const headingHeight = 36;
 
 /**
+ * A vault's knowledge and contents trees: the vault beside (ADR 038) and irori
+ * mode's files view (ADR 068). Without an explorer they only open files.
+ */
+export function VaultSections({
+  space,
+  roots,
+  revision,
+  selected,
+  connections,
+  explorer,
+  onOpen,
+}: {
+  space: Space;
+  roots?: Listing;
+  revision: number;
+  selected?: Selected;
+  connections: CloudConnection[];
+  explorer?: Explorer;
+  onOpen: (space: Space, entry: Entry) => void;
+}) {
+  const contentRoots = roots?.entries.filter(
+    (entry) => entry.layer === 'contents' && space.contents.includes(entry.path),
+  );
+  const layers = ['Knowledge_Base', 'contents'] as const;
+  return (
+    <div className="side-sections">
+      {layers.map((layer) => (
+        <section
+          key={layer}
+          className={`brain-section ${layer}`}
+          aria-label={layerLabel(space, layer)}
+        >
+          <div className="section-heading">
+            <span className="section-toggle">
+              <Icon name={layerIcons[layer]} size={15} strokeWidth={1.9} className="layer-icon" />
+              <span>{layerLabel(space, layer)}</span>
+            </span>
+          </div>
+          <div className="section-body">
+            {layer === 'Knowledge_Base' ? (
+              <Tree
+                key={knowledgeFolder(space)}
+                space={space}
+                layer={layer}
+                roots={roots}
+                revision={revision}
+                selected={selected}
+                onOpen={onOpen}
+                {...(explorer && { explorer, writable: true })}
+              />
+            ) : !contentRoots ? (
+              <small className="tree-empty">{t('読み込み中…', 'Loading…')}</small>
+            ) : (
+              contentRoots.map((root) => (
+                <div key={root.path} className="contents-root">
+                  {contentRoots.length > 1 && (
+                    <span className="contents-root-name">{root.path}</span>
+                  )}
+                  {root.blocked ? (
+                    <small className="tree-empty">{root.blocked}</small>
+                  ) : (
+                    <Tree
+                      space={space}
+                      layer="contents"
+                      directory={root.path}
+                      revision={revision}
+                      selected={selected}
+                      connections={connections}
+                      onOpen={onOpen}
+                      explorer={explorer}
+                    />
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+/**
  * One brain: its Schema, Knowledge and Contents, and its changes. Memoised: it
  * re-renders for its own data, not for every keystroke in the editor.
  */
@@ -676,10 +761,6 @@ export const SideBrainPanel = memo(function SideBrainPanel({
   onClose: () => void;
 }) {
   useLanguage();
-  const contentRoots = roots?.entries.filter(
-    (entry) => entry.layer === 'contents' && space.contents.includes(entry.path),
-  );
-  const layers = ['Knowledge_Base', 'contents'] as const;
   // A vault on an SSH host is shown, not changed (ADR 061).
   const shown = locked || space.host ? undefined : held ? addingOnly(explorer) : explorer;
   const identity = (
@@ -734,60 +815,15 @@ export const SideBrainPanel = memo(function SideBrainPanel({
           </button>
         </div>
       </header>
-      <div className="side-sections">
-        {layers.map((layer) => (
-          <section
-            key={layer}
-            className={`brain-section ${layer}`}
-            aria-label={layerLabel(space, layer)}
-          >
-            <div className="section-heading">
-              <span className="section-toggle">
-                <Icon name={layerIcons[layer]} size={15} strokeWidth={1.9} className="layer-icon" />
-                <span>{layerLabel(space, layer)}</span>
-              </span>
-            </div>
-            <div className="section-body">
-              {layer === 'Knowledge_Base' ? (
-                <Tree
-                  key={knowledgeFolder(space)}
-                  space={space}
-                  layer={layer}
-                  roots={roots}
-                  revision={revision}
-                  selected={selected}
-                  onOpen={onOpen}
-                  {...(shown && { explorer: shown, writable: true })}
-                />
-              ) : !contentRoots ? (
-                <small className="tree-empty">{t('読み込み中…', 'Loading…')}</small>
-              ) : (
-                contentRoots.map((root) => (
-                  <div key={root.path} className="contents-root">
-                    {contentRoots.length > 1 && (
-                      <span className="contents-root-name">{root.path}</span>
-                    )}
-                    {root.blocked ? (
-                      <small className="tree-empty">{root.blocked}</small>
-                    ) : (
-                      <Tree
-                        space={space}
-                        layer="contents"
-                        directory={root.path}
-                        revision={revision}
-                        selected={selected}
-                        connections={connections}
-                        onOpen={onOpen}
-                        explorer={shown}
-                      />
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-        ))}
-      </div>
+      <VaultSections
+        space={space}
+        roots={roots}
+        revision={revision}
+        selected={selected}
+        connections={connections}
+        explorer={shown}
+        onOpen={onOpen}
+      />
     </section>
   );
 });

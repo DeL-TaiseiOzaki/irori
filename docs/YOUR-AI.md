@@ -254,6 +254,9 @@ agent sets up the person's vaults.
   ([ADR 034](decisions/034-irori-mode-threads.md)). Its log shows each run's hand-offs as a task list
   (vault, what it was asked, working / needs approval / done), each vault's
   report, and the vault agents' requests labelled with their vault.
+  A path in a reply to a vault's file opens in irori mode's **ファイル** layout,
+  read only, with the columns still beside it
+  ([ADR 068](decisions/068-reading-files-in-irori-mode.md)).
 - **Map:** the irori agent's orb at the hearth. A line runs to each vault with
   a hand-off under way from any thread on show or running, with a spark moving along it unless less motion is asked
   for. The vault glows.
