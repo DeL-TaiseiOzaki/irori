@@ -2,9 +2,9 @@
 
 **Reading files in irori mode, 0.2.87**
 ([ADR 068](decisions/068-reading-files-in-irori-mode.md)). Next:
-1. The UI smokes for it (`overview-ui-smoke`, `your-ai-ui-smoke`) have run only
-   in CI; if they fail there, look first at the files view's selectors and at
-   the narrow-header check, which now holds a third layout button.
+Published as `v0.2.87-preview.1`; its UI smokes passed in CI only, on Linux.
+1. Try it on the owner's Windows 11 and Mac: a reply's path and a search hit
+   opening in the files view, and **vault で編集**.
 2. Not covered: the irori agent's own folder in the files view, find (Ctrl+F)
    and comments there, more than one file at a time.
 

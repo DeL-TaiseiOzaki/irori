@@ -1,6 +1,7 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Reading files in irori mode, 2026-11-20 (**0.2.87**, not yet merged or published;
+Reading files in irori mode, 2026-11-20 (**0.2.87**,
+[#361](https://github.com/DeL-TaiseiOzaki/irori/pull/361), published as `v0.2.87-preview.1`;
 [ADR 068](decisions/068-reading-files-in-irori-mode.md)): the owner asked to read
 files in irori mode while going on working there.
 - `VaultFiles` is irori mode's third layout, **ファイル**: a vault's trees
@@ -12,8 +13,14 @@ files in irori mode while going on working there.
   the file with the tab.
 - Verified by `npm run build` and `npm test`. `overview-ui-smoke` and
   `your-ai-ui-smoke` were updated for the new behavior but could not run on the
-  development machine (no display server; Electron lacks `libgbm`), so CI is
-  their first run.
+  development machine (no display server; Electron lacks `libgbm`); the pull
+  request's CI run `44665167189` ran them and the whole `test:ui`, and passed.
+- `publish.yml` published
+  [v0.2.87-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.87-preview.1)
+  from `abd4b68` (the pull request's run `44665167189`, then publish run `44669965453`).
+  Anonymous downloads matched `SHA256SUMS.txt`: Windows 179,417,088 bytes, Mac
+  145,733,890 bytes and `irori-0.2.87-full.nupkg` 178,587,685 bytes; the live
+  page links the 0.2.87 installers.
 
 The Schema checked on real CLIs, 2026-11-19 (**0.2.86**,
 [#359](https://github.com/DeL-TaiseiOzaki/irori/pull/359), published as `v0.2.86-preview.1`;
