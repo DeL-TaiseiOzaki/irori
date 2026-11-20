@@ -491,6 +491,16 @@ export function questionOption(option: unknown): QuestionOption {
     typeof value[key] === 'string' && value[key] ? { [key]: value[key] as string } : {};
   return { label: String(value.label ?? ''), ...text('description'), ...text('preview') };
 }
+/** Claude Code's built-in plugin that loads AGENTS.md (2.1.277 on). */
+const claudeAgentsPlugin = 'cc-plugin-agents-md';
+/**
+ * Whether Claude Code loaded AGENTS.md in a folder, by its working directory, as
+ * its last session there said (ADR 058). Its `InstructionsLoaded` names
+ * CLAUDE.md alone (2.1.316), so the session's `init` is read instead: the
+ * plugin is listed where it loads AGENTS.md. That comes after the request's
+ * `UserPromptSubmit`, so a request knows what the folder's previous session said.
+ */
+const claudeLoadsAgents = new Map<string, boolean>();
 export class AgentService {
   // Runs by id: one per conversation, and an owner's conversations run side by
   // side in its checkout, as Claudian's tabs do in one vault (ADR 020).
@@ -1541,7 +1551,9 @@ export class AgentService {
       parts.bytes > reach.instructions.limit
     )
       prompt.instructions = { file: parts.file, limit: reach.instructions.limit };
-    if (!reach.nested && folder.knowledge && !you)
+    // Named on every CLI: those that load them do so only once they read a file
+    // there, not before writing a new one (checked with Claude Code 2.1.316).
+    if (folder.knowledge && !you)
       prompt.nested = (await this.nestedInstructions?.(input.scopeId).catch(() => [])) ?? [];
     // The shared Schema's skills are listed with it; the folder's own win a name both have.
     if (!reach.skills) prompt.skills = parts.skills;
@@ -3320,6 +3332,7 @@ export class AgentService {
     const agentsText = agentsGiven
       ? undefined
       : (await fs.readFile(agentsFile, 'utf8').catch(() => undefined))?.trim();
+    const agentsKnown = claudeLoadsAgents.get(cwd);
     const agents = agentsText
       ? {
           file: await fs.realpath(agentsFile).catch(() => agentsFile),
@@ -3360,7 +3373,7 @@ export class AgentService {
             // AGENTS.md is the Schema's instructions: read beside a CLAUDE.md too (ADR 058).
             ...(run.agentsBesideClaude && {
               pluginConfigs: {
-                'cc-plugin-agents-md@builtin': {
+                [`${claudeAgentsPlugin}@builtin`]: {
                   options: { instructionFiles: 'claude-md-and-agents-md' },
                 },
               },
@@ -3421,16 +3434,19 @@ export class AgentService {
             {
               hooks: [
                 async () => {
-                  if (!agents || agentsGiven || loaded.has(agents.file)) return {};
+                  if (!agents || agentsGiven || loaded.has(agents.file) || agentsKnown) return {};
                   agentsGiven = true;
-                  this.event(
-                    run,
-                    'status',
-                    t(
-                      'Claude Code がこのフォルダの AGENTS.md を読み込まなかったため、irori が依頼と一緒に渡しました。',
-                      "Claude Code did not load this folder's AGENTS.md, so irori gave it with the request.",
-                    ),
-                  );
+                  // Said only when the folder's previous session showed it missing;
+                  // before any session there it is given without a word.
+                  if (agentsKnown === false)
+                    this.event(
+                      run,
+                      'status',
+                      t(
+                        'Claude Code がこのフォルダの AGENTS.md を読み込まなかったため、irori が依頼と一緒に渡しました。',
+                        "Claude Code did not load this folder's AGENTS.md, so irori gave it with the request.",
+                      ),
+                    );
                   return {
                     hookSpecificOutput: {
                       hookEventName: 'UserPromptSubmit',
@@ -3542,6 +3558,10 @@ export class AgentService {
         // A compaction may have taken what the session heard (ADR 058).
         if (msg.type === 'system' && msg.subtype === 'compact_boundary') run.compacted = true;
         if (msg.type === 'system' && msg.subtype === 'init') {
+          claudeLoadsAgents.set(
+            cwd,
+            (msg.plugins ?? []).some((plugin) => plugin.name === claudeAgentsPlugin),
+          );
           run.nativeHandle = msg.session_id;
           await this.saveSession(run, msg.session_id);
         }

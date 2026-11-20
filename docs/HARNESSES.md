@@ -137,17 +137,33 @@ Added 2026-11-07 (0.2.61, [ADR 058](decisions/058-every-schema-setting-reaches-e
 Every Schema setting reaches every CLI. The CLI loads a setting itself where
 its source shows it does; otherwise irori gives it. `src/domain/schema-reach.ts`
 holds the table, and `hookEvents` in the same file lists the hook events irori
-runs per CLI. The facts below were read from source or documentation. No real
-CLI was run; the protocol fixtures in `tests/schema-reach.test.ts` follow them.
+runs per CLI. The facts below were read from source or documentation; the
+protocol fixtures in `tests/schema-reach.test.ts` follow them. Claude Code,
+Codex and the Antigravity CLI were also run for real on 2026-11-19 (0.2.86,
+`scripts/schema-reach-acceptance.ts`, below).
 
 | CLI | AGENTS.md | Knowledge folder AGENTS.md | `.claude/rules` | `.agents/skills` | Hooks | Compaction seen as |
 | --- | --- | --- | --- | --- | --- | --- |
-| Claude Code | Reads it (2.1.277+). irori sets `instructionFiles: claude-md-and-agents-md` where a CLAUDE.md is, checks `InstructionsLoaded` each session and gives it through `UserPromptSubmit` when it was not loaded; with hooks off or an older version, as words | Loads it on a Read there | Reads them | Links from irori (ADR 049) | Its own | `system` `compact_boundary` |
+| Claude Code | Reads it (2.1.277+). irori sets `instructionFiles: claude-md-and-agents-md` where a CLAUDE.md is, reads each session's `init`: where `plugins` lists `cc-plugin-agents-md` it loaded AGENTS.md, otherwise the folder's next request gives it through `UserPromptSubmit` (2.1.316's `InstructionsLoaded` names CLAUDE.md only); with hooks off or an older version, as words | Loads it on a Read there, not before writing a new file: irori names them | Reads them | Links from irori (ADR 049) | Its own | `system` `compact_boundary` |
 | Codex | Root to cwd. irori raises `project_doc_max_bytes` to 1 MiB. irori gives it when `instructionSources` omits it or `AGENTS.override.md` is present | Never: irori names them | irori, as words | Reads them | Its own hooks, given per thread and trusted by hash; they hand each event to irori | `contextCompaction` item |
 | OpenCode | Reads it (no limit) | Attached on a Read only: irori names them | irori, as words | Reads them | irori's plugin, which says it loaded | `session.compacted` |
 | Pi | Reads it whatever the trust. irori gives it when `AGENTS.override.md` is present | Never: irori names them | irori, as words | `--skill` per folder from irori | irori's extension | `compaction_end` |
-| Hermes Agent | Reads one context kind and cuts it (20,000 characters at least). A resumed session keeps its copy. irori gives a changed one, and gives it when `.hermes.md`, `HERMES.md` or `AGENTS.override.md` is present | Appended to tool results there | irori, as words | Only trusted Git projects: irori lists them | Around the run, and PostToolUse after the call | Not reported: words go whole every time |
+| Hermes Agent | Reads one context kind and cuts it (20,000 characters at least). A resumed session keeps its copy. irori gives a changed one, and gives it when `.hermes.md`, `HERMES.md` or `AGENTS.override.md` is present | Appended to tool results there; irori names them too | irori, as words | Only trusted Git projects: irori lists them | Around the run, and PostToolUse after the call | Not reported: words go whole every time |
 | Antigravity CLI | Reads it and cuts at 24,000 bytes; irori says to read the whole file | Never: irori names them | irori, as words | Reads them | `.agents/hooks.json` in irori's `--add-dir` folder | Not reported: words go whole every time |
+
+Real-CLI check, 2026-11-19 (0.2.86): `npm run test:schema-reach -- [claude]
+[codex] [antigravity]` drives `AgentService` as the app does against the
+signed-in CLIs, in a disposable vault and irori agent folder. Canary tokens sit
+in the shared Schema's instructions, rule and skill, and in the vault's
+AGENTS.md, `.claude/rules`, `.agents/skills`, a knowledge folder's AGENTS.md
+and a `UserPromptSubmit` hook. One request asks for them without tools; a second
+creates a file in the knowledge folder and runs both skills. Claude Code 2.1.316,
+Codex 0.166.0 and the Antigravity CLI 1.5.12 passed all
+twelve checks in standard access. The same run on 0.2.85 found Claude Code
+creating the file only after searching the vault, having taken the knowledge
+folder's AGENTS.md for material, and irori saying on every request that Claude
+Code had not loaded AGENTS.md, which it had. OpenCode, Pi and Hermes Agent are not
+installed here and were not run.
 
 The shared Schema's skills (ADR 066, 0.2.84) are in the irori agent's folder,
 which no CLI reads, so irori gives them to each as its own skills, beside their

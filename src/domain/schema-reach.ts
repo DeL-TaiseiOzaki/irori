@@ -14,7 +14,11 @@ export interface SchemaReach {
    * `stale`: a session it goes on with keeps the copy it began with.
    */
   instructions: { reads: boolean; limit?: number; hiddenBy?: string[]; stale?: boolean };
-  /** It loads the `AGENTS.md` of a folder below whenever it works with a file there. */
+  /**
+   * It loads the `AGENTS.md` of a folder below once it reads or uses a file there.
+   * irori names a knowledge folder's AGENTS.md to every CLI all the same: none
+   * loads it before writing a new file there.
+   */
   nested: boolean;
   /** It reads `.claude/rules`. */
   rules: boolean;
