@@ -9,8 +9,12 @@ work of sub-agents and sub-sessions as cards framed in another colour.
   lanes: 要対応, 実行中, 完了 (ended since last looked at), 開いている. Hand-offs
   nest under the irori agent's conversation by the new
   `ConversationSummary.handedBy`; a CLI's own sub-agent is recognised from its
-  tool call (`Task`/`Agent`, Codex `spawnAgent`, OpenCode `task`, Pi's
-  `subagent`, Hermes Agent `delegate_task`) and ends with its result or its run.
+  tool call (`Task`/`Agent`, Codex `subAgentActivity` or `spawnAgent`,
+  Antigravity `invoke_subagent`, OpenCode `task`, Pi's `subagent`, Hermes Agent
+  `delegate_task`) and ends as each CLI reports it, or with its run. The
+  Antigravity adapter now passes on the `subagent` step it used to drop.
+- Real runs, 2026-11-20: Claude Code 2.1.316, Codex 0.166.0 and Antigravity CLI
+  1.5.12 each started a sub-agent in the app, and its card worked and ended.
 - `useSessionBoard` reads the workspace owners' lists when a run begins or ends
   and follows events between reads; `SessionBoard` is the first pane of the
   dock and of irori mode. Window item `sessions`, on by default. Sub-session

@@ -119,6 +119,16 @@ export async function runAntigravity(ctx: NativeContext) {
           result: step.state !== 'ACTIVE' || undefined,
         });
       }
+      // A `subagent` step launches the sub-agents it names (`invoke_subagent`,
+      // 1.5.12); it carries no `tool_info`. It shows as a call; the hooks guard
+      // above never applied to it and still does not.
+      const launched = record(step.subagent_info);
+      if (step.step_type === 'subagent' && launched)
+        ctx.event('tool', String(step.tool_name ?? 'invoke_subagent'), {
+          details: JSON.stringify(launched),
+          call: typeof step.step_index === 'number' ? `step-${step.step_index}` : undefined,
+          result: step.state !== 'ACTIVE' || undefined,
+        });
     }
     const final = record(event.result);
     if (event.event === 'result' && final) {

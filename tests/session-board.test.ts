@@ -5,7 +5,6 @@ import {
   foldSession,
   liveFromConversation,
   sessionBoard,
-  subAgentStart,
   type SessionLive,
   type SessionRow,
 } from '../src/domain/session-board';
@@ -37,61 +36,160 @@ const row = (id: string, overrides: Partial<SessionRow> = {}): SessionRow => ({
   ...overrides,
 });
 
+const subs = (events: AgentEvent[]) =>
+  fold(events).subAgents.map((agent) => [agent.call, agent.label, agent.kind, agent.state]);
+
 test('Each CLI’s own sub-agent tool starts a sub-agent; other calls do not', () => {
-  const claude = subAgentStart(
-    event({
-      type: 'tool',
-      text: 'Task',
-      call: 'toolu_1',
-      details: JSON.stringify({
-        description: 'Survey the notes',
-        prompt: 'Read every note\nand list them',
-        subagent_type: 'Explore',
-      }),
-    }),
-  );
-  assert.deepEqual(claude, { call: 'toolu_1', label: 'Survey the notes', kind: 'Explore' });
-  const codex = subAgentStart(
-    event({
-      type: 'tool',
-      text: 'collabAgentToolCall',
-      call: 'spawn-1',
-      details: JSON.stringify({
-        type: 'collabAgentToolCall',
-        tool: 'spawnAgent',
-        prompt: 'Check links',
-      }),
-    }),
-  );
-  assert.deepEqual(codex, { call: 'spawn-1', label: 'Check links' });
-  // Codex's other collaboration calls wait for or talk to a sub-agent; they start none.
-  assert.equal(
-    subAgentStart(
-      event({
-        type: 'tool',
-        text: 'collabAgentToolCall',
-        call: 'wait-1',
-        details: JSON.stringify({ tool: 'wait' }),
-      }),
-    ),
-    undefined,
-  );
-  assert.equal(subAgentStart(event({ type: 'tool', text: 'Read', call: 'r' })), undefined);
-  // A result, or a hand-off's step followed in the irori agent's log, is not a start.
-  assert.equal(
-    subAgentStart(event({ type: 'tool', text: 'Task', call: 'toolu_1', result: true })),
-    undefined,
-  );
-  assert.equal(
-    subAgentStart(
+  // Claude Code 2.1.316 (`Agent`; `Task` before): the call's result ends it.
+  assert.deepEqual(
+    subs([
       event({
         type: 'tool',
         text: 'Task',
-        call: 'toolu_2',
+        call: 'toolu_1',
+        details: JSON.stringify({
+          description: 'Survey the notes',
+          prompt: 'Read every note\nand list them',
+          subagent_type: 'Explore',
+        }),
+      }),
+    ]),
+    [['toolu_1', 'Survey the notes', 'Explore', 'working']],
+  );
+  const agent = event({
+    type: 'tool',
+    text: 'Agent',
+    call: 'toolu_2',
+    details: JSON.stringify({ description: 'Read note.md answer', prompt: 'Read the file' }),
+  });
+  // Its own steps show in the parent's log, as the parent's steps.
+  const step = event({
+    type: 'tool',
+    text: 'Read',
+    call: 'toolu_3',
+    details: '{"file_path":"n.md"}',
+  });
+  const back = event({
+    type: 'tool',
+    text: 'Agent の結果',
+    call: 'toolu_2',
+    result: true,
+    details: '[]',
+  });
+  assert.deepEqual(subs([agent, step]), [['toolu_2', 'Read note.md answer', undefined, 'working']]);
+  assert.deepEqual(subs([agent, step, back]), [
+    ['toolu_2', 'Read note.md answer', undefined, 'done'],
+  ]);
+  assert.equal(fold([agent, step]).step, 'Read · n.md');
+  // Other calls start none, nor does a result or a hand-off's step in the irori agent's log.
+  assert.deepEqual(subs([event({ type: 'tool', text: 'Read', call: 'r' })]), []);
+  assert.deepEqual(subs([event({ type: 'tool', text: 'Task', call: 't', result: true })]), []);
+  assert.deepEqual(
+    subs([
+      event({
+        type: 'tool',
+        text: 'Task',
+        call: 'toolu_4',
         delegate: { scopeId: 'v', task: 't', state: 'working' },
       }),
+    ]),
+    [],
+  );
+});
+
+test('Codex’s sub-agent works from its started activity until its completed one', () => {
+  // As codex 0.166 reports it: each activity is an item complete as it starts.
+  const activity = (id: string, kind: string, result = false) =>
+    event({
+      type: 'tool',
+      text: result ? 'subAgentActivity の結果' : 'subAgentActivity',
+      call: id,
+      result: result || undefined,
+      details: JSON.stringify({
+        type: 'subAgentActivity',
+        id,
+        kind,
+        agentThreadId: 'thread-1',
+        agentPath: '/root/read_note',
+      }),
+    });
+  const wait = (result: boolean) =>
+    event({
+      type: 'tool',
+      text: result ? 'collabAgentToolCall の結果' : 'collabAgentToolCall',
+      call: 'wait-1',
+      result: result || undefined,
+      details: JSON.stringify({ type: 'collabAgentToolCall', tool: 'wait', agentsStates: {} }),
+    });
+  const started = [activity('call-1', 'started'), activity('call-1', 'started', true), wait(false)];
+  assert.deepEqual(subs(started), [['codex:thread-1', 'read note', undefined, 'working']]);
+  assert.equal(fold(started).step, 'read note');
+  const done = [
+    ...started,
+    activity('done-1', 'completed'),
+    activity('done-1', 'completed', true),
+    wait(true),
+  ];
+  assert.deepEqual(subs(done), [['codex:thread-1', 'read note', undefined, 'done']]);
+  assert.deepEqual(subs([...started, activity('stop-1', 'interrupted')]), [
+    ['codex:thread-1', 'read note', undefined, 'stopped'],
+  ]);
+
+  // The earlier protocol: `spawnAgent` returns once the thread began, and a later
+  // call's states say it ended. A spawn and its activity are one sub-agent.
+  const collab = (call: string, value: Record<string, unknown>, result = false) =>
+    event({
+      type: 'tool',
+      text: 'collabAgentToolCall',
+      call,
+      result: result || undefined,
+      details: JSON.stringify({ type: 'collabAgentToolCall', ...value }),
+    });
+  const spawned = [
+    collab('spawn-1', { tool: 'spawnAgent', prompt: 'Check links', model: 'gpt-mini' }),
+    collab(
+      'spawn-1',
+      { tool: 'spawnAgent', status: 'completed', receiverThreadIds: ['thread-1'] },
+      true,
     ),
-    undefined,
+    activity('call-1', 'started'),
+  ];
+  assert.deepEqual(subs(spawned), [['codex:thread-1', 'Check links', 'gpt-mini', 'working']]);
+  assert.deepEqual(
+    subs([
+      ...spawned,
+      collab('wait-2', { tool: 'wait', agentsStates: { 'thread-1': { status: 'errored' } } }, true),
+    ]),
+    [['codex:thread-1', 'Check links', 'gpt-mini', 'failed']],
+  );
+  assert.deepEqual(subs([collab('wait-3', { tool: 'wait' })]), []);
+});
+
+test('Antigravity’s launched sub-agents work until their run ends', () => {
+  // As agy 1.5.12 reports `invoke_subagent`: done once launched.
+  const launch = (result: boolean) =>
+    event({
+      type: 'tool',
+      text: 'invoke_subagent',
+      call: 'step-2',
+      result: result || undefined,
+      details: JSON.stringify({
+        subagents: [
+          { type_name: 'research', role: 'Note Reader', initial_prompt: 'Read note.md' },
+          { type_name: 'general', initial_prompt: 'Check the links\nand report' },
+        ],
+      }),
+    });
+  const launched = [launch(false), launch(true)];
+  assert.deepEqual(subs(launched), [
+    ['antigravity:step-2#0', 'Note Reader', 'research', 'working'],
+    ['antigravity:step-2#1', 'Check the links', 'general', 'working'],
+  ]);
+  assert.deepEqual(
+    subs([...launched, event({ type: 'done', text: '完了', outcome: 'completed' })]).map(
+      (s) => s[3],
+    ),
+    ['done', 'done'],
   );
 });
 

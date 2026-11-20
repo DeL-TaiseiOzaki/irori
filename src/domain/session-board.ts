@@ -41,7 +41,10 @@ export interface SessionLive {
   subAgents: SubAgent[];
 }
 
-/** The tools that start a CLI's own sub-agent, by the name each CLI reports. */
+/**
+ * The tools that start a CLI's own sub-agent and return when it finished, by the
+ * name each CLI reports. The call's result ends the sub-agent.
+ */
 const subAgentTools = new Set([
   // Claude Code
   'Task',
@@ -53,8 +56,30 @@ const subAgentTools = new Set([
   // Hermes Agent
   'delegate_task',
 ]);
-/** Codex reports a sub-agent as a collaboration item whose tool spawns it. */
+/**
+ * Codex reports a sub-agent it started as a `subAgentActivity` item (0.166):
+ * `started`, then `completed` or `interrupted` as an item of its own, both for
+ * the sub-agent's thread. An earlier protocol reports a `collabAgentToolCall`
+ * whose `spawnAgent` returns once the sub-agent began; its result names the
+ * thread, and a later call's `agentsStates` says when that thread ended.
+ */
+const codexActivity = 'subAgentActivity';
 const codexCollab = 'collabAgentToolCall';
+const codexThread = (thread: string) => `codex:${thread}`;
+const codexEnd: Record<string, SubAgent['state'] | undefined> = {
+  completed: 'done',
+  shutdown: 'done',
+  interrupted: 'stopped',
+  notFound: 'stopped',
+  errored: 'failed',
+};
+/**
+ * Antigravity's `invoke_subagent` step names the sub-agents it launches
+ * (`subagents`: `type_name`, `role`, `initial_prompt`) and is done once they
+ * were launched (1.5.12): what they report comes back later as a message of the
+ * conversation, naming none of them. They are working until their run ends.
+ */
+const antigravityTool = 'invoke_subagent';
 
 function firstLine(value: unknown, limit = 120) {
   if (typeof value !== 'string') return undefined;
@@ -81,15 +106,101 @@ function inputOf(details?: string): Record<string, unknown> {
   }
   return {};
 }
+const objects = (value: unknown) =>
+  Array.isArray(value)
+    ? value.filter(
+        (item): item is Record<string, unknown> =>
+          !!item && typeof item === 'object' && !Array.isArray(item),
+      )
+    : [];
 
-/** The sub-agent a tool call starts, or undefined for any other call. */
-export function subAgentStart(event: AgentEvent): Omit<SubAgent, 'state'> | undefined {
+/** Adds a sub-agent unless one with its call is there already. */
+function add(agents: SubAgent[], agent: Omit<SubAgent, 'state'>): SubAgent[] {
+  return agents.some((item) => item.call === agent.call)
+    ? agents
+    : [...agents, { ...agent, state: 'working' }];
+}
+/** Ends a working sub-agent. */
+function end(agents: SubAgent[], call: string, state: SubAgent['state']): SubAgent[] {
+  return agents.some((agent) => agent.call === call && agent.state === 'working')
+    ? agents.map((agent) =>
+        agent.call === call && agent.state === 'working' ? { ...agent, state } : agent,
+      )
+    : agents;
+}
+
+/**
+ * A run's sub-agents after one more of its tool events, or undefined when the
+ * event says nothing of a sub-agent and is an ordinary step.
+ */
+export function foldSubAgents(agents: SubAgent[], event: AgentEvent): SubAgent[] | undefined {
   // A hand-off's steps, shown in the irori agent's log, belong to the vault's own conversation.
-  if (event.type !== 'tool' || event.result || !event.call || event.delegate) return undefined;
+  if (event.type !== 'tool' || event.delegate) return undefined;
   const input = inputOf(event.details);
-  if (event.text === codexCollab) {
-    if (input.tool !== 'spawnAgent') return undefined;
-  } else if (!subAgentTools.has(event.text)) return undefined;
+  if (input.type === codexActivity) {
+    const thread = typeof input.agentThreadId === 'string' ? input.agentThreadId : undefined;
+    // An activity item is complete as it starts; its result says nothing more.
+    if (!thread || event.result) return agents;
+    const call = codexThread(thread);
+    if (input.kind === 'started') {
+      const name = typeof input.agentPath === 'string' ? input.agentPath.split('/').pop() : '';
+      return add(agents, { call, label: (name ?? '').replace(/_/g, ' ') });
+    }
+    const state = codexEnd[String(input.kind)];
+    return state ? end(agents, call, state) : agents;
+  }
+  if (input.type === codexCollab) {
+    if (!event.result) {
+      if (input.tool !== 'spawnAgent' || !event.call) return agents;
+      return add(agents, {
+        call: event.call,
+        label: firstLine(input.prompt) ?? '',
+        ...(firstLine(input.model) && { kind: firstLine(input.model) }),
+      });
+    }
+    let next = agents;
+    if (input.tool === 'spawnAgent' && event.call) {
+      const thread = (Array.isArray(input.receiverThreadIds) ? input.receiverThreadIds : []).find(
+        (id): id is string => typeof id === 'string',
+      );
+      if (input.status === 'failed') next = end(next, event.call, 'failed');
+      else if (thread)
+        next = next.some((agent) => agent.call === codexThread(thread))
+          ? next.filter((agent) => agent.call !== event.call)
+          : next.map((agent) =>
+              agent.call === event.call ? { ...agent, call: codexThread(thread) } : agent,
+            );
+    }
+    const states = input.agentsStates;
+    if (states && typeof states === 'object')
+      for (const [thread, value] of Object.entries(states)) {
+        const state = codexEnd[String((value as { status?: unknown } | null)?.status)];
+        if (state) next = end(next, codexThread(thread), state);
+      }
+    return next;
+  }
+  if (event.text === antigravityTool) {
+    if (event.result || !event.call) return agents;
+    let next = agents;
+    objects(input.subagents).forEach((agent, index) => {
+      const kind = firstLine(agent.type_name);
+      next = add(next, {
+        call: `antigravity:${event.call}#${index}`,
+        label: firstLine(agent.role) ?? firstLine(agent.initial_prompt) ?? kind ?? '',
+        ...(kind && { kind }),
+      });
+    });
+    return next;
+  }
+  if (event.result) {
+    if (!event.call || !agents.some((agent) => agent.call === event.call)) return undefined;
+    return end(
+      agents,
+      event.call,
+      input.status === 'failed' || input.is_error === true ? 'failed' : 'done',
+    );
+  }
+  if (!event.call || !subAgentTools.has(event.text)) return undefined;
   const kind =
     firstLine(input.subagent_type) ?? firstLine(input.agent_type) ?? firstLine(input.agent);
   const label =
@@ -99,13 +210,7 @@ export function subAgentStart(event: AgentEvent): Omit<SubAgent, 'state'> | unde
     firstLine(input.goal) ??
     kind ??
     '';
-  return { call: event.call, label, ...(kind && { kind }) };
-}
-
-/** Whether a tool's result reports a failure: Codex's item status, or an error flag. */
-function failed(details?: string) {
-  const input = inputOf(details);
-  return input.status === 'failed' || input.is_error === true;
+  return add(agents, { call: event.call, label, ...(kind && { kind }) });
 }
 
 const replyLimit = 240;
@@ -163,22 +268,17 @@ export function foldSession(
   // The irori agent's log follows a hand-off's steps; the vault's own card shows them.
   if (event.delegate) return running;
   if (event.type === 'tool') {
-    const started = subAgentStart(event);
-    if (started)
-      return {
-        ...running,
-        step: started.label || event.text,
-        subAgents: [...running.subAgents, { ...started, state: 'working' }],
-      };
-    if (event.result && event.call) {
-      const at = running.subAgents.findIndex((agent) => agent.call === event.call);
-      if (at >= 0) {
-        const subAgents = running.subAgents.slice();
-        subAgents[at] = { ...subAgents[at], state: failed(event.details) ? 'failed' : 'done' };
-        return { ...running, subAgents };
-      }
-      return running;
+    const subAgents = foldSubAgents(running.subAgents, event);
+    if (subAgents) {
+      if (subAgents === running.subAgents) return running;
+      // A sub-agent that began is the run's step; the newest one names it.
+      const started = subAgents.filter(
+        (agent) => !running.subAgents.some((item) => item.call === agent.call),
+      );
+      const last = started[started.length - 1];
+      return { ...running, subAgents, ...(last && { step: last.label || event.text }) };
     }
+    if (event.result) return running;
     const target = eventTarget(event.details);
     return { ...running, step: target ? `${event.text} · ${target}` : event.text };
   }

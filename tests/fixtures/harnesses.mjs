@@ -652,6 +652,19 @@ async function antigravity(log) {
     result({ status: 'ERROR', response: '', error: 'Fixture provider error' });
     process.exit(3);
   }
+  if (prompt.includes('subagent')) {
+    // As 1.5.12 launches one: the step is done once launched, carries no `tool_info`,
+    // and the sub-agent's report comes back as a system message naming no one.
+    const sub = { type_name: 'research', role: 'Note Reader', initial_prompt: 'Read note.md' };
+    const launch = { state: 'ACTIVE', step_type: 'subagent', tool_name: 'invoke_subagent' };
+    step(2, { ...launch, subagent_info: { subagents: [sub] } });
+    step(2, {
+      ...launch,
+      state: 'DONE',
+      subagent_info: { subagents: [{ ...sub, conversation_id: 'sub-conversation' }] },
+    });
+    step(4, { state: 'DONE', step_type: 'system_message' });
+  }
   const text = '日本語\u2028の応答';
   if (prompt.includes('denied')) {
     step(2, {

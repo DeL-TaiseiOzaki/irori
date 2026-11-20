@@ -43,6 +43,12 @@ records are `init` (`conversation_id`), `step_update` (`conversation_id`,
 `step_index`, `state`, `step_type`; `text_delta` on an `agent_response`,
 `tool_info` on a `tool`) and one `result` (`status`, `response`, `error`,
 `denied_actions`). A step of another conversation (a sub-agent's) is not shown.
+A `subagent` step (`tool_name: invoke_subagent`, no `tool_info`) names the
+sub-agents it launches in `subagent_info.subagents` (`type_name`, `role`,
+`initial_prompt`; `conversation_id` once launched). It is `DONE` once they were
+launched; their report comes back later as a `system_message` step naming none
+of them (1.5.12, seen live on 2026-11-20). irori shows the step as a call and
+the session board keeps those sub-agents working until the run ends.
 `denied_actions` become a status line naming what was left undone. A `result`
 whose `status` is not `SUCCESS`, a non-zero exit or no `result` fails the run;
 without an earlier interactive sign-in the CLI ends at once and the panel says

@@ -53,9 +53,16 @@ rule. Its board is a separate drawer or window; the owner asked for a column.
    conversation. A CLI's own sub-agent — Claude Code's `Task` or `Agent`,
    Codex's `spawnAgent`, OpenCode's `task`, Pi's sub-agent extension and Hermes
    Agent's `delegate_task` — is a card with a dashed frame, named by its
-   description and kind, working until its call returns or its run ends; it
-   opens its parent's conversation. A hand-off that shows brings its parent's
-   card with it.
+   description and kind; it opens its parent's conversation. Each CLI says when
+   one ended in its own way: Claude Code's, OpenCode's, Pi's and Hermes Agent's
+   call returns with it; Codex 0.166 reports `subAgentActivity` items for the
+   sub-agent's thread, `started` and then `completed` or `interrupted` (an
+   earlier protocol's `spawnAgent` returns at once, and a later call's
+   `agentsStates` ends the thread); Antigravity's `invoke_subagent` returns once
+   it launched, with no later word naming it, so its sub-agents work until the
+   run ends. Any still working when the run ends end with it. A hand-off that
+   shows brings its parent's card with it. Once a conversation ended and the
+   person looked at it, its sub-agents fold away with its run.
 6. **Colour.** States keep ADR 053's roles: attention for waiting, danger for a
    failure, running neutral and told by motion, an ended run uncoloured. The
    sub-session frame is the Identity role's `--schema` colour: a folder's
@@ -80,7 +87,14 @@ rule. Its board is a separate drawer or window; the owner asked for a column.
 - `scripts/session-board-ui-smoke.ts` runs two Pi fixture conversations side by
   side: the cards' lanes as runs start, end and ask, a sub-agent's dashed card,
   a card opening its conversation, and the window item. The Pi fixture starts a
-  sub-agent through the extension's tool when a request says `subagent`.
+  sub-agent through the extension's tool when a request says `subagent`, and the
+  Antigravity fixture launches one as 1.5.12 does.
+- On 2026-11-20 real Claude Code 2.1.316 (`Agent`), Codex 0.166.0
+  (`subAgentActivity`) and Antigravity CLI 1.5.12 (`invoke_subagent`) runs each
+  started a sub-agent in the app: its dashed card showed while it worked, and in
+  完了 as done when the run ended out of sight. Codex's and Antigravity's
+  sub-agents were not recognised before that run: Codex no longer reported
+  `spawnAgent`, and irori's Antigravity adapter dropped the `subagent` step.
 - The window items count nine, four on for a new device.
 
 ## Later
