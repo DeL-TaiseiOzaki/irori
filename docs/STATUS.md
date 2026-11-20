@@ -24,8 +24,30 @@ work of sub-agents and sub-sessions as cards framed in another colour.
   `explorer-ui-smoke` (system trash), `ssh-config` and one `remote-hosts` test
   (SSH key permissions), which fail the same way on `main` on that machine.
   `your-ai` and `routines` smokes caught the board taking a share of a widened
-  side; the board now keeps its pixel width. No real CLI ran; macOS and Windows
-  not tried.
+  side; the board now keeps its pixel width. macOS and Windows not tried.
+  Merged after 0.2.87 (#361), so it takes 0.2.88.
+
+Reading files in irori mode, 2026-11-20 (**0.2.87**,
+[#361](https://github.com/DeL-TaiseiOzaki/irori/pull/361), published as `v0.2.87-preview.1`;
+[ADR 068](decisions/068-reading-files-in-irori-mode.md)): the owner asked to read
+files in irori mode while going on working there.
+- `VaultFiles` is irori mode's third layout, **ファイル**: a vault's trees
+  (`VaultSections`, shared with the vault beside) and the file read through
+  `StagePreview`, whose `target` brings a line or hit into view once.
+- `openPath` and the search's `onOpen` read a vault's file there while irori mode
+  or the routines page is on show (`readInIrori`); `openInVault` keeps the old
+  path for the vault, and **vault で編集** uses it. `TabPlace.overviewFile` keeps
+  the file with the tab.
+- Verified by `npm run build` and `npm test`. `overview-ui-smoke` and
+  `your-ai-ui-smoke` were updated for the new behavior but could not run on the
+  development machine (no display server; Electron lacks `libgbm`); the pull
+  request's CI run `44665167189` ran them and the whole `test:ui`, and passed.
+- `publish.yml` published
+  [v0.2.87-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.87-preview.1)
+  from `abd4b68` (the pull request's run `44665167189`, then publish run `44669965453`).
+  Anonymous downloads matched `SHA256SUMS.txt`: Windows 179,417,088 bytes, Mac
+  145,733,890 bytes and `irori-0.2.87-full.nupkg` 178,587,685 bytes; the live
+  page links the 0.2.87 installers.
 
 The Schema checked on real CLIs, 2026-11-19 (**0.2.86**,
 [#359](https://github.com/DeL-TaiseiOzaki/irori/pull/359), published as `v0.2.86-preview.1`;

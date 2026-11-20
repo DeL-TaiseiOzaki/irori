@@ -47,6 +47,7 @@ import {
   type Explorer,
 } from './EntryActions';
 import { lineTarget, type SearchTarget } from '../editor/search-navigation';
+import type { PreviewTarget } from './StagePreview';
 import type { PathTarget } from '../domain/path-links';
 import type { PathOpener } from './path-links';
 import type { NoteAuthorship, SourceRef } from '../domain/knowledge';
@@ -216,6 +217,7 @@ import { Settings } from './Settings';
 import { SchemaDialog } from './SchemaDialog';
 import { sharedSchemaId } from '../domain/you';
 import { Overview, type OverviewView } from './Overview';
+import { VaultFiles, type OverviewFile } from './VaultFiles';
 import { YourAiScreen } from './YourAiScreen';
 import { StatusBar } from './StatusBar';
 import { TerminalDrawer } from './TerminalDrawer';
@@ -688,6 +690,9 @@ function App() {
     setLevel(next);
   }
   const [overviewView, setOverviewView] = useState<OverviewView>('map');
+  // The file irori mode's files view shows (ADR 068); each place to look at counts up.
+  const [overviewFile, setOverviewFile] = useState<OverviewFile>();
+  const fileTargets = useRef(0);
   const [trashOpen, setTrashOpen] = useState(false);
   const [searchTarget, setSearchTarget] = useState<Navigation>();
   const [searchNotice, setSearchNotice] = useState('');
@@ -1951,6 +1956,7 @@ function App() {
     overviewView,
     scopeId: active?.scopeId,
     side: sideSpace?.scopeId,
+    overviewFile: overviewFile && { scopeId: overviewFile.scopeId, path: overviewFile.path },
   });
   /**
    * Brings a tab on show where it was left: the tab `key` names, or else the workspace's
@@ -1979,6 +1985,7 @@ function App() {
     levelNow.current = left?.level ?? 'brain';
     setLevel(left?.level ?? 'brain');
     setOverviewView(left?.overviewView ?? 'map');
+    setOverviewFile(left?.overviewFile);
     setView('note');
     setSide(left?.side);
     setActive(shown);
@@ -2395,6 +2402,41 @@ function App() {
     if (!workspaceSpaces.length) return;
     goToLevel('overview');
   }
+  /**
+   * Shows a file in irori mode's files view (ADR 068), so the irori agent's columns
+   * stay in view while it is read. From the routines page, irori mode comes back.
+   */
+  function readInIrori(scopeId: string, path: string, at?: Omit<PreviewTarget, 'n'>) {
+    fileTargets.current += 1;
+    setOverviewFile({ scopeId, path, target: at && { ...at, n: fileTargets.current } });
+    setOverviewView('files');
+    goToLevel('overview');
+  }
+  /** A row chosen in the files view's trees: read here, or opened in its application. */
+  function openInIrori(space: Space, entry: Entry) {
+    if (entry.blocked) setStatus(entry.blocked);
+    else if (!opensInIrori(entry.path))
+      void host.openExternal(space.scopeId, entry.path).catch(report);
+    else readInIrori(space.scopeId, entry.path);
+  }
+  /** Opens a file in its vault, at the place it names: the files view's **vault で編集**, or a path. */
+  function openInVault(scopeId: string, path: string, at?: Omit<PreviewTarget, 'n'>) {
+    const space = workspaceSpaces.find((item) => item.scopeId === scopeId);
+    if (!space) return;
+    const rich = /\.md$/i.test(path);
+    void open(
+      space,
+      fileEntry(path, classify(space, path)),
+      at
+        ? (doc) => {
+            if (at.search) return at.search;
+            const found = lineTarget(doc.text, at.line, rich);
+            return found && { ...found, pointed: true };
+          }
+        : undefined,
+      'reveal',
+    );
+  }
   // The rail, the brain panel, the status bar and the dock's columns are memoised, so
   // a keystroke in the editor re-renders none of them. They take their actions under
   // identities that never change; each still does what the latest render's would.
@@ -2464,21 +2506,24 @@ function App() {
         goToLevel('you');
         return;
       }
-      const space = workspaceSpaces.find((item) => item.scopeId === target.scopeId);
-      if (!space) return;
-      const rich = /\.md$/i.test(target.path);
-      void open(
-        space,
-        fileEntry(target.path, classify(space, target.path)),
-        target.line
-          ? (doc) => {
-              const at = lineTarget(doc.text, target.line!, rich);
-              return at && { ...at, pointed: true };
-            }
-          : undefined,
-        'reveal',
-      );
+      if (!workspaceSpaces.some((item) => item.scopeId === target.scopeId)) return;
+      const at = target.line ? { line: target.line } : undefined;
+      // From irori mode a file is read beside the columns; elsewhere it opens in its vault.
+      if (
+        (levelNow.current === 'overview' || levelNow.current === 'routines') &&
+        opensInIrori(target.path)
+      )
+        readInIrori(target.scopeId, target.path, at);
+      else openInVault(target.scopeId, target.path, at);
     },
+    openInIrori,
+    closeOverviewFile: () => setOverviewFile(undefined),
+    editOverviewFile: (file: OverviewFile) =>
+      openInVault(
+        file.scopeId,
+        file.path,
+        file.target && { line: file.target.line, search: file.target.search },
+      ),
     refreshBrain: () => bump(active?.scopeId),
     showHome: () => setView('home'),
     openDaily,
@@ -3482,6 +3527,17 @@ function App() {
               yourColumnCount={yourColumns.length}
               yourBoard={boardShown ? { width: boardWidth, minimum: boardMinimum } : undefined}
               yourWatched={yourWatched}
+              files={
+                <VaultFiles
+                  spaces={workspaceSpaces}
+                  file={overviewFile}
+                  revisions={revisions}
+                  onOpen={act.openInIrori}
+                  onEdit={act.editOverviewFile}
+                  onClose={act.closeOverviewFile}
+                  onError={report}
+                />
+              }
               onAskYou={(text) => setYourSeed((seed) => ({ text, key: (seed?.key ?? 0) + 1 }))}
               onShowConversation={(scopeId, id, next) =>
                 void showOwnerConversation(scopeId, id, next).catch(report)
@@ -4545,6 +4601,15 @@ function App() {
               throw Error(
                 t('この KB はワークスペースにありません。', "This KB isn't in the workspace."),
               );
+            // A search from irori mode reads the hit beside the columns (ADR 068).
+            if (levelNow.current === 'overview' || levelNow.current === 'routines') {
+              readInIrori(scopeId, hit.path, {
+                line: hit.line,
+                search: { query, line: hit.line, preview: hit.preview },
+              });
+              setSearchOpen(false);
+              return;
+            }
             const opened = await open(target, fileEntry(hit.path, 'Knowledge_Base'), {
               query,
               line: hit.line,

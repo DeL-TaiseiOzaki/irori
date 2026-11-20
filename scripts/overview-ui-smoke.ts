@@ -265,7 +265,7 @@ try {
   await expect(map).toHaveCount(0);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
 
-  // A result found from the Overview opens in its own brain.
+  // A result found from irori mode is read there, beside the agents (ADR 068).
   await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
   await page.getByRole('button', { name: /^vault を検索/ }).click();
   const palette = page.getByRole('dialog', { name: 'KB内を検索' });
@@ -279,10 +279,51 @@ try {
   await found.getByRole('button').first().click();
   await expect(palette).toHaveCount(0);
   await expect(map).toHaveCount(0);
-  await expect(page.locator('.brain-names strong')).toHaveText('Research');
+  const views = page.getByRole('group', { name: 'irori mode の表示' });
+  await expect(views.getByRole('button', { name: 'ファイル', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  const reading = page.getByRole('region', { name: 'ファイル', exact: true });
+  await expect(reading.locator('.ProseMirror')).toContainText('lantern');
+  await expect(reading.locator('.crumbs')).toContainText('Research note');
+  await expect(reading).toContainText('閲覧のみ');
+  await expect(reading.locator('[contenteditable="true"]')).toHaveCount(0);
+  // The agents stay beside it, and the vault's trees mark the file.
+  await expect(page.locator('.overview-ai-pane')).toBeVisible();
+  const researchFiles = page.getByRole('region', { name: 'Research のファイル' });
+  await expect(
+    researchFiles.locator('[data-entry="Knowledge_Base/Research note.md"]'),
+  ).toHaveAttribute('aria-current', 'page');
+  // What changes on disk, as an agent's edit does, shows without opening the file again.
+  await writeFile(
+    path.join(roots[1], 'Knowledge_Base', 'Research note.md'),
+    '# Research\n\nlantern\n\nA line an agent added.\n',
+  );
+  await expect(reading.locator('.ProseMirror')).toContainText('A line an agent added.');
+  // Another vault's trees, and a file chosen in them.
+  await page.getByRole('button', { name: '表示中の vault: Research' }).click();
+  await page.getByRole('menuitem', { name: 'Product' }).click();
+  const productFiles = page.getByRole('region', { name: 'Product のファイル' });
+  await productFiles.locator('[data-entry="Knowledge_Base/Product note.md"]').click();
+  await expect(reading.locator('.crumbs')).toContainText('Product note');
+  await page.screenshot({ path: 'test-results/irori-overview-files.png' });
+  // The view is kept while irori mode is left and comes back.
+  await rail.getByRole('button', { name: /^Research・AI/ }).click();
+  await expect(page.locator('.overview')).toHaveCount(0);
+  await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
+  await expect(reading.locator('.crumbs')).toContainText('Product note');
+  // Closing the file leaves the trees; editing opens it in its vault.
+  await reading.getByRole('button', { name: 'ファイルを閉じる' }).click();
+  await expect(reading).toContainText('ファイルを選ぶと、ここで読めます。');
+  await productFiles.locator('[data-entry="Knowledge_Base/Product note.md"]').click();
+  await reading.getByRole('button', { name: 'vault で編集' }).click();
+  await expect(page.locator('.overview')).toHaveCount(0);
+  await expect(page.locator('.brain-names strong')).toHaveText('Product');
+  await expect(page.locator('.stage .ProseMirror')).toContainText('lantern');
   expect(errors).toEqual([]);
   console.log(
-    'Overview UI passed: two brains running at once, switching during a run, a request answered after a switch and from the Overview, a background queue, stop/resume, sending and queueing from the Overview, map and columns, all-brains search opening in its brain. Protocol fixture only.',
+    'Overview UI passed: two brains running at once, switching during a run, a request answered after a switch and from the Overview, a background queue, stop/resume, sending and queueing from the Overview, map and columns, all-brains search read in the irori mode files view, its trees and editing in the vault. Protocol fixture only.',
   );
 } finally {
   // A run left by a failure would hold the window open behind a confirmation.

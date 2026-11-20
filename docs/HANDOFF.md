@@ -8,8 +8,14 @@
 2. Not covered: a sub-agent's own steps, moving cards by hand, the board in its
    own window, keeping what was looked at across restarts. A vault on an SSH
    host whose list cannot be read keeps its last cards silently.
-3. 0.2.87 is taken by the open irori-mode files pull request (#361, ADR 068);
-   whichever merges second advances past the other's published version.
+
+**Reading files in irori mode, 0.2.87**
+([ADR 068](decisions/068-reading-files-in-irori-mode.md)). Next:
+Published as `v0.2.87-preview.1`; its UI smokes passed in CI only, on Linux.
+1. Try it on the owner's Windows 11 and Mac: a reply's path and a search hit
+   opening in the files view, and **vault で編集**.
+2. Not covered: the irori agent's own folder in the files view, find (Ctrl+F)
+   and comments there, more than one file at a time.
 
 **A tab's right click, and one workspace in several tabs, 0.2.85**
 ([ADR 067](decisions/067-tab-menu-and-duplicate-tabs.md)). Tabs are known by a key

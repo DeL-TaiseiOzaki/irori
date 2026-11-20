@@ -744,6 +744,7 @@ export function Overview({
   yourColumnCount,
   yourBoard,
   yourWatched,
+  files,
   onAskYou,
   onShowConversation,
   routineChoices,
@@ -781,6 +782,8 @@ export function Overview({
   yourBoard?: { width: number; minimum: number };
   /** The irori agent's conversations the map follows: those on show and those running. */
   yourWatched: string[];
+  /** The files view: a vault's trees and the file read beside the columns (ADR 068). */
+  files: ReactNode;
   /** Puts words in the irori agent's first column, for the person to finish. */
   onAskYou: (text: string) => void;
   /** Shows one of an owner's conversations in its panel; `null` lets the host pick. */
@@ -924,6 +927,15 @@ export function Overview({
                       </>
                     ),
                   },
+                  {
+                    value: 'files',
+                    label: (
+                      <>
+                        <Icon name="folderOpen" size={14} />
+                        <span className="overview-label">{t('ファイル', 'Files')}</span>
+                      </>
+                    ),
+                  },
                 ]}
               />
             )}
@@ -1010,6 +1022,8 @@ export function Overview({
                 {t('このワークスペースに vault がありません。', 'This workspace has no vault yet.')}
               </p>
             </div>
+          ) : view === 'files' ? (
+            files
           ) : view === 'map' ? (
             <OverviewMap
               spaces={spaces}
