@@ -1,6 +1,7 @@
 # Implementation status — notes, native agents and connection onboarding
 
-The Schema checked on real CLIs, 2026-11-19 (**0.2.86**, pull request open;
+The Schema checked on real CLIs, 2026-11-19 (**0.2.86**,
+[#359](https://github.com/DeL-TaiseiOzaki/irori/pull/359), published as `v0.2.86-preview.1`;
 [ADR 058](decisions/058-every-schema-setting-reaches-every-cli.md) revised): the
 owner asked to confirm that the shared and vault Schemas, skills and rules reach
 each CLI agent, through irori's own launch paths, including knowledge folders'
@@ -22,6 +23,11 @@ AGENTS.md.
   Code stand-in now behaves as 2.1.316, and its case fails without the change)
   and `npm run test:schema-reach claude codex antigravity`: all twelve checks on
   each. OpenCode, Pi and Hermes Agent not installed or run; Linux only.
+- `publish.yml` published
+  [v0.2.86-preview.1](https://github.com/DeL-TaiseiOzaki/irori/releases/tag/v0.2.86-preview.1)
+  from `2a09abe` (the pull request's run `44538178645`, then publish run `44646393498`).
+  Anonymous downloads matched `SHA256SUMS.txt`: Windows 179,418,112 bytes, Mac
+  145,731,365 bytes and `irori-0.2.86-full.nupkg` 178,588,307 bytes.
 
 A tab's right click, and one workspace in several tabs, 2026-11-19 (**0.2.85**,
 [#354](https://github.com/DeL-TaiseiOzaki/irori/pull/354), published as `v0.2.85-preview.1`;
