@@ -14,9 +14,8 @@ hollowed-out or broken paths, UI/CSS regressions, and duplicated core helpers.
   paths (`CloudRecovery.tsx`, `src/cloud/leftovers.ts`; [ADR 023](decisions/023-retire-drive-sign-in.md)
   amended); fixed `PageProperties` custom property input (replacing
   `window.prompt`), `FindScope` visibility and hidden conditions, `AgentColumn`
-  effect cleanup and `tabRevisions` refresh, `SchemaDialog` file open and remote
-  locking, targeted new-note scope, CSS selector specificity regressions, and
-  vault-host `$version` busy reporting (`host.running || host.waiting`); aligned
+  effect cleanup, `SchemaDialog` file open and remote locking, targeted new-note
+  scope, CSS selector specificity regressions, and vault-host `$version` busy reporting (`host.running || host.waiting`); aligned
   [ADR 050](decisions/050-vault-agents-and-their-sub-agents.md) and
   [ADR 058](decisions/058-every-schema-setting-reaches-every-cli.md) wording
   with current behavior.

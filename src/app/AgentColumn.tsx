@@ -492,15 +492,7 @@ export function AgentColumn({
       document.removeEventListener('visibilitychange', shown);
       flushPending.current = () => {};
     };
-  }, [
-    scopeId,
-    ready,
-    target?.id,
-    workspaceId,
-    shared.reload,
-    shared.tabRevisions[scopeId ?? ''],
-    retry,
-  ]);
+  }, [scopeId, ready, target?.id, workspaceId, shared.reload, retry]);
 
   /** Reads the queue again after a queued instruction started, leaving the log as it is. */
   async function refreshQueue() {
