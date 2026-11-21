@@ -80,7 +80,6 @@ test('Each CLI’s own sub-agent tool starts a sub-agent; other calls do not', (
   assert.deepEqual(subs([agent, step, back]), [
     ['toolu_2', 'Read note.md answer', undefined, 'done'],
   ]);
-  assert.equal(fold([agent, step]).step, 'Read · n.md');
   // Other calls start none, nor does a result or a hand-off's step in the irori agent's log.
   assert.deepEqual(subs([event({ type: 'tool', text: 'Read', call: 'r' })]), []);
   assert.deepEqual(subs([event({ type: 'tool', text: 'Task', call: 't', result: true })]), []);
@@ -123,7 +122,6 @@ test('Codex’s sub-agent works from its started activity until its completed on
     });
   const started = [activity('call-1', 'started'), activity('call-1', 'started', true), wait(false)];
   assert.deepEqual(subs(started), [['codex:thread-1', 'read note', undefined, 'working']]);
-  assert.equal(fold(started).step, 'read note');
   const done = [
     ...started,
     activity('done-1', 'completed'),
@@ -193,20 +191,26 @@ test('Antigravity’s launched sub-agents work until their run ends', () => {
   );
 });
 
-test('A run’s events give its step, its requests, its sub-agents and its end', () => {
+test('A run’s events give its request, its asks, its sub-agents and its end', () => {
   let live = fold([
-    event({ role: 'user', text: 'Tidy the notes\nplease' }),
+    event({ role: 'user', text: '  Tidy the notes\nplease  ' }),
     event({ type: 'tool', text: 'Read', details: JSON.stringify({ file_path: 'a.md' }) }),
   ]);
   assert.equal(live.runId, 'run');
-  assert.equal(live.prompt, 'Tidy the notes');
-  assert.equal(live.step, 'Read · a.md');
+  // The request is kept whole, for the card's panel; when it began, as seen here.
+  assert.equal(live.prompt, 'Tidy the notes\nplease');
+  assert.equal(live.startedAt, 1);
   live = fold(
     [
       event({ type: 'tool', text: 'Task', call: 'c1', details: '{"description":"One"}' }),
       event({ type: 'tool', text: 'Task', call: 'c2', details: '{"description":"Two"}' }),
       event({ type: 'tool', text: 'Task result', call: 'c1', result: true, details: 'ok' }),
-      event({ type: 'permission', text: 'Allow Bash?', requestId: 'r1' }),
+      event({
+        type: 'permission',
+        text: 'Allow Bash?',
+        details: JSON.stringify({ command: 'ls -la', description: 'List' }),
+        requestId: 'r1',
+      }),
     ],
     live,
     2,
@@ -219,8 +223,22 @@ test('A run’s events give its step, its requests, its sub-agents and its end',
     ],
   );
   assert.deepEqual(live.requests, ['r1']);
-  assert.equal(live.ask, 'Allow Bash?');
+  // A permission's ask carries what it would do; a question's, what it asks.
+  assert.equal(live.ask, 'Allow Bash?\nls -la');
   assert.equal(live.changedAt, 2);
+  assert.equal(
+    foldSession(
+      live,
+      event({
+        type: 'question',
+        text: 'Codex asks',
+        requestId: 'q1',
+        questions: [{ id: 'a', title: 'Which folder?' }],
+      }),
+      2,
+    ).ask,
+    'Codex asks\nWhich folder?',
+  );
   live = foldSession(live, event({ type: 'status', text: '', resolved: 'r1' }), 3);
   assert.deepEqual(live.requests, []);
   assert.equal(live.ask, undefined);
@@ -276,12 +294,15 @@ test('A conversation read from the host counts only a run in progress', () => {
   assert.equal(running.runId, 'r2');
   assert.deepEqual(running.requests, ['q']);
   assert.equal(running.subAgents[0].label, 'Look');
+  // Saved events carry no times: the read is not when the run began.
+  assert.equal(running.startedAt, undefined);
+  assert.equal(running.prompt, 'Now');
 });
 
 test('The board puts each conversation in its lane and a hand-off under its maker', () => {
   const live: Record<string, SessionLive> = {
     asking: fold([
-      event({ runId: 'a', role: 'user', text: 'x' }),
+      event({ runId: 'a', role: 'user', text: 'Tidy up' }),
       event({ runId: 'a', type: 'permission', text: 'May I?', requestId: 'p' }),
     ]),
     finished: fold(
@@ -300,6 +321,7 @@ test('The board puts each conversation in its lane and a hand-off under its make
       undefined,
       60,
     ),
+    handed: fold([event({ runId: 'h', role: 'user', text: 'irori: the irori agent handed you' })]),
     looked: fold(
       [
         event({ runId: 'l', role: 'user', text: 'x' }),
@@ -338,7 +360,13 @@ test('The board puts each conversation in its lane and a hand-off under its make
     maker.children.map((item) => [item.id, item.state, item.handOff]),
     [['handed', 'running', true]],
   );
-  assert.equal(lanes.attention.find((item) => item.id === 'asking')!.line, 'May I?');
+  // A card carries what its panel shows: the ask while it waits, the model.
+  const asking = lanes.attention.find((item) => item.id === 'asking')!;
+  assert.equal(asking.ask, 'May I?');
+  assert.equal(asking.model, null);
+  assert.equal(asking.request, 'Tidy up');
+  // A hand-off's card names its task, not irori's words to the vault agent.
+  assert.equal(maker.children[0].request, 'handed');
   assert.equal(boardCards(lanes).length, 8);
   assert.ok(!boardCards(lanes).some((item) => item.id === 'history' || item.id === 'looked'));
 });

@@ -1,5 +1,14 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Minimal session cards, 2026-11-21 (**0.2.90**, ADR 069 decision 4 revised): the
+owner asked for cards with only the vault's icon, the request and the CLI, and
+the rest on hover. `SessionCard.request` (a hand-off's task), `model`,
+`startedAt`, `reply` and `ask` feed a panel drawn in a portal beside the board;
+the live state keeps the whole request and no longer a one-line step. The run's
+start is when this device saw it; a run read already going shows time since its
+last change. The board's handle drags its width, as `session-board-ui-smoke.ts`
+now checks.
+
 Sub-sessions indented, 2026-11-21 (**0.2.89**): screenshots of 0.2.88 showed a
 hand-off's and a sub-agent's cards in line with their parent's.
 `.session-lane ul` outweighed `.session-subs`, so the nested list lost its

@@ -176,7 +176,7 @@
 }
 .session-card-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   min-width: 0;
 }
@@ -194,39 +194,27 @@
   flex: none;
   color: var(--schema);
 }
+/* The request, in at most two lines; the panel beside the board has the rest. */
 .session-card-title {
   flex: 1;
   min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   font-size: 12px;
   font-weight: 600;
+  line-height: 1.35;
+}
+.session-card-head > .session-dot,
+.session-card-head > .session-owner-mark {
+  margin-top: 2px;
 }
 .session-card.idle .session-card-title,
 .session-card.sub-agent .session-card-title {
   font-weight: 500;
   color: var(--tx-2);
-}
-.session-card-prompt,
-.session-card-line {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  font-size: 11px;
-  line-height: 1.4;
-}
-.session-card-prompt {
-  -webkit-line-clamp: 1;
-  color: var(--tx-3);
-}
-.session-card-line {
-  -webkit-line-clamp: 2;
-  color: var(--tx-2);
-}
-.session-card.waiting .session-card-line {
-  color: var(--attn-tx);
 }
 .session-card-foot {
   display: flex;
@@ -236,15 +224,6 @@
   color: var(--tx-3);
   font-size: 10.5px;
   white-space: nowrap;
-}
-.session-card-owner {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.session-card-time {
-  margin-left: auto;
-  font-variant-numeric: tabular-nums;
 }
 .session-kind {
   flex: none;
@@ -287,4 +266,47 @@
   background: none;
   box-shadow: inset 0 0 0 1.5px var(--tx-2);
   opacity: 1;
+}
+
+/* What a card leaves out, beside the board while a pointer or focus is on it.
+   Fixed, so the board's scrolling lanes do not clip it. */
+.session-detail {
+  position: fixed;
+  z-index: 40;
+  width: 300px;
+  max-height: min(420px, calc(100vh - 16px));
+  overflow: hidden;
+  padding: 10px 12px;
+  border: 1px solid var(--hair);
+  border-radius: 8px;
+  background: var(--raised);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.28);
+  color: var(--tx);
+  font-size: 11.5px;
+  line-height: 1.45;
+  pointer-events: none;
+}
+.session-detail dl {
+  margin: 0;
+}
+.session-detail dt {
+  margin-top: 8px;
+  color: var(--tx-3);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.session-detail dt:first-child {
+  margin-top: 0;
+}
+.session-detail dd {
+  margin: 2px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  overflow: hidden;
+}
+.session-detail-ask {
+  color: var(--attn-tx);
 }
