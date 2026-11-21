@@ -107,7 +107,8 @@
   flex-direction: column;
   gap: 6px;
 }
-.session-subs {
+/* Nested in a lane's list, so it must outweigh `.session-lane ul` above. */
+.session-lane .session-subs {
   margin: 5px 0 0 9px;
   padding-left: 8px;
   border-left: 1px solid color-mix(in srgb, var(--schema) 45%, transparent);

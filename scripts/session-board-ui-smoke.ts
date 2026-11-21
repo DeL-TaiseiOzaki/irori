@@ -129,6 +129,12 @@ try {
   };
   if (!frames.child || frames.child === frames.parent || frames.style !== 'dashed')
     throw Error(`A sub-agent's card is framed as its parent's: ${JSON.stringify(frames)}`);
+  // It stands indented under its parent, on the sub-sessions' rule.
+  const parentBox = await card(page, '二つ目 subagent hold').boundingBox();
+  const subBox = await sub.boundingBox();
+  const rule = await subs.evaluate((element) => getComputedStyle(element).borderLeftStyle);
+  if (!parentBox || !subBox || subBox.x < parentBox.x + 8 || rule !== 'solid')
+    throw Error(`A sub-agent's card is not indented under its parent (${rule})`);
   await page.screenshot({ path: 'test-results/irori-session-board-running.png' });
 
   // The first run ends while the second is on show: its card moves to 完了.
