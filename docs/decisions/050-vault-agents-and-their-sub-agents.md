@@ -46,8 +46,9 @@ worker's folder, which loads its own instructions and skills there.
    Schema itself, with irori's introduction (ADR 039), the shared Schema
    (ADR 027) and the task. irori no longer writes sub-agent definitions into the
    irori agent's folder, and the starter `AGENTS.md` says so.
-2. **The hand-off runs in the irori agent's access mode**, not in the vault
-   agent's starting mode. Its permission requests and questions show with the
+2. **The hand-off runs in the vault agent's starting access mode**, never in the
+   irori agent's access mode (so full access in the irori agent does not widen a
+   vault's permissions). Its permission requests and questions show with the
    irori agent too, labelled with the vault. An answer in either place reaches
    the vault agent's run.
 3. **A vault may define its own agent** as `vault-agent` in any of the three

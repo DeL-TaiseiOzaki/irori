@@ -25,6 +25,7 @@ import { agentIds, agentNames } from '../domain/types';
 import { defaultAgentAccess, requireAgentAccess } from '../domain/agent-access';
 import { runPi } from './pi';
 import { runOpenCode } from './opencode';
+import { mergeOpenCodeConfig } from './opencode-config';
 import { runHermes } from './hermes';
 import { runAntigravity } from './antigravity';
 import { codexServer, initializeCodex, refuseCodex } from './codex';
@@ -952,16 +953,10 @@ export class AgentService {
             id,
             version: v,
             available: true,
-            tested:
-              id === 'codex'
-                ? v.includes('0.154.0')
-                : id === 'claude'
-                  ? v.includes('2.1.232')
-                  : false,
             detail: '',
           };
         } catch (e) {
-          return { id, version: '', available: false, tested: false, detail: String(e) };
+          return { id, version: '', available: false, detail: String(e) };
         }
       }),
     );
@@ -1634,9 +1629,10 @@ export class AgentService {
       });
     }
     if (!list.length) return undefined;
+    const { IRORI_COMMAND: _hidden, ...hookEnv } = runEnv(run);
     const runner = new SchemaHookRunner(list, {
       cwd: root,
-      env: runEnv(run),
+      env: hookEnv,
       agent: input.agent,
       fields: () => ({
         session_id: run.nativeHandle ?? run.resumed ?? '',
@@ -2075,22 +2071,20 @@ export class AgentService {
       run.codexRoles = await writeCodexRoles(this.files.dataDir, run.id, foreign);
     if (agent === 'opencode') {
       const env = run.env ?? agentEnv();
-      const content = JSON.parse(env.OPENCODE_CONFIG_CONTENT ?? '{}');
-      run.env = {
-        ...env,
-        OPENCODE_CONFIG_CONTENT: JSON.stringify({
-          ...content,
-          agent: {
-            ...Object.fromEntries(
-              foreign.map((item) => [
-                item.name,
-                { description: item.description, prompt: item.instructions, mode: 'subagent' },
-              ]),
-            ),
-            ...content.agent,
-          },
-        }),
-      };
+      run.env = mergeOpenCodeConfig(env, (content) => ({
+        ...content,
+        agent: {
+          ...Object.fromEntries(
+            foreign.map((item) => [
+              item.name,
+              { description: item.description, prompt: item.instructions, mode: 'subagent' },
+            ]),
+          ),
+          ...(content.agent && typeof content.agent === 'object' && !Array.isArray(content.agent)
+            ? content.agent
+            : {}),
+        },
+      }));
     }
   }
   private async execute(run: Run, input: StartRun) {
@@ -2161,6 +2155,7 @@ export class AgentService {
                   ? Promise.reject(Error('Only "irori call" is available here.'))
                   : setup(argv, cwd, {
                       workspaceId: input.workspace,
+                      handedScopes: input.brains?.length ? input.brains : undefined,
                       agent: { agent: input.agent, model: input.model, effort: input.effort },
                       inRoutine: !!run.step,
                       by: `${agentNames[input.agent]} (irori agent)`,
@@ -2479,7 +2474,16 @@ export class AgentService {
       // theirs; one sent anyway is not passed on.
       // What runs without asking (hooks, MCP servers, plugins, settings) runs as allowed.
       const sharedHooks =
-        input.agent === 'claude' ? await this.you?.sharedHooks().catch(() => undefined) : undefined;
+        input.agent === 'claude'
+          ? await this.you?.sharedHooks().catch((error) => {
+              throw new NotSent(
+                t(
+                  `共通 Schema のフックを読めませんでした: ${String(error)}`,
+                  `Could not read the shared Schema's hooks: ${String(error)}`,
+                ),
+              );
+            })
+          : undefined;
       const places = this.configPlaces(run, space.root);
       const given: FoundConfig[] = [
         ...(sharedHooks

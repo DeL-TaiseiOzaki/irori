@@ -5,7 +5,6 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { FileService } from '../src/host/files';
 import { KnowledgeStore } from '../src/knowledge/store';
-import { pendingWrite } from '../src/domain/knowledge';
 import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // Real disposable files and persisted records; no provider/model process is started.
@@ -22,26 +21,6 @@ await writeFile(path.join(root, '資料.md'), '# Earlier source\n');
 await writeFile(path.join(root, 'editing.md'), '# Editing\n');
 await writeFile(path.join(otherRoot, 'reference.md'), '# Separate reference\n');
 const store = new KnowledgeStore(files.dataDir, (ref) => files.resolve(ref.scopeId, ref.path));
-// A copy prepared for upload to a Google Drive connection before 0.1.67 (ADR 023),
-// whose owner and connection are gone: only the start screen's leftovers reach it.
-await writeFile(path.join(root, 'orphaned.md'), 'Retained before connection removal');
-const orphan = pendingWrite.parse({
-  id: randomUUID(),
-  ownerId: randomUUID(),
-  mountId: randomUUID(),
-  folderId: 'removed-folder',
-  accountId: randomUUID(),
-  name: 'orphaned.md',
-  source: await store.capture({ scopeId: space.scopeId, path: 'orphaned.md' }),
-  createdAt: new Date().toISOString(),
-  state: 'pending',
-});
-await mkdir(path.join(files.dataDir, 'cloud-outbox', orphan.ownerId), { recursive: true });
-await writeFile(
-  path.join(files.dataDir, 'cloud-outbox', orphan.ownerId, `${orphan.id}.json`),
-  JSON.stringify(orphan),
-);
-await rm(path.join(root, 'orphaned.md'));
 const first = await store.begin(randomUUID(), {
   scopeId: space.scopeId,
   agent: 'codex',
@@ -81,21 +60,6 @@ const errors: string[] = [];
 try {
   let page = await app.firstWindow();
   page.on('pageerror', (error) => errors.push(String(error)));
-  await page.getByRole('button', { name: 'Drive の未送信分 1', exact: true }).click();
-  const recovery = page.getByRole('dialog', { name: 'Drive の未送信分', exact: true });
-  await expect(recovery).toContainText('orphaned.md');
-  const recoveredPath = path.join(base, 'recovered.md');
-  await app.evaluate(({ dialog }, filePath) => {
-    dialog.showSaveDialog = async () => ({ canceled: false, filePath });
-  }, recoveredPath);
-  await recovery.getByRole('button', { name: '別ファイルに復元', exact: true }).click();
-  await expect
-    .poll(() => readFile(recoveredPath, 'utf8'))
-    .toBe('Retained before connection removal');
-  await recovery.getByRole('button', { name: '別ファイルに復元', exact: true }).click();
-  await expect(recovery.getByRole('alert')).toContainText('上書きできません');
-  expect(await readFile(recoveredPath, 'utf8')).toBe('Retained before connection removal');
-  await recovery.getByRole('button', { name: '閉じる', exact: true }).click();
   // Keep the other scope outside this workspace until after the guarded navigation test.
   await page.getByRole('checkbox', { name: /記録のKB/ }).check();
   await page.getByLabel('ワークスペース名').fill('Record workspace');

@@ -195,7 +195,6 @@ export interface AgentInfo {
   id: AgentId;
   version: string;
   available: boolean;
-  tested: boolean;
   detail: string;
 }
 /** A model the installed CLI offers, as it names it. */
@@ -274,24 +273,6 @@ export interface CloudRoot {
   contents: string[];
 }
 /**
- * A Google Drive folder irori connected itself before 0.1.67. Kept in a vault's
- * `.irori/cloud-mounts.json`, it is listed as retired until it is switched to a
- * folder on this computer or unregistered (ADR 023).
- */
-export interface CloudAttachment {
-  schemaVersion: 1;
-  mountId: string;
-  scopeId: string;
-  provider: 'google-drive';
-  folderId: string;
-  parentId: string;
-  driveId?: string;
-  folderName: string;
-  contentsRoot: string;
-  name: string;
-  access: CloudAccess;
-}
-/**
  * A folder on this device, such as one a Drive, Dropbox, Box, iCloud or OneDrive
  * app keeps in sync, shown in contents through a link. Its path is device-local.
  */
@@ -327,7 +308,7 @@ export interface RepositoryAttachment {
 }
 /** A connection whose files are a folder on this device. */
 export type FolderAttachment = LocalAttachment | RepositoryAttachment;
-export type Attachment = CloudAttachment | FolderAttachment;
+export type Attachment = FolderAttachment;
 export type CloudAccess = 'read-only' | 'read-write';
 export type CloudConnection = Attachment & ConnectionState;
 /**
@@ -346,11 +327,9 @@ export interface StrayEntry {
 export interface ConnectionState {
   /**
    * `waiting`: its folder is not there yet (a drive not mounted, a sync app
-   * starting); it connects by itself once it is. `retired`: a Google Drive
-   * connection from before 0.1.67, to be switched to a folder.
+   * starting); it connects by itself once it is.
    */
-  state:
-    'unconfigured' | 'disconnected' | 'connecting' | 'waiting' | 'mounted' | 'error' | 'retired';
+  state: 'unconfigured' | 'disconnected' | 'connecting' | 'waiting' | 'mounted' | 'error';
   detail?: string;
   /** Linked so that files can be changed. */
   writable?: boolean;
@@ -465,7 +444,7 @@ export function nativeThemeSource(theme: Theme): 'system' | 'light' | 'dark' {
 }
 export interface DeviceSettings {
   theme: Theme;
-  /** The interface language; Japanese unless the reader chose otherwise. */
+  /** The interface language; English unless the reader chose otherwise (ADR 011). */
   language: import('./i18n').Language;
   markdownFont: MarkdownFont;
   pageMargins: PageMargins;
@@ -502,12 +481,6 @@ export interface DeviceSettings {
 }
 
 export interface HostAPI {
-  /** Copies once prepared for upload to Google Drive, before 0.1.67 (ADR 023). */
-  recoverableCloudWrites(): Promise<import('./knowledge').CloudWriteRecovery>;
-  /** Changed files a Google Drive connection never uploaded, still on this device. */
-  unsentDriveChanges(): Promise<number>;
-  /** Saves those files to a folder the person chooses; null when nothing was chosen. */
-  exportUnsentDriveChanges(): Promise<{ folder: string; count: number } | null>;
   draftRead(key: import('./drafts').DraftKey): Promise<import('./drafts').DraftRecord | null>;
   draftWrite(
     key: import('./drafts').DraftKey,
@@ -660,8 +633,6 @@ export interface HostAPI {
   updateRepository(scopeId: string, mountId: string): Promise<RepositoryUpdate>;
   /** Chooses the folder a local connection uses on this device. */
   bindLocalFolder(scopeId: string, mountId: string, path: string): Promise<void>;
-  /** Switches a retired Google Drive connection to a folder on this device, keeping its name. */
-  switchCloudToLocal(scopeId: string, mountId: string, path: string): Promise<void>;
   renameCloud(scopeId: string, mountId: string, name: string): Promise<void>;
   removeCloud(scopeId: string, mountId: string): Promise<void>;
   /** What the vault's contents folders hold that no connection names. */

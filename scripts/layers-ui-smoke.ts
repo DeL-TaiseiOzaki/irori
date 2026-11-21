@@ -39,16 +39,14 @@ for (const [name, category] of [
     JSON.stringify({ ...declaration, contents: [contentsRoot] }),
   );
   await writeFile(
-    path.join(root, '.irori/cloud-mounts.json'),
+    path.join(root, '.irori/local-folders.json'),
     JSON.stringify([
       {
         schemaVersion: 1,
         scopeId: space.scopeId,
         mountId: randomUUID(),
-        provider: 'google-drive',
-        folderId: 'fixture-folder',
-        parentId: 'root',
-        folderName: 'Drive name',
+        provider: 'local',
+        folderName: '調査 資料',
         contentsRoot,
         name: '調査 資料',
         access: 'read-only',

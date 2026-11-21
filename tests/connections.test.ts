@@ -22,14 +22,7 @@ import { WorkspaceService, inspectRepository } from '../src/host/workspaces';
 import { githubRepository } from '../src/domain/git';
 import { FileService, readViewerBytes } from '../src/host/files';
 import { CloudService } from '../src/cloud/service';
-import {
-  connectedFixture,
-  connectionRoot,
-  fixture,
-  retiredDeclaration,
-  syncedFolder,
-  writeRetired,
-} from './fixtures/cloud';
+import { connectedFixture, connectionRoot, fixture, syncedFolder } from './fixtures/cloud';
 
 test('A lost link is linked again when the connections are read, and reported until then', async (t) => {
   const { cloud, space, entry, target } = await connectedFixture(t);
@@ -397,23 +390,34 @@ test('Connection limit rejects additions before writing an unreadable record', a
 
 test('Unreadable connection records are reported in words a person can act on', async (t) => {
   const { space, cloud } = await fixture(t);
-  for (const [file, pattern] of [
-    ['cloud-mounts.json', /「Personal」の Drive 接続の記録（\.irori\/cloud-mounts\.json）/],
-    ['local-folders.json', /「Personal」のフォルダ接続の記録（\.irori\/local-folders\.json）/],
-  ] as const) {
-    const filename = path.join(space.root, '.irori', file);
-    for (const text of ['{ malformed', JSON.stringify([{ name: 'missing fields' }])]) {
-      await writeFile(filename, text);
-      await assert.rejects(cloud.connections(space.scopeId), (error: Error) => {
-        assert.match(error.message, pattern);
-        assert.doesNotMatch(error.message, /SyntaxError|position|expected/i);
-        return true;
-      });
-    }
-    await rm(filename);
+  const filename = path.join(space.root, '.irori', 'local-folders.json');
+  for (const text of ['{ malformed', JSON.stringify([{ name: 'missing fields' }])]) {
+    await writeFile(filename, text);
+    await assert.rejects(cloud.connections(space.scopeId), (error: Error) => {
+      assert.match(
+        error.message,
+        /「Personal」のフォルダ接続の記録（\.irori\/local-folders\.json）/,
+      );
+      assert.doesNotMatch(error.message, /SyntaxError|position|expected/i);
+      return true;
+    });
   }
   // A record of another vault is refused rather than shown here.
-  await writeRetired(space, retiredDeclaration({ scopeId: randomUUID() }));
+  await writeFile(
+    filename,
+    JSON.stringify([
+      {
+        schemaVersion: 1,
+        mountId: randomUUID(),
+        scopeId: randomUUID(),
+        provider: 'local',
+        folderName: 'Other',
+        contentsRoot: 'contents',
+        name: 'Other',
+        access: 'read-only',
+      },
+    ]),
+  );
   await assert.rejects(cloud.connections(space.scopeId), /重複・不一致/);
 });
 

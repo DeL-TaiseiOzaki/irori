@@ -1,6 +1,24 @@
+import { realpathSync } from 'node:fs';
 import path from 'node:path';
 import { handToVaultAgent, outsideIroriAgent } from '../../prompts';
 import { within } from '../domain/scopes';
+
+function canonical(base: string, file: string) {
+  const resolved = path.resolve(base, file);
+  let probe = resolved;
+  const tail: string[] = [];
+  for (;;) {
+    try {
+      const real = realpathSync(probe);
+      return tail.length ? path.join(real, ...tail.reverse()) : real;
+    } catch {
+      const parent = path.dirname(probe);
+      if (parent === probe) return resolved;
+      tail.push(path.basename(probe));
+      probe = parent;
+    }
+  }
+}
 
 /**
  * What your AI may reach in one run: its own folder, and the brains handed to
@@ -32,8 +50,10 @@ export type Decision = { allow: true } | { allow: false; reason: string };
 
 /** The brain a path lies in, if any. */
 export function brainOfPath(delegation: Delegation, file: string) {
-  const absolute = path.resolve(delegation.you, file);
-  return onThisDevice(delegation).find((brain) => within(brain.root, absolute));
+  const absolute = canonical(delegation.you, file);
+  return onThisDevice(delegation).find((brain) =>
+    within(canonical(delegation.you, brain.root), absolute),
+  );
 }
 
 /**
@@ -43,10 +63,14 @@ export function brainOfPath(delegation: Delegation, file: string) {
  * `irori call`, which runs inside the brain with its Schema (ADR 050).
  */
 export function writeDecision(delegation: Delegation, file: string): Decision {
-  const absolute = path.resolve(delegation.you, file);
-  if (onThisDevice(delegation).some((item) => item.work && within(item.work, absolute)))
+  const absolute = canonical(delegation.you, file);
+  if (
+    onThisDevice(delegation).some(
+      (item) => item.work && within(canonical(delegation.you, item.work), absolute),
+    )
+  )
     return { allow: true };
-  if (within(delegation.you, absolute)) return { allow: true };
+  if (within(canonical(delegation.you, delegation.you), absolute)) return { allow: true };
   const target = brainOfPath(delegation, absolute);
   return { allow: false, reason: target ? handToVaultAgent(target) : outsideIroriAgent };
 }
@@ -63,7 +87,6 @@ export const editedPath = (input: unknown) => fileOf(input, ['file_path', 'fileP
 
 /** Claude Code's tools that write a file, as its hook matcher names them. */
 export const writeToolMatcher = 'Write|Edit|MultiEdit|NotebookEdit';
-export const writeTools = new RegExp(`^(${writeToolMatcher})$`);
 
 /**
  * The handed vault `irori call` names: by its vault agent name, or by its

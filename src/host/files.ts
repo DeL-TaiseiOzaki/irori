@@ -809,7 +809,15 @@ export class FileService {
             `${next} is not a folder in the vault.`,
           ),
         );
-      if (owner(this.spaces, absolute)?.scopeId !== id)
+      const real = await fs.realpath(absolute);
+      if (!within(s.root, real))
+        throw Error(
+          t(
+            `${next} は vault の中のフォルダではありません。`,
+            `${next} is not a folder in the vault.`,
+          ),
+        );
+      if (owner(this.spaces, real)?.scopeId !== id)
         throw Error(t('そのフォルダは別の vault です。', "That folder is another vault's."));
       const meta = await this.metadata(s.root);
       const raw = JSON.parse(await fs.readFile(meta, 'utf8')) as Record<string, unknown>;
@@ -853,7 +861,7 @@ export class FileService {
   /** The connection records whose folders appear in `previous`, rewritten to appear in `next`. */
   private async contentsRecords(directory: string, previous: string, next: string) {
     const out: { filename: string; original: string; next: string }[] = [];
-    for (const name of ['local-folders.json', 'repositories.json', 'cloud-mounts.json']) {
+    for (const name of ['local-folders.json', 'repositories.json']) {
       const filename = path.join(directory, name);
       const stat = await fs.lstat(filename).catch((error) => {
         if (!isMissing(error)) throw error;
@@ -1295,6 +1303,18 @@ export class FileService {
       const parent = await this.resolve(id, folder === '.' ? '' : folder, true);
       const actual = path.join(parent, path.posix.basename(from));
       const info = await fs.lstat(actual);
+      if (info.isSymbolicLink())
+        throw Error(t('リンクの名前は変えられません。', 'Symbolic links cannot be renamed here.'));
+      if (info.isDirectory()) {
+        this.holdsNoBoundary(space, from);
+        if (knowledgeFolder(space).startsWith(`${from}/`))
+          throw Error(
+            t(
+              'このフォルダにはナレッジのフォルダが入っています。',
+              'This folder holds the knowledge folder.',
+            ),
+          );
+      }
       const moved = info.isDirectory() ? await this.walk(actual, from) : [from];
       await renameEntry(actual, path.join(parent, name));
       // A kept draft follows its file.

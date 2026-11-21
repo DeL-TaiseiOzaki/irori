@@ -3,7 +3,7 @@ import { Readable } from 'node:stream';
 import type { ChildProcess } from 'node:child_process';
 import { t, type Language } from '../domain/i18n';
 import type { HostEvent } from '../domain/types';
-import { decode, encode, type Frame } from '../remote/wire';
+import { decode, encode, lineLimit, type Frame } from '../remote/wire';
 import {
   attachedLine,
   busyLine,
@@ -98,6 +98,8 @@ export interface RemoteLinkOptions {
   onProgress(detail: string): void;
   /** The connection ended after it was open, by itself or because `close` was called. */
   onClosed(): void;
+  /** Host-scoped secret sent in `$attach` to authenticate against `host.sock`. */
+  secret?: string;
 }
 
 /**
@@ -229,9 +231,16 @@ export class RemoteLink {
         if (part) return part(false);
         failed();
       });
+      let installing = false;
       child.stdout!.setEncoding('utf8');
       child.stdout!.on('data', (chunk: string) => {
         buffer += chunk;
+        if (buffer.length > lineLimit) {
+          buffer = '';
+          if (attached) child.kill();
+          else failed();
+          return;
+        }
         for (let at = buffer.indexOf('\n'); at >= 0; at = buffer.indexOf('\n')) {
           const line = buffer.slice(0, at).replace(/\r$/, '');
           buffer = buffer.slice(at + 1);
@@ -257,8 +266,10 @@ export class RemoteLink {
                 'Another version of irori is running an agent on this SSH host. irori connects once it finishes.',
               ),
             );
-          else if (line.startsWith(`${needsLine} `))
+          else if (line.startsWith(`${needsLine} `) && !installing) {
+            installing = true;
             install(line.split(' ').slice(1)).catch((error: Error) => failed(error.message));
+          }
         }
       });
     });
@@ -351,6 +362,7 @@ export class RemoteLink {
         version: bundle.version,
         language: this.options.language(),
         ...(this.seq !== undefined && { resume: this.seq }),
+        ...(this.options.secret && { secret: this.options.secret }),
       },
     ]);
     if (reply.version !== bundle.version) {

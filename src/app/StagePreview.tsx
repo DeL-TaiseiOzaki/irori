@@ -1,11 +1,13 @@
-import { useRef } from 'react';
+import { lazy, Suspense, useRef } from 'react';
 import { isPropertyPage } from '../domain/scopes';
+import { t } from '../domain/i18n';
 import { lineTarget, type SearchTarget } from '../editor/search-navigation';
 import type { Space } from '../domain/types';
 import { useResource } from './useResource';
-import { PageEditor } from './PageEditor';
-import { CsvPreview } from './CsvPreview';
-import { FileViewer } from './FileViewer';
+
+const PageEditor = lazy(() => import('./PageEditor').then((m) => ({ default: m.PageEditor })));
+const CsvPreview = lazy(() => import('./CsvPreview').then((m) => ({ default: m.CsvPreview })));
+const FileViewer = lazy(() => import('./FileViewer').then((m) => ({ default: m.FileViewer })));
 
 const host = window.irori;
 const ignore = () => {};
@@ -25,12 +27,14 @@ export function StagePreview({
   path,
   revision,
   target,
+  onFollowLink,
   onError,
 }: {
   space: Space;
   path: string;
   revision: number;
   target?: PreviewTarget;
+  onFollowLink?: (href: string) => void;
   onError: (error: unknown) => void;
 }) {
   const applied = useRef<number>(undefined);
@@ -48,34 +52,37 @@ export function StagePreview({
     ) : null;
   return (
     <div className="document-scroll">
-      {doc.viewer ? (
-        <FileViewer
-          key={doc.hash}
-          doc={{ ...doc, viewer: doc.viewer }}
-          load={(scopeId, file) => host.viewerBytes(scopeId, file)}
-          onExternal={() => void host.openExternal(doc.scopeId, doc.path).catch(onError)}
-          onLink={(url) => void host.openUrl(url).catch(onError)}
-        />
-      ) : /\.csv$/i.test(path) ? (
-        <CsvPreview key={doc.hash} text={doc.text} />
-      ) : (
-        <PageEditor
-          key={`${doc.hash}:${target?.n ?? 0}`}
-          page={!doc.cloud && isPropertyPage(space, path)}
-          properties={null}
-          text={doc.text}
-          mode={rich ? 'rich' : 'source'}
-          filename={path}
-          readOnly
-          searchTarget={pending && (pending.search ?? lineTarget(doc.text, pending.line, rich))}
-          onSearchResult={() => {
-            applied.current = pending?.n;
-          }}
-          onChange={ignore}
-          onError={onError}
-          resolveImage={(url) => host.readImage(doc.scopeId, doc.path, url)}
-        />
-      )}
+      <Suspense fallback={<p className="hint">{t('開いています…', 'Opening…')}</p>}>
+        {doc.viewer ? (
+          <FileViewer
+            key={doc.hash}
+            doc={{ ...doc, viewer: doc.viewer }}
+            load={(scopeId, file) => host.viewerBytes(scopeId, file)}
+            onExternal={() => void host.openExternal(doc.scopeId, doc.path).catch(onError)}
+            onLink={(url) => void host.openUrl(url).catch(onError)}
+          />
+        ) : /\.csv$/i.test(path) && !target ? (
+          <CsvPreview key={doc.hash} text={doc.text} />
+        ) : (
+          <PageEditor
+            key={`${doc.hash}:${target?.n ?? 0}`}
+            page={!doc.cloud && isPropertyPage(space, path)}
+            properties={null}
+            text={doc.text}
+            mode={rich ? 'rich' : 'source'}
+            filename={path}
+            readOnly
+            searchTarget={pending && (pending.search ?? lineTarget(doc.text, pending.line, rich))}
+            onSearchResult={() => {
+              applied.current = pending?.n;
+            }}
+            onChange={ignore}
+            onFollowLink={onFollowLink}
+            onError={onError}
+            resolveImage={(url) => host.readImage(doc.scopeId, doc.path, url)}
+          />
+        )}
+      </Suspense>
     </div>
   );
 }

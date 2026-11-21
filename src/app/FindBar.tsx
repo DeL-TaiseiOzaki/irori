@@ -193,7 +193,11 @@ export function FindScope({
   // nothing modal is over it; the terminal keeps Ctrl+F for the shell.
   const keys = useRef<(event: KeyboardEvent) => void>(() => {});
   keys.current = (event) => {
-    if (live.current.hidden || !bar.current?.parentElement?.checkVisibility()) return;
+    if (
+      live.current.hidden ||
+      !bar.current?.parentElement?.checkVisibility({ visibilityProperty: true })
+    )
+      return;
     const target = event.target as Element | null;
     if (target?.closest?.('.terminal-panel, dialog') || document.querySelector('dialog[open]'))
       return;

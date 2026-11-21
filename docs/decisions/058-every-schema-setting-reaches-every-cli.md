@@ -195,9 +195,10 @@ The owner answered that all of it must be fixed, and that 1 to 3 are fatal.
      read as text is named for the agent to read, and the rest still goes.
    - **CLI commands.** A command that moves the CLI to another session (`/clear`)
      leaves that session having heard nothing.
-7. **The settings say how.** Under Rules and Hooks, the Schema settings say how
-   each reaches every CLI, built from the table. The skill reach view says irori
-   gives Pi the skills and names them to Hermes.
+7. **The settings stay concise (amended 0.2.71).** The skill reach view says how
+   each CLI receives skills, while the Schema settings omit explanatory reach
+   notes under Rules and Hooks; the reach table still drives runs and hook
+   event availability.
 
 ## Consequences
 

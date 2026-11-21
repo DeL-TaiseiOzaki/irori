@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { t, type Language } from '../domain/i18n';
 import type {
@@ -67,6 +67,7 @@ const hostRecord = z.object({
   name: z.string().min(1).max(60),
   destination: sshDestination,
   port: z.number().int().min(1).max(65535).optional(),
+  secret: z.string().min(32).max(128).optional(),
   vaults: z.array(vaultRecord).max(200).default([]),
 });
 type HostRecord = z.infer<typeof hostRecord>;
@@ -271,6 +272,7 @@ export class RemoteHosts implements RemoteVaults {
         name: value.name,
         destination: value.destination,
         ...(value.port && { port: value.port }),
+        secret: previous?.secret ?? randomBytes(32).toString('hex'),
         vaults: previous?.vaults ?? [],
       };
       const moved =
@@ -368,10 +370,15 @@ export class RemoteHosts implements RemoteVaults {
           asked = true;
           return this.question(id, question, gone);
         });
+    if (!record.secret) {
+      record.secret = randomBytes(32).toString('hex');
+      void this.queue.run(() => this.save()).catch(() => {});
+    }
     const link = new RemoteLink({
       launcher: this.options.launcher(record, session),
       payload: this.options.payload,
       language: this.options.language,
+      secret: record.secret,
       onEvent: (event) => this.event(id, event),
       ask: (question, params) => this.options.ask(this.shown(this.record(id)), question, params),
       onProgress: (detail) => this.set(id, 'connecting', detail),
@@ -391,6 +398,7 @@ export class RemoteHosts implements RemoteVaults {
           live.retries = 0;
           this.set(id, 'connected');
           await this.refresh(id, link).catch(() => {});
+          await this.resume(id, link).catch(() => {});
           // The events missed while away came before the answer to that request; a run
           // still open after them, on a host where nothing runs, ended unseen.
           if (!reply.running) this.lost(id);
@@ -445,10 +453,7 @@ export class RemoteHosts implements RemoteVaults {
       live.retry = undefined;
       live.failed = undefined;
       // Nobody is asked for a retry of irori's own: a host that needs an answer waits for the person.
-      this.link(id, true).then(
-        (link) => this.resume(id, link),
-        () => this.retry(id),
-      );
+      this.link(id, true).catch(() => this.retry(id));
     }, wait);
   }
   /** After a reconnection: where each hand-off stands, and what it still asks. */
@@ -485,9 +490,10 @@ export class RemoteHosts implements RemoteVaults {
     });
   }
   private event(id: string, event: HostEvent) {
+    if (!event || typeof event !== 'object') return;
     if (event.type === 'files') {
-      if (this.has(event.scopeId)) this.options.emit(event);
-    } else if (event.type === 'agent') {
+      if (typeof event.scopeId === 'string' && this.has(event.scopeId)) this.options.emit(event);
+    } else if (event.type === 'agent' && event.event && typeof event.event === 'object') {
       const entry = this.state(id).handOffs.get(event.event.runId);
       if (entry) this.followed(id, entry, event.event);
       this.relay(id, event.event);
@@ -498,11 +504,31 @@ export class RemoteHosts implements RemoteVaults {
    * amended 0.2.79): its events go to the windows, and what it asks is answered here.
    */
   private relay(id: string, event: AgentEvent) {
-    if (!event.scopeId || !this.has(event.scopeId)) return;
-    if (event.conversationId) this.conversations.set(event.conversationId, id);
-    if ((event.type === 'permission' || event.type === 'question') && event.requestId)
+    if (
+      typeof event.scopeId !== 'string' ||
+      typeof event.runId !== 'string' ||
+      !this.has(event.scopeId)
+    )
+      return;
+    // Never let a remote host overwrite a conversation or request already owned by another host or local hand-off.
+    const holderIds = new Set([...this.live.values()].flatMap((live) => [...live.handOffs.keys()]));
+    if (
+      typeof event.conversationId === 'string' &&
+      event.conversationId &&
+      !holderIds.has(event.conversationId) &&
+      (!this.conversations.has(event.conversationId) ||
+        this.conversations.get(event.conversationId) === id)
+    )
+      this.conversations.set(event.conversationId, id);
+    if (
+      (event.type === 'permission' || event.type === 'question') &&
+      typeof event.requestId === 'string' &&
+      event.requestId &&
+      (!this.asked.has(event.requestId) || this.asked.get(event.requestId) === id)
+    )
       this.asked.set(event.requestId, id);
-    else if (event.type === 'status' && event.resolved) this.asked.delete(event.resolved);
+    else if (event.type === 'status' && event.resolved && this.asked.get(event.resolved) === id)
+      this.asked.delete(event.resolved);
     const runs = this.state(id).runs;
     if (event.type === 'done') runs.delete(event.runId);
     else if (!runs.has(event.runId))
@@ -734,7 +760,7 @@ export class RemoteHosts implements RemoteVaults {
     };
     while (live.handOffs.get(runId) === entry && !this.closing) {
       try {
-        const link = await this.link(id);
+        const link = await this.link(id, true);
         const ended = await link.request<HandOffResult>('awaitHandOff', [runId]);
         void link.request('forgetHandOff', [runId]).catch(() => {});
         return done(ended);

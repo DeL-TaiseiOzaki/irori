@@ -15,11 +15,12 @@ const notShipped = [
   /^tests\//,
   /^website\//,
   /^\.github\/(?!workflows\/app\.yml$)/,
-  /^scripts\/[^/]+-smoke\.ts$/,
-  // Release tooling that only workflows run; the build never reads it.
-  /^scripts\/(real-agents|lifecycle-agents|preview-vm|process-metrics|release-policy|release-source)\.ts$/,
+  /^scripts\/[^/]+-(smoke|acceptance)\.ts$/,
+  /^scripts\/extension-compatibility\//,
+  // Release and verification tooling that only workflows or developers run; the build never reads it.
+  /^scripts\/(real-agents|lifecycle-agents|preview-vm|process-metrics|release-policy|release-source|ui-screens)\.ts$/,
   /^scripts\/(preview-vm\.html|record-evidence\.mjs|start\.mjs)$/,
-  /^(README(\.[a-z]+)?\.md|AGENTS\.md|CLAUDE\.md|\.gitignore|\.prettierrc\.json)$/,
+  /^(README(\.[a-z]+)?\.md|AGENTS\.md|\.gitignore|\.prettierrc\.json)$/,
 ];
 
 export function shipped(path: string): boolean {
@@ -230,11 +231,13 @@ function publish(report: Report) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [command, ...rest] = process.argv.slice(2);
-  const grace = Number(
-    rest.find((arg) => arg.startsWith('--grace-minutes='))?.split('=')[1] ?? '60',
-  );
+  const rawGrace = rest.find((arg) => arg.startsWith('--grace-minutes='))?.split('=')[1];
+  const grace = rawGrace === undefined ? 60 : Number(rawGrace);
   const positional = rest.filter((arg) => !arg.startsWith('--'));
-  if (command === 'pr' && positional.length === 2)
+  if (!Number.isFinite(grace) || grace < 0) {
+    console.error('Invalid --grace-minutes value');
+    process.exitCode = 2;
+  } else if (command === 'pr' && positional.length === 2)
     publish(checkPullRequest(process.cwd(), positional[0], positional[1]));
   else if (command === 'drift')
     publish(checkDrift(process.cwd(), positional[0] ?? 'origin/main', Date.now(), grace));

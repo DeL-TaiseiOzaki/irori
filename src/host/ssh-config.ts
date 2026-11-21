@@ -59,17 +59,70 @@ interface Pattern {
   test(name: string): boolean;
 }
 
+/** Linear-time wildcard matcher (`*` and `?`, optional character classes) without regex backtracking. */
+function wildcardMatch(pat: string, text: string, allowClass = false): boolean {
+  let p = 0;
+  let t = 0;
+  let starP = -1;
+  let starT = 0;
+  const matchClass = (start: number, ch: string): { matched: boolean; end: number } | undefined => {
+    const close = pat.indexOf(']', start + 2);
+    if (close < 0) return undefined;
+    const negated = pat[start + 1] === '!';
+    const inner = pat.slice(start + (negated ? 2 : 1), close);
+    let hit = false;
+    for (let i = 0; i < inner.length; i++) {
+      if (i + 2 < inner.length && inner[i + 1] === '-') {
+        if (ch >= inner[i] && ch <= inner[i + 2]) hit = true;
+        i += 2;
+      } else if (inner[i] === ch) hit = true;
+    }
+    return { matched: negated ? !hit : hit, end: close };
+  };
+  while (t < text.length) {
+    if (p < pat.length && pat[p] === '*') {
+      starP = p++;
+      starT = t;
+    } else if (p < pat.length && pat[p] === '?') {
+      p++;
+      t++;
+    } else if (allowClass && p < pat.length && pat[p] === '[') {
+      const cls = matchClass(p, text[t]);
+      if (cls) {
+        if (cls.matched) {
+          p = cls.end + 1;
+          t++;
+        } else if (starP >= 0) {
+          p = starP + 1;
+          t = ++starT;
+        } else return false;
+      } else if (pat[p] === text[t]) {
+        p++;
+        t++;
+      } else if (starP >= 0) {
+        p = starP + 1;
+        t = ++starT;
+      } else return false;
+    } else if (p < pat.length && pat[p] === text[t]) {
+      p++;
+      t++;
+    } else if (starP >= 0) {
+      p = starP + 1;
+      t = ++starT;
+    } else {
+      return false;
+    }
+  }
+  while (p < pat.length && pat[p] === '*') p++;
+  return p === pat.length;
+}
+
 function pattern(word: string): Pattern {
   const negated = word.startsWith('!');
   const body = negated ? word.slice(1) : word;
   if (!/[*?]/.test(body))
     return { negated, name: negated ? undefined : body, test: (name) => name === body };
-  const source = body
-    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    .replace(/\*/g, '.*')
-    .replace(/\?/g, '.');
-  const matches = new RegExp(`^${source}$`, 's');
-  return { negated, test: (name) => matches.test(name) };
+  return { negated, test: (name) => wildcardMatch(body, name) };
 }
 
 /** Whether a `Host` line applies to a name: one of its patterns matches, and none of its negated ones. */
@@ -93,23 +146,7 @@ type Line =
 
 /** Whether a name in a folder matches one part of an `Include` path with `*`, `?` or `[…]` in it. */
 function matcher(part: string) {
-  let source = '';
-  for (let at = 0; at < part.length; at++) {
-    const char = part[at];
-    const close = char === '[' ? part.indexOf(']', at + 2) : -1;
-    if (char === '*') source += '[^/]*';
-    else if (char === '?') source += '[^/]';
-    else if (close > 0) {
-      const inner = part.slice(at + 1, close).replace(/\\/g, '\\\\');
-      source += `[${inner.startsWith('!') ? `^${inner.slice(1)}` : inner}]`;
-      at = close;
-    } else source += char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
-  try {
-    return new RegExp(`^${source}$`);
-  } catch {
-    return undefined;
-  }
+  return { test: (name: string) => !name.includes('/') && wildcardMatch(part, name, true) };
 }
 
 /** The files an `Include` path names, in lexical order; a path that names none gives none. */

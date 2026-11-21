@@ -466,7 +466,10 @@ export function AgentColumn({
       })().catch((error) => {
         if (current) setConversationError(errorText(error));
       });
-    if (!target) return;
+    if (!target)
+      return () => {
+        current = false;
+      };
     const id = target.id;
     flushPending.current = flush;
     document.addEventListener('visibilitychange', shown);
@@ -489,7 +492,15 @@ export function AgentColumn({
       document.removeEventListener('visibilitychange', shown);
       flushPending.current = () => {};
     };
-  }, [scopeId, ready, target?.id, workspaceId, shared.reload, retry]);
+  }, [
+    scopeId,
+    ready,
+    target?.id,
+    workspaceId,
+    shared.reload,
+    shared.tabRevisions[scopeId ?? ''],
+    retry,
+  ]);
 
   /** Reads the queue again after a queued instruction started, leaving the log as it is. */
   async function refreshQueue() {
