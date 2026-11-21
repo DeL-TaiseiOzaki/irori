@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import writeFileAtomic from 'write-file-atomic';
 import { personLinesHeld as held } from '../../prompts';
 import { loopbackServer } from './command-bridge';
+import { addOpenCodePlugin } from './opencode-config';
 
 /** What a file tool call should be told before it runs, or nothing. */
 export type Notice = (tool: string, input: unknown) => Promise<string | undefined>;
@@ -72,11 +73,7 @@ export async function personLinesBridge(
   if (agent === 'opencode') {
     // OpenCode reads a plugin from an absolute path named in this variable's
     // JSON, merged after its own files; a value already set is kept.
-    const content = JSON.parse(env.OPENCODE_CONFIG_CONTENT ?? '{}');
-    env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
-      ...content,
-      plugin: [...(content.plugin ?? []), file],
-    });
+    env = addOpenCodePlugin(env, file);
   }
   return {
     env,

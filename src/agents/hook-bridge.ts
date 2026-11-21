@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { chmod, mkdir, readdir, rm } from 'node:fs/promises';
 import writeFileAtomic from 'write-file-atomic';
 import { commandLaunchers, loopbackServer } from './command-bridge';
+import { addOpenCodePlugin } from './opencode-config';
 import { hookUnreachable, hookUnreachableAfter, hookUnreadable } from '../../prompts';
 
 /**
@@ -199,11 +200,7 @@ export async function hookBridge(
   if (agent === 'opencode') {
     // OpenCode reads a plugin from an absolute path named in this variable's
     // JSON, merged after its own files; plugins already named there stay.
-    const content = JSON.parse(env.OPENCODE_CONFIG_CONTENT ?? '{}');
-    env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
-      ...content,
-      plugin: [...(content.plugin ?? []), file],
-    });
+    env = addOpenCodePlugin(env, file);
   }
   return { env, args: agent === 'pi' ? ['-e', file] : [], state, close: server.close };
 }

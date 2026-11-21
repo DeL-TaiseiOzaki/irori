@@ -18,7 +18,7 @@ import { setLanguage } from '../domain/i18n';
 import type { HostEvent } from '../domain/types';
 import { createVaultHost, type HostQuestion } from './host';
 import { attachRequest, attachedLine, busyLine, replacingLine, type AttachReply } from './protocol';
-import { decode, readFrames, writeFrame } from './wire';
+import { decode, lineLimit, readFrames, writeFrame } from './wire';
 import { connect, releasePlace, takePlace } from './host-place';
 
 /**
@@ -86,59 +86,65 @@ async function serve(dataDir: string) {
   const server = net.createServer((socket) => {
     readFrames(
       socket,
-      async (frame) => {
-        if ('answer' in frame) {
-          if (device !== socket) return;
-          questions.get(frame.answer)?.answer(frame.value);
-          questions.delete(frame.answer);
-          return;
-        }
-        if (!('method' in frame)) return;
-        const { id, method, args } = frame;
-        try {
-          // Asked before attaching, by the login that is about to: no device is let go for it.
-          if (method === '$version') {
+      (frame) => {
+        void (async () => {
+          if (!frame || typeof frame !== 'object' || Array.isArray(frame)) return;
+          if ('answer' in frame) {
+            if (device !== socket) return;
+            questions.get(frame.answer)?.answer(frame.value);
+            questions.delete(frame.answer);
+            return;
+          }
+          if (!('method' in frame)) return;
+          const { id, method, args } = frame;
+          try {
+            // Asked before attaching, by the login that is about to: no device is let go for it.
+            if (method === '$version') {
+              writeFrame(socket, {
+                id,
+                ok: true,
+                value: { version: vaultHostVersion, running: host.running || host.waiting },
+              });
+              return;
+            }
+            if (method === '$attach') {
+              const request = attachRequest.parse(args[0]);
+              setLanguage(request.language);
+              if (device && device !== socket) device.destroy();
+              device = socket;
+              lastAttached = Date.now();
+              const after = request.resume ?? seq;
+              const missed = recent.filter((item) => item.seq > after);
+              const reply: AttachReply = {
+                version: vaultHostVersion,
+                about: host.about(),
+                seq,
+                // Every event after `resume` is still kept, or some have been dropped.
+                resumed: after >= seq || missed[0]?.seq === after + 1,
+                running: host.running,
+              };
+              writeFrame(socket, { id, ok: true, value: reply });
+              for (const item of missed) writeFrame(socket, item);
+              for (const [number, { question }] of questions) put(number, question);
+              return;
+            }
+            if (method === '$shutdown') {
+              // Allow either the authenticated attached device, or an idle replacement when no device or work is active.
+              if (device !== socket && (device || host.running || host.waiting))
+                throw Error('Not attached');
+              writeFrame(socket, { id, ok: true, value: true });
+              return void stop();
+            }
+            if (device !== socket) throw Error('Not attached');
+            writeFrame(socket, { id, ok: true, value: await host.call(method, args) });
+          } catch (error) {
             writeFrame(socket, {
               id,
-              ok: true,
-              value: { version: vaultHostVersion, running: host.running },
+              ok: false,
+              error: error instanceof Error ? error.message : String(error),
             });
-            return;
           }
-          if (method === '$attach') {
-            const request = attachRequest.parse(args[0]);
-            setLanguage(request.language);
-            if (device && device !== socket) device.destroy();
-            device = socket;
-            lastAttached = Date.now();
-            const after = request.resume ?? seq;
-            const missed = recent.filter((item) => item.seq > after);
-            const reply: AttachReply = {
-              version: vaultHostVersion,
-              about: host.about(),
-              seq,
-              // Every event after `resume` is still kept, or some have been dropped.
-              resumed: after >= seq || missed[0]?.seq === after + 1,
-              running: host.running,
-            };
-            writeFrame(socket, { id, ok: true, value: reply });
-            for (const item of missed) writeFrame(socket, item);
-            for (const [number, { question }] of questions) put(number, question);
-            return;
-          }
-          if (device !== socket) throw Error('Not attached');
-          if (method === '$shutdown') {
-            writeFrame(socket, { id, ok: true });
-            return void stop();
-          }
-          writeFrame(socket, { id, ok: true, value: await host.call(method, args) });
-        } catch (error) {
-          writeFrame(socket, {
-            id,
-            ok: false,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
+        })().catch(() => socket.destroy());
       },
       () => {
         if (device === socket) {
@@ -174,12 +180,15 @@ async function serve(dataDir: string) {
 function asked(socket: net.Socket, method: string, args: unknown[]) {
   return new Promise<unknown>((resolve) => {
     let buffer = '';
+    const timer = setTimeout(() => done(), 15_000);
     const done = (value?: unknown) => {
+      clearTimeout(timer);
       socket.off('data', read);
       resolve(value);
     };
     const read = (chunk: Buffer | string) => {
       buffer += chunk;
+      if (buffer.length > lineLimit) return done();
       for (let at = buffer.indexOf('\n'); at >= 0; at = buffer.indexOf('\n')) {
         const line = buffer.slice(0, at);
         buffer = buffer.slice(at + 1);
@@ -218,14 +227,18 @@ async function sameVersion(socketPath: string): Promise<'same' | 'busy' | 'none'
     probe.destroy();
     return 'same';
   }
-  const found = said?.running ? said : await attaching();
+  const found = said ?? (await attaching());
   if (!found || found.running) {
     probe.destroy();
     return found ? 'busy' : 'none';
   }
   process.stdout.write(`${replacingLine}\n`);
   const closed = new Promise<void>((resolve) => probe.once('close', () => resolve()));
-  await asked(probe, '$shutdown', []);
+  const shut = await asked(probe, '$shutdown', []);
+  if (shut === undefined && said) {
+    probe.destroy();
+    return 'busy';
+  }
   // It lets its device go last, once its place is free.
   await Promise.race([closed, new Promise((resolve) => setTimeout(resolve, 20_000))]);
   probe.destroy();
@@ -242,6 +255,7 @@ async function attach(dataDir: string) {
   let socket = there === 'same' ? await connect(socketPath).catch(() => undefined) : undefined;
   if (!socket) {
     await fs.mkdir(dataDir, { recursive: true, mode: 0o700 });
+    await fs.chmod(dataDir, 0o700);
     const logFile = path.join(dataDir, 'host.log');
     // The log starts over once it has grown; it is for finding why a host did not start.
     const size = await fs.stat(logFile).then(

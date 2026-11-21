@@ -1,35 +1,20 @@
 import { z } from 'zod';
-import {
-  agentAccessModes,
-  agentIds,
-  lineSpacings,
-  markdownFonts,
-  pageMargins,
-  textSizes,
-  themes,
-} from './types';
+import { agentIds } from './types';
 import type { HostRequests } from './host-bridge';
 import { sourceDestination, sourceRef, sourceVersion } from './knowledge';
-import { agentEffort, agentModel, startInput, yourAiChoice } from './conversation';
+import { agentEffort, agentModel, startInput } from './conversation';
 import { searchQuery } from './search';
 import { draftKey, draftValue, draftRevision } from './drafts';
 import { noteRef } from './note-operations';
 import { externalUrl } from './links';
-import { languages } from './i18n';
 import { linkHref } from './note-links';
-import { skillAudience, skillName } from './skills';
-import { windowItemChoices } from './window-items';
+import { skillName } from './skills';
+import { deviceSettingsPatchSchema } from './settings';
 import { brainLook, categoryText } from './brains';
 import { remoteAnswerLimit, remoteHostInput, remotePath } from './remote-hosts';
 import { knowledgeFolderName, layerLabelChanges } from './layers';
 import { githubOwnerPattern, validGitEmail, validGitName, validRepositoryName } from './git';
-import {
-  routineRef,
-  routineRuntimeList,
-  secretName,
-  secretValue,
-  storedSecretName,
-} from './routines';
+import { routineRef, secretName, secretValue, storedSecretName } from './routines';
 import { newComment } from './comments';
 import { attachmentByteLimit } from './attachments';
 import { broughtChunkBytes } from './connections';
@@ -81,9 +66,6 @@ const cols = z.number().int().min(2).max(500),
 
 // This registry is also the preload allowlist. Every HostAPI request must have a validator.
 export const hostArguments = {
-  recoverableCloudWrites: z.tuple([]),
-  unsentDriveChanges: z.tuple([]),
-  exportUnsentDriveChanges: z.tuple([]),
   draftRead: z.tuple([draftKey]),
   draftWrite: z.tuple([draftKey, draftValue, draftRevision]),
   checkForUpdates: z.tuple([]),
@@ -94,26 +76,7 @@ export const hostArguments = {
   restartToUpdate: z.tuple([]),
   openUrl: z.tuple([externalUrl]),
   deviceSettings: z.tuple([]),
-  saveDeviceSettings: z.tuple([
-    z.object({
-      theme: z.enum(themes).optional(),
-      language: z.enum(languages).optional(),
-      markdownFont: z.enum(markdownFonts).optional(),
-      pageMargins: z.enum(pageMargins).optional(),
-      textSize: z.enum(textSizes).optional(),
-      lineSpacing: z.enum(lineSpacings).optional(),
-      editorAssistance: z.boolean().optional(),
-      propertiesFolded: z.boolean().optional(),
-      vaultAgent: z.boolean().optional(),
-      agentAccess: z.enum(agentAccessModes).optional(),
-      // The pane library keys a layout by its prefix, the group id and every panel id.
-      layouts: z.record(z.string().max(160), z.string().max(4096)).optional(),
-      skillAudiences: z.record(z.string().max(64), skillAudience).optional(),
-      yourAi: yourAiChoice.optional(),
-      routineRuntimes: routineRuntimeList.optional(),
-      windowItems: windowItemChoices.optional(),
-    }),
-  ]),
+  saveDeviceSettings: z.tuple([deviceSettingsPatchSchema]),
   moveNote: z.tuple([noteRef, path, z.boolean()]),
   trashNote: z.tuple([noteRef]),
   trashedNotes: z.tuple([id]),
@@ -241,7 +204,6 @@ export const hostArguments = {
   cloneRepository: z.tuple([id, id, path.min(1)]),
   updateRepository: z.tuple([id, id]),
   bindLocalFolder: z.tuple([id, id, path.min(1)]),
-  switchCloudToLocal: z.tuple([id, id, path.min(1)]),
   renameCloud: z.tuple([id, id, z.string().max(200)]),
   removeCloud: z.tuple([id, id]),
   contentsStrays: z.tuple([id]),
@@ -405,14 +367,16 @@ export const hostArguments = {
       .object({
         workspaceId: id,
         digest: version.optional(),
-        agents: z.record(
-          id,
-          z.object({
-            agent: z.enum(agentIds),
-            model: agentModel.optional(),
-            effort: agentEffort.optional(),
-          }),
-        ),
+        agents: z
+          .record(
+            id,
+            z.object({
+              agent: z.enum(agentIds),
+              model: agentModel.optional(),
+              effort: agentEffort.optional(),
+            }),
+          )
+          .refine((value) => Object.keys(value).length <= 200),
       })
       .strict(),
   ]),
@@ -456,7 +420,11 @@ export const hostArguments = {
     id,
     z.boolean(),
     z
-      .record(z.string(), z.union([z.string().max(16000), z.array(z.string().max(16000)).max(100)]))
+      .record(
+        z.string().max(256),
+        z.union([z.string().max(16000), z.array(z.string().max(16000)).max(100)]),
+      )
+      .refine((value) => Object.keys(value).length <= 100)
       .optional(),
   ]),
 } satisfies { [K in keyof HostRequests]: z.ZodType<Parameters<HostRequests[K]>> };

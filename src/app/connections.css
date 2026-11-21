@@ -112,34 +112,9 @@
   color: var(--ink-2);
   overflow-wrap: anywhere;
 }
-.connect-sheet .connect-notice {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--warn-wash);
-  color: var(--warn-ink);
-  font-size: 12px;
-  line-height: 1.6;
-  overflow-wrap: anywhere;
-}
-.connect-sheet .connect-notice-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
 .connect-sheet .error {
   margin: 0;
   padding: 10px 12px;
-  font-size: 12px;
-  line-height: 1.6;
-}
-.connect-sheet .moved-notice {
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--stage-2);
-  color: var(--ink-2);
   font-size: 12px;
   line-height: 1.6;
 }
@@ -228,7 +203,6 @@
   color: var(--ink-3);
 }
 .connect-sheet .connect-field :is(input, select),
-.connect-sheet .account-add input,
 .connect-sheet .connection-rename input {
   width: 100%;
   height: 36px;
@@ -246,196 +220,7 @@
   padding-right: 30px;
 }
 
-/* Step 1: accounts */
-.connect-sheet .account-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 50px;
-  padding: 8px 8px 8px 12px;
-  border-radius: 12px;
-  background: var(--card);
-  box-shadow: var(--card-shadow);
-}
-.connect-sheet .account-avatar {
-  width: 28px;
-  height: 28px;
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: var(--stage-3);
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 700;
-}
-.connect-sheet .account-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.connect-sheet .account-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  column-gap: 10px;
-  row-gap: 2px;
-}
-.connect-sheet .account-line strong {
-  font-size: 13.5px;
-  font-weight: 600;
-}
-.connect-sheet .account-state {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-}
-.connect-sheet .account-state.good {
-  color: var(--ink-2);
-}
-.connect-sheet .account-state.warn {
-  color: var(--warn-ink);
-}
-.connect-sheet .account-state.bad {
-  color: var(--del-ink);
-}
-.connect-sheet .account-state.wait {
-  color: var(--ink-2);
-}
-.connect-sheet .account-row small {
-  display: block;
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: var(--ink-3);
-}
-.connect-sheet .account-add {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.connect-sheet .account-add input {
-  width: 220px;
-  height: 30px;
-  font-size: 12.5px;
-}
-.connect-sheet .account-add button {
-  gap: 6px;
-  color: var(--ink-2);
-}
-
-/* Step 2: the Drive folder */
-.connect-sheet .folder-box {
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--card);
-  box-shadow: var(--card-shadow);
-}
-.connect-sheet .folder-crumbs {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 38px;
-  padding: 0 10px;
-  font-size: 12.5px;
-  color: var(--ink-2);
-}
-.connect-sheet .folder-crumbs > .ui-icon {
-  color: var(--ink-3);
-}
-.connect-sheet .folder-crumbs .stage-button {
-  height: 26px;
-  border-radius: 7px;
-  font-size: 12.5px;
-  color: var(--ink-2);
-}
-.connect-sheet .folder-here {
-  padding: 0 6px;
-  font-weight: 600;
-  color: var(--ink);
-}
-.connect-sheet .folder-crumbs .choose-current {
-  margin-left: auto;
-  padding: 0 9px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ink);
-}
-.connect-sheet .folder-crumbs .choose-current[aria-pressed='true'] {
-  background: var(--stage-2);
-}
-.connect-sheet .folder-rows {
-  max-height: 252px;
-  overflow: auto;
-  overscroll-behavior: contain;
-}
-.connect-sheet .folder-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 42px;
-  padding: 0 8px 0 14px;
-  box-shadow: inset 0 1px 0 var(--rule);
-}
-.connect-sheet .folder-row.selected {
-  background: var(--stage-2);
-  box-shadow: inset 0 1px 0 var(--rule);
-}
-.connect-sheet .folder-row .folder-pick {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
-  margin: 0;
-  cursor: pointer;
-}
-.connect-sheet .folder-pick input {
-  width: 15px;
-  height: 15px;
-  margin: 0;
-}
-.connect-sheet .folder-pick .ui-icon {
-  color: var(--ink-3);
-}
-.connect-sheet .folder-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--ink);
-}
-.connect-sheet .folder-row.selected .folder-pick .ui-icon {
-  color: var(--cont-ink);
-}
-.connect-sheet .folder-row.selected .folder-name {
-  font-weight: 600;
-}
-.connect-sheet .folder-row small {
-  display: inline;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--ink-3);
-}
-.connect-sheet .folder-row .stage-button {
-  height: 26px;
-  gap: 4px;
-  padding: 0 9px;
-  border-radius: 7px;
-  color: var(--ink-2);
-}
-.connect-sheet .folder-note {
-  padding: 12px 14px;
-  box-shadow: inset 0 1px 0 var(--rule);
-  font-size: 12px;
-  color: var(--ink-2);
-}
-
-/* Step 3: where it appears in Contents */
+/* Where it appears in Contents */
 .connect-sheet .attachment-form {
   display: flex;
   flex-direction: column;
@@ -617,14 +402,6 @@
   align-items: center;
   gap: 4px;
 }
-.connect-sheet .connection-pending {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--run-ink);
-}
 .connect-sheet .connection-actions {
   display: flex;
   flex-wrap: wrap;
@@ -648,20 +425,6 @@
 .connect-sheet .connection-actions .connect-more {
   margin-left: auto;
 }
-.connect-sheet .connection-confirm {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--warn-wash);
-  color: var(--warn-ink);
-  font-size: 12px;
-  line-height: 1.6;
-}
-.connect-sheet .connection-confirm .connection-actions {
-  justify-content: flex-end;
-}
 .connect-sheet .connection-rename {
   display: flex;
   flex-direction: column;
@@ -669,14 +432,6 @@
 }
 .connect-sheet .connection-rename .connection-actions {
   justify-content: flex-end;
-}
-.connect-sheet .earlier-connections {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 0 0 12px;
-  border: 0;
-  box-shadow: inset 0 -1px 0 var(--rule);
 }
 
 @media (max-width: 860px) {

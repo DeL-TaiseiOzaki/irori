@@ -45,7 +45,7 @@
   font-size: 15px;
   font-weight: 600;
 }
-.schema-owner {
+.schema-owners .schema-owner {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -59,16 +59,16 @@
   font-weight: 400;
   text-align: left;
 }
-.schema-owner span {
+.schema-owners .schema-owner span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.schema-owner:hover {
+.schema-owners .schema-owner:hover {
   background: var(--raised);
 }
-.schema-owner[aria-pressed='true'] {
+.schema-owners .schema-owner[aria-pressed='true'] {
   background: var(--raised-2);
 }
 .schema-owner-icon {

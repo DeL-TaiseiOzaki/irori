@@ -19,6 +19,7 @@ export function SchemaDialog({
   initialOwner,
   revision,
   locked,
+  onOpenFile,
   onClose,
 }: {
   /** The irori agent; the shared Schema lives in its folder, so both need it set up. */
@@ -30,6 +31,7 @@ export function SchemaDialog({
   revision: number;
   /** Whether a run, a Git operation or a connection holds that Schema's folder. */
   locked: (scopeId: string) => boolean;
+  onOpenFile?: (scopeId: string, path: string) => void;
   onClose: () => void;
 }) {
   const ready = you?.state === 'ready';
@@ -101,7 +103,10 @@ export function SchemaDialog({
               selected={target}
               locked={locked(owner)}
               onSelect={setTarget}
-              onOpenFile={() => undefined}
+              onOpenFile={(file) => {
+                onOpenFile?.(owner, file.path);
+                onClose();
+              }}
             />
           </div>
         ) : (

@@ -198,19 +198,22 @@ export interface AddSubmodule {
 }
 /** A folder name suggested from a repository URL: its last segment without `.git`. */
 export function repositoryFolder(url: string) {
-  return /[/:]([\w.-]+?)(?:\.git)?\/?$/.exec(url.trim())?.[1] ?? '';
+  const name = /[/:]([\w.-]+?)(?:\.git)?\/?$/.exec(url.trim())?.[1] ?? '';
+  return validRepositoryName(name) ? name : '';
 }
 /** The owner/repository a GitHub remote names, or undefined for any other remote. */
 export function githubRepository(remote: string): string | undefined {
   // Return only an owner/repository identity; never display embedded credentials or query strings.
+  const pair = (owner: string, name: string) =>
+    githubOwnerPattern.test(owner) && validRepositoryName(name) ? `${owner}/${name}` : undefined;
   const scp = /^git@github\.com:([\w.-]+)\/([\w.-]+?)(?:\.git)?$/.exec(remote);
-  if (scp) return `${scp[1]}/${scp[2]}`;
+  if (scp) return pair(scp[1], scp[2]);
   try {
     const url = new URL(remote);
     if (url.hostname.toLowerCase() !== 'github.com' || !['https:', 'ssh:'].includes(url.protocol))
       return;
     const parts = /^\/([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/.exec(url.pathname);
-    if (parts) return `${parts[1]}/${parts[2]}`;
+    if (parts) return pair(parts[1], parts[2]);
   } catch {
     /* not a supported GitHub remote */
   }

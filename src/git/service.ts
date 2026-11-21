@@ -617,7 +617,7 @@ export class GitService {
     if (!branch) return { identity: '' };
     const configured = await this.config(s, `branch.${branch}.remote`);
     const name = configured || 'origin';
-    if (!/^[\w.-]+$/.test(name) || name === '.') return { identity: '' };
+    if (!/^[\w.][\w.-]*$/.test(name) || name === '.' || name === '..') return { identity: '' };
     if (!(await this.config(s, `remote.${name}.url`))) return { identity: '' };
     const url = await this.optional(s, ['remote', 'get-url', name]);
     if (!url) return { identity: '' };
@@ -1101,8 +1101,9 @@ export class GitService {
         if (!(await this.ref(sub, `${oid}^{commit}`))) {
           const remote =
             (await this.optional(sub, ['config', '--get', `branch.${branch}.remote`])) || 'origin';
-          if (!/^[\w.-]+$/.test(remote)) throw Error('remote');
-          await this.git(sub, ['fetch', '--no-tags', '--no-recurse-submodules', remote], {
+          if (!/^[\w.][\w.-]*$/.test(remote) || remote === '.' || remote === '..')
+            throw Error('remote');
+          await this.git(sub, ['fetch', '--no-tags', '--no-recurse-submodules', '--', remote], {
             network: true,
           });
         }

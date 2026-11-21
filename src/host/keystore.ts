@@ -8,6 +8,7 @@ import {
   type SecretList,
 } from '../domain/routines';
 import { readLocalJson, writeLocalJson } from './local-json';
+import { SerialQueue } from './serial-queue';
 
 /** Electron's `safeStorage`, given by the host once the app is ready. */
 export interface SecureStorage {
@@ -67,7 +68,7 @@ const record = z.object({
  * a value to the renderer; `values` is for the routine host only.
  */
 export class SecretStore {
-  private queue: Promise<unknown> = Promise.resolve();
+  private queue = new SerialQueue();
   constructor(
     private file: string,
     private storage?: SecureStorage,
@@ -86,13 +87,11 @@ export class SecretStore {
   }
   /** One change at a time, so two routines writing back never lose one another's. */
   private change(apply: (values: Record<string, string>) => void) {
-    const next = this.queue.then(async () => {
+    return this.queue.run(async () => {
       const values = await this.read();
       apply(values);
       await writeLocalJson(this.file, { schemaVersion: 1, values });
     });
-    this.queue = next.catch(() => {});
-    return next;
   }
   private seal(name: string, value: string) {
     if (!this.available) throw Error(unavailableText());
@@ -133,7 +132,7 @@ export class SecretStore {
   /** The values a step receives; throws when one is missing or cannot be decrypted. */
   async values(names: string[]) {
     if (!this.available) throw Error(unavailableText());
-    await this.queue;
+    await this.queue.idle();
     const stored = await this.read();
     const found: Record<string, string> = {};
     for (const name of names) {

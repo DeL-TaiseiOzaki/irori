@@ -348,7 +348,7 @@ function RepositoryPanel({
   const [diff, setDiff] = useState<GitDiff>(),
     [conflict, setConflict] = useState<GitConflict>(),
     [resolution, setResolution] = useState('');
-  const [confirmation, setConfirmation] = useState<'commit' | GitSyncAction>();
+  const [confirmation, setConfirmation] = useState<GitSyncAction>();
   const [publishing, setPublishing] = useState(false);
   const [history, setHistory] = useState<GitCommit[]>([]),
     [more, setMore] = useState(false),
@@ -613,8 +613,7 @@ function RepositoryPanel({
     (!!staged.length || status.operation === 'merge');
   const canSync = !!status.remote && !!status.head && !!status.branch;
   const remoteLabel = `${status.remote?.label ?? t('リモート未設定', 'No remote set')} / ${status.remote?.branch ?? ''}`;
-  const confirmLabels = {
-    commit: t('コミット', 'Commit'),
+  const confirmLabels: Record<GitSyncAction, string> = {
     fetch: t('取得', 'Fetch'),
     pull: t('Pull', 'Pull'),
     merge: t('統合', 'Merge'),
@@ -1341,35 +1340,21 @@ function RepositoryPanel({
         >
           <div>
             <strong>
-              {confirmation === 'commit'
-                ? t(
-                    `${staged.length} 件の変更を ${label} に commit`,
-                    `Commit ${staged.length} change${staged.length === 1 ? '' : 's'} to ${label}`,
-                  )
-                : `${label} / ${status.branch} ${t('と', 'and')} ${confirmation === 'push' ? remoteLabel : `${status.remote?.fetchLabel} / ${status.remote?.branch}`}`}
+              {`${label} / ${status.branch} ${t('と', 'and')} ${confirmation === 'push' ? remoteLabel : `${status.remote?.fetchLabel} / ${status.remote?.branch}`}`}
             </strong>
             <p>
-              {confirmation === 'commit'
-                ? message
-                : confirmation === 'push'
-                  ? t(
-                      `commit ${status.head?.slice(0, 8)} までを送信します。`,
-                      `Sends up to commit ${status.head?.slice(0, 8)}.`,
-                    )
-                  : confirmation === 'merge'
-                    ? t('リモートを取得して統合します。', 'Fetches remote and merges.')
-                    : t(
-                        'リモートを取得し、分岐していなければ更新します。',
-                        'Fetches remote and updates if history has not diverged.',
-                      )}
+              {confirmation === 'push'
+                ? t(
+                    `commit ${status.head?.slice(0, 8)} までを送信します。`,
+                    `Sends up to commit ${status.head?.slice(0, 8)}.`,
+                  )
+                : confirmation === 'merge'
+                  ? t('リモートを取得して統合します。', 'Fetches remote and merges.')
+                  : t(
+                      'リモートを取得し、分岐していなければ更新します。',
+                      'Fetches remote and updates if history has not diverged.',
+                    )}
             </p>
-            {confirmation === 'commit' && (
-              <ul>
-                {staged.map((c) => (
-                  <li key={c.path}>{c.path}</li>
-                ))}
-              </ul>
-            )}
           </div>
           <div className="actions">
             <button disabled={busy} onClick={() => setConfirmation(undefined)}>
@@ -1380,26 +1365,10 @@ function RepositoryPanel({
               disabled={busy}
               onClick={() =>
                 void perform(
-                  async () => {
-                    if (confirmation === 'commit') {
-                      const acknowledged = messageDraft.snapshot().record?.revision;
-                      const value = await host.gitCommit(target, message, status.version);
-                      if (!(await messageDraft.clear(acknowledged)))
-                        throw Error(
-                          t(
-                            '下書きの完了を保存できませんでした。',
-                            'Could not mark the draft complete.',
-                          ),
-                        );
-                      return value;
-                    }
-                    return host.gitSync(target, confirmation, confirmationVersion.current);
-                  },
-                  confirmation === 'commit'
-                    ? t('コミットしました。', 'Committed.')
-                    : confirmation === 'push'
-                      ? t('送信しました。', 'Pushed.')
-                      : t('受信しました。', 'Fetched.'),
+                  () => host.gitSync(target, confirmation, confirmationVersion.current),
+                  confirmation === 'push'
+                    ? t('送信しました。', 'Pushed.')
+                    : t('受信しました。', 'Fetched.'),
                 )
               }
             >
