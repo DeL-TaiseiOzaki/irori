@@ -3,6 +3,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import { t } from '../domain/i18n';
 import { within } from '../domain/scopes';
+import { ancestorWithin } from './path-guard';
 import { sharedSchemaFolder } from '../domain/you';
 import { iroriAgentSkills, yourAiStarter } from '../../prompts';
 import { utf8Text } from './files';
@@ -189,6 +190,11 @@ export async function restoreAgentFiles(root: string, saved: StoredAgentFile[]) 
         kept.push(file.path);
         continue;
       }
+    }
+    // Verify existing ancestors stay inside `real` before creating subdirectories.
+    if (!(await ancestorWithin(real, path.dirname(destination)))) {
+      kept.push(file.path);
+      continue;
     }
     await fs.mkdir(path.dirname(destination), { recursive: true });
     // A link on the way would lead the write out of the folder.

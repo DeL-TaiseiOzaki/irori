@@ -15,6 +15,10 @@ import type { AgentId } from '../domain/types';
 const own: Partial<Record<AgentId, { files: string[]; folders: string[] }>> = {
   claude: {
     files: ['.claude/settings.json', '.claude/settings.local.json', '.mcp.json'],
+    folders: ['.claude/hooks'],
+  },
+  codex: {
+    files: ['.codex/config.toml', '.codex/hooks.json'],
     folders: [],
   },
   opencode: {
@@ -24,12 +28,19 @@ const own: Partial<Record<AgentId, { files: string[]; folders: string[] }>> = {
       '.opencode/opencode.json',
       '.opencode/opencode.jsonc',
     ],
-    folders: ['.opencode/plugin', '.opencode/plugins'],
+    folders: ['.opencode/plugin', '.opencode/plugins', '.opencode/tool', '.opencode/tools'],
   },
   pi: { files: [], folders: ['.pi/extensions'] },
+  antigravity: {
+    files: ['.agents/hooks.json'],
+    folders: [],
+  },
 };
-/** A folder given beside it: Claude Code loads its `.claude` (skills, agents, commands, plugins). */
-const added: Partial<Record<AgentId, string[]>> = { claude: ['.claude'] };
+/** A folder given beside it: Claude Code loads `.claude`, Antigravity CLI loads `.agents/hooks.json`. */
+const added: Partial<Record<AgentId, { files?: string[]; folders?: string[] }>> = {
+  claude: { folders: ['.claude'] },
+  antigravity: { files: ['.agents/hooks.json'] },
+};
 const fileLimit = 500;
 
 /** Where a run's CLI reads configuration: its working folder, or one given beside it. */
@@ -42,21 +53,40 @@ const sha256 = (value: string | Buffer) => createHash('sha256').update(value).di
 async function entry(file: string): Promise<string | undefined> {
   const info = await fs.lstat(file).catch(() => undefined);
   if (!info) return undefined;
-  if (info.isSymbolicLink()) return `link ${await fs.readlink(file).catch(() => '?')}`;
+  if (info.isSymbolicLink()) {
+    const link = await fs.readlink(file).catch(() => '?');
+    const target = await fs.stat(file).catch(() => undefined);
+    const content = target?.isFile()
+      ? sha256(await fs.readFile(file).catch(() => Buffer.alloc(0)))
+      : '';
+    return `link ${link} ${content}`;
+  }
   if (!info.isFile()) return undefined;
   return sha256(await fs.readFile(file));
 }
 
-async function walk(root: string, rel: string, out: [string, string][], depth = 0) {
-  const entries = await fs
-    .readdir(path.join(root, rel), { withFileTypes: true })
-    .catch(() => undefined);
+async function walk(
+  root: string,
+  rel: string,
+  out: [string, string][],
+  depth = 0,
+  visited = new Set<string>(),
+) {
+  const dirPath = path.join(root, rel);
+  const realDir = await fs.realpath(dirPath).catch(() => undefined);
+  if (!realDir || visited.has(realDir)) return;
+  visited.add(realDir);
+  const entries = await fs.readdir(dirPath, { withFileTypes: true }).catch(() => undefined);
   for (const item of entries ?? []) {
     if (out.length >= fileLimit) return;
     const child = `${rel}/${item.name}`;
-    if (item.isDirectory() && depth < 8) await walk(root, child, out, depth + 1);
+    const full = path.join(root, child);
+    const isDir =
+      item.isDirectory() ||
+      (item.isSymbolicLink() && (await fs.stat(full).catch(() => undefined))?.isDirectory());
+    if (isDir && depth < 8) await walk(root, child, out, depth + 1, visited);
     else {
-      const value = await entry(path.join(root, child));
+      const value = await entry(full);
       if (value) out.push([child, value]);
     }
   }
@@ -68,12 +98,13 @@ export async function findConfig(
   agent: AgentId,
 ): Promise<FoundConfig | undefined> {
   const found: [string, string][] = [];
-  for (const rel of place.added ? [] : (own[agent]?.files ?? [])) {
+  const files = place.added ? (added[agent]?.files ?? []) : (own[agent]?.files ?? []);
+  const folders = place.added ? (added[agent]?.folders ?? []) : (own[agent]?.folders ?? []);
+  for (const rel of files) {
     const value = await entry(path.join(place.root, rel));
     if (value) found.push([rel, value]);
   }
-  for (const rel of place.added ? (added[agent] ?? []) : (own[agent]?.folders ?? []))
-    await walk(place.root, rel, found);
+  for (const rel of folders) await walk(place.root, rel, found);
   if (!found.length) return undefined;
   found.sort(([a], [b]) => (a < b ? -1 : 1));
   return {

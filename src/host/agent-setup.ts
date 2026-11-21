@@ -143,6 +143,8 @@ export interface SetupContext {
   workspaceId?: string;
   /** The CLI, model and thinking level the request runs on, for the agent steps of a routine it starts. */
   agent?: { agent: AgentId; model?: string; effort?: string };
+  /** The vaults handed to an irori-agent run; other vaults are refused for mutations. */
+  handedScopes?: string[];
   /** The request is an agent step of a routine, which starts none (D6). */
   inRoutine?: boolean;
 }
@@ -153,10 +155,10 @@ type Joined = 'joined' | 'member' | 'no workspace';
 const irori = new Set(['clone', 'create', 'add', 'workspace', 'remove', 'run']);
 /**
  * Forms the person confirms each time: they add a folder agents may write in,
- * register or remove a vault, or start a routine with its secrets. Any process
+ * clone, create, register or remove a vault, or start a routine with its secrets. Any process
  * the agent starts holds the command too, so a request alone is not enough.
  */
-const confirmed = new Set(['add', 'connect', 'work', 'remove', 'run']);
+const confirmed = new Set(['clone', 'create', 'add', 'connect', 'work', 'remove', 'run']);
 
 /**
  * Carries out the irori agent's `irori` command: what the person does in
@@ -192,10 +194,30 @@ export class AgentSetup {
       throw Error(
         `"irori ${command.kind}" is the irori agent's. Ask the person to ask the irori agent in irori mode.`,
       );
+    const relativePathArg =
+      command.kind === 'add'
+        ? !path.isAbsolute(command.folder) && !/^~(?:[\\/]|$)/.test(command.folder)
+        : command.kind === 'connect'
+          ? !command.repository &&
+            !path.isAbsolute(command.folder) &&
+            !/^~(?:[\\/]|$)/.test(command.folder)
+          : command.kind === 'work'
+            ? !!command.folder &&
+              !path.isAbsolute(command.folder) &&
+              !/^~(?:[\\/]|$)/.test(command.folder)
+            : command.kind === 'clone' || command.kind === 'create'
+              ? !!command.parent &&
+                !path.isAbsolute(command.parent) &&
+                !/^~(?:[\\/]|$)/.test(command.parent)
+              : false;
+    const shownCommand = `irori ${argv.join(' ')}${relativePathArg ? ` (in ${cwd})` : ''}`.slice(
+      0,
+      2000,
+    );
     if (
       confirmed.has(command.kind) &&
       this.host.confirm &&
-      !(await this.host.confirm(`irori ${argv.join(' ')}`.slice(0, 2000), context.by ?? 'agent'))
+      !(await this.host.confirm(shownCommand, context.by ?? 'agent'))
     )
       throw Error(
         `The person did not allow "irori ${command.kind}". Do not try it again unless they ask.`,
@@ -467,7 +489,7 @@ export class AgentSetup {
     );
   }
   /** The registered vault a command names: by name, sub-agent name or folder. */
-  private vault(name: string, cwd: string, scope?: string) {
+  private vault(name: string, cwd: string, scope?: string, handed?: string[]) {
     const spaces = this.host.files.list();
     const agents = brainAgentNames(spaces);
     const folder = this.folder(cwd, name);
@@ -478,29 +500,33 @@ export class AgentSetup {
         agents.get(space.scopeId) === name.trim() ||
         space.root === folder,
     );
-    if (found.length === 1) return this.allowed(found[0], scope);
+    if (found.length === 1) return this.allowed(found[0], scope, handed);
     if (found.length)
       throw Error(
         `More than one vault is named "${name}". Name it by its folder: ${found.map((space) => JSON.stringify(space.root)).join(', ')}.`,
       );
     throw Error(`No vault is named "${name}". Run "irori list" for their names and folders.`);
   }
-  /** Refuses another vault to a vault agent's command. */
-  private allowed(space: Space, scope: string | undefined) {
+  /** Refuses another vault to a vault agent's command, or an unhanded vault when scopes were handed. */
+  private allowed(space: Space, scope: string | undefined, handed?: string[]) {
     if (scope && space.scopeId !== scope)
       throw Error(
         `You are the vault agent of another vault; "${space.name}" is not yours. Ask the person to ask the irori agent.`,
       );
+    if (!scope && handed && !handed.includes(space.scopeId))
+      throw Error(
+        `The vault "${space.name}" was not handed to this request. Ask the person to include it.`,
+      );
     return space;
   }
   /** The vault a file is in, and the file's path in it, refused outside the vaults this run reaches. */
-  private located(cwd: string, file: string, scope: string | undefined) {
+  private located(cwd: string, file: string, scope: string | undefined, handed?: string[]) {
     const absolute = this.folder(cwd, file);
     const space = owner(this.host.files.list(), absolute);
     if (!space || absolute === space.root)
       throw Error(`${JSON.stringify(file)} is not a file in a vault.`);
     return {
-      space: this.allowed(space, scope),
+      space: this.allowed(space, scope, handed),
       path: path.relative(space.root, absolute).split(path.sep).join('/'),
     };
   }
@@ -511,7 +537,7 @@ export class AgentSetup {
     context: SetupContext,
   ) {
     // A folder connected only adds to contents, so it goes on during the vault's run (ADR 042 D2).
-    const space = this.vault(command.vault, cwd, context.vault);
+    const space = this.vault(command.vault, cwd, context.vault, context.handedScopes);
     if (command.repository) return this.connectRepository(space, command, cwd);
     const folder = this.folder(cwd, command.folder);
     const contentsRoot = space.contents[0];
@@ -606,7 +632,7 @@ export class AgentSetup {
     cwd: string,
     context: SetupContext,
   ) {
-    const space = this.vault(command.vault, cwd, context.vault);
+    const space = this.vault(command.vault, cwd, context.vault, context.handedScopes);
     this.idle(space, 'Take the folder out', context.vault);
     const wanted = command.name.replace(/^.*[\\/]/, '');
     const connection = (await this.host.cloud.connections(space.scopeId)).find(
@@ -631,7 +657,7 @@ export class AgentSetup {
   ) {
     // A vault's name, category, look and layer names: its run keeps what it was told,
     // so they change during it as in the vault's settings (ADR 020 D5).
-    const space = this.vault(command.vault, cwd, context.vault);
+    const space = this.vault(command.vault, cwd, context.vault, context.handedScopes);
     const change: SpaceChange = {
       ...(command.name && { name: command.name }),
       ...(command.category && { category: command.category }),
@@ -671,7 +697,7 @@ export class AgentSetup {
     cwd: string,
     context: SetupContext,
   ) {
-    const space = this.vault(command.vault, cwd, context.vault);
+    const space = this.vault(command.vault, cwd, context.vault, context.handedScopes);
     if (!this.host.work) throw Error('irori cannot choose work folders here.');
     const chosen = await this.host.work.choose(
       space.scopeId,
@@ -684,7 +710,7 @@ export class AgentSetup {
     cwd: string,
     context: SetupContext,
   ) {
-    const space = this.vault(command.vault, cwd, context.vault);
+    const space = this.vault(command.vault, cwd, context.vault, context.handedScopes);
     const word = command.layer === 'contents' ? 'contents' : 'knowledge';
     this.idle(space, `Choose its ${word} folder`, context.vault);
     try {
@@ -777,8 +803,8 @@ export class AgentSetup {
     context: SetupContext,
   ) {
     if (!this.host.moveNote) throw Error('Moving notes is not available here.');
-    const from = this.located(cwd, command.note, context.vault);
-    let to = this.located(cwd, command.destination, context.vault);
+    const from = this.located(cwd, command.note, context.vault, context.handedScopes);
+    let to = this.located(cwd, command.destination, context.vault, context.handedScopes);
     if (to.space.scopeId !== from.space.scopeId) throw Error('A note moves within its own vault.');
     // A folder as the destination keeps the note's name.
     const folder = await fs
@@ -796,7 +822,7 @@ export class AgentSetup {
     context: SetupContext,
   ) {
     if (!this.host.trashNote) throw Error("irori's trash is not available here.");
-    const note = this.located(cwd, command.note, context.vault);
+    const note = this.located(cwd, command.note, context.vault, context.handedScopes);
     await this.host.trashNote(note.space.scopeId, note.path);
     this.host.announce?.({ scopeId: note.space.scopeId });
     return noteTrashed(note.space.name, note.path);
@@ -807,7 +833,7 @@ export class AgentSetup {
     context: SetupContext,
   ) {
     if (!this.host.addComment) throw Error('Comments are not available here.');
-    const file = this.located(cwd, command.file, context.vault);
+    const file = this.located(cwd, command.file, context.vault, context.handedScopes);
     const comments = await this.host.addComment(
       file.space.scopeId,
       file.path,
@@ -827,7 +853,7 @@ export class AgentSetup {
     context: SetupContext,
   ) {
     if (!this.host.removeComment) throw Error('Comments are not available here.');
-    const file = this.located(cwd, command.file, context.vault);
+    const file = this.located(cwd, command.file, context.vault, context.handedScopes);
     const left = await this.host.removeComment(file.space.scopeId, file.path, command.id);
     this.host.announce?.({ scopeId: file.space.scopeId });
     return commentResolved(file.path, command.id, left.length);
@@ -856,11 +882,11 @@ export class AgentSetup {
   private named(command: { kind: string; vault?: string }, cwd: string, context: SetupContext) {
     const here = owner(this.host.files.list(), this.folder(cwd, '.'));
     const space = command.vault
-      ? this.vault(command.vault, cwd, context.vault)
+      ? this.vault(command.vault, cwd, context.vault, context.handedScopes)
       : context.vault
         ? this.host.files.get(context.vault)
         : here
-          ? this.allowed(here, undefined)
+          ? this.allowed(here, undefined, context.handedScopes)
           : undefined;
     if (!space) throw Error(`Name the vault: "irori ${command.kind} <vault>".`);
     return space;

@@ -76,7 +76,16 @@ export class KnowledgeStore {
     return path.join(this.directory, 'blobs', digest);
   }
   async bytes(version: SourceVersion) {
-    const bytes = await fs.readFile(this.blobPath(version.hash));
+    const file = this.blobPath(version.hash);
+    const stat = await fs.stat(file);
+    if (!stat.isFile() || stat.size !== version.size || stat.size > materialLimit)
+      throw Error(
+        t(
+          '保持した資料の整合性を確認できません。',
+          'Could not verify the integrity of the kept material.',
+        ),
+      );
+    const bytes = await fs.readFile(file);
     if (bytes.length !== version.size || hash(bytes) !== version.hash)
       throw Error(
         t(
@@ -309,7 +318,8 @@ export class KnowledgeStore {
   private async index(scopeId: string) {
     z.uuid().parse(scopeId);
     const filename = path.join(this.directory, `index-${scopeId}.json`);
-    const entries = z.record(z.string(), z.uuid()).parse(await readLocalJson(filename, {}));
+    const parsed = z.record(z.string(), z.uuid()).parse(await readLocalJson(filename, {}));
+    const entries: Record<string, string> = Object.assign(Object.create(null), parsed);
     if (new Set(Object.values(entries)).size !== Object.keys(entries).length)
       throw Error(
         t('資料 ID の登録が重複しています。', 'The material ID is registered more than once.'),
@@ -344,7 +354,7 @@ export class KnowledgeStore {
     return this.queue.run(async () => {
       const { filename, entries } = await this.index(scopeId);
       let changed = false;
-      const next: Record<string, string> = {};
+      const next: Record<string, string> = Object.create(null);
       for (const [key, id] of Object.entries(entries)) {
         const moved = movedPath(move, key);
         if (moved !== undefined) changed = true;

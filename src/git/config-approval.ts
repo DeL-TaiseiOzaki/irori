@@ -12,13 +12,28 @@ import { t } from '../domain/i18n';
  * can carry them, so Git runs there only once the person has seen them.
  */
 const runs =
-  /^(core\.(hookspath|sshcommand|pager|editor|askpass|fsmonitor|gitproxy|alternaterefscommand)|credential\.(.+\.)?helper|filter\..+\.(clean|smudge|process)|diff\.external|diff\..+\.(command|textconv)|merge\..+\.driver|gpg\.(.+\.)?program|sequence\.editor|uploadpack\.packobjectshook|remote\..+\.(uploadpack|receivepack|vcs)|include\.path|includeif\..+\.path)$/;
+  /^(core\.(hookspath|sshcommand|pager|editor|askpass|fsmonitor|gitproxy|alternaterefscommand)|credential\.(.+\.)?helper|filter\..+\.(clean|smudge|process)|diff\.external|diff\..+\.(command|textconv)|merge\..+\.driver|gpg\.(.+\.)?program|sequence\.editor|uploadpack\.packobjectshook|remote\..+\.(uploadpack|receivepack|vcs)|protocol\.(.+\.)?allow|url\..+\.(insteadof|pushinsteadof)|extensions\.worktreeconfig|include\.path|includeif\..+\.path)$/;
 
 /** Each `key = value` of a Git config file, keys spelled as Git compares them. */
 export function configEntries(text: string): [string, string][] {
   const entries: [string, string][] = [];
   let section = '';
+  // Join Git's trailing-backslash line continuations before parsing entries.
+  const logicalLines: string[] = [];
+  let pending = '';
   for (const raw of text.split(/\r?\n/)) {
+    const combined = pending ? `${pending}${raw}` : raw;
+    let slashes = 0;
+    for (let i = combined.length - 1; i >= 0 && combined[i] === '\\'; i--) slashes++;
+    if (slashes % 2 === 1) {
+      pending = combined.slice(0, -1);
+    } else {
+      logicalLines.push(combined);
+      pending = '';
+    }
+  }
+  if (pending) logicalLines.push(pending);
+  for (const raw of logicalLines) {
     const line = raw.trim();
     if (!line || line.startsWith('#') || line.startsWith(';')) continue;
     const header = /^\[\s*([^\s"\]]+)(?:\s+"((?:[^"\\]|\\.)*)")?\s*\]\s*(.*)$/.exec(line);
@@ -39,20 +54,21 @@ export function configEntries(text: string): [string, string][] {
   return entries;
 }
 
-/** The repository's own Git folder (shared by its worktrees) for a working folder, if any. */
-async function gitFolder(cwd: string): Promise<string | undefined> {
+/** The repository's own Git folder (common dir) and worktree-specific dir, if any. */
+async function gitFolders(cwd: string): Promise<{ folder: string; gitDir: string } | undefined> {
   for (let dir = path.resolve(cwd); ; dir = path.dirname(dir)) {
     const dot = path.join(dir, '.git');
     const info = await fs.stat(dot).catch(() => undefined);
-    let folder: string | undefined;
-    if (info?.isDirectory()) folder = dot;
+    let gitDir: string | undefined;
+    if (info?.isDirectory()) gitDir = dot;
     else if (info?.isFile()) {
       const match = /^gitdir:\s*(.+)$/m.exec(await fs.readFile(dot, 'utf8').catch(() => ''));
-      if (match) folder = path.resolve(dir, match[1].trim());
+      if (match) gitDir = path.resolve(dir, match[1].trim());
     }
-    if (folder) {
-      const common = await fs.readFile(path.join(folder, 'commondir'), 'utf8').catch(() => '');
-      return common.trim() ? path.resolve(folder, common.trim()) : folder;
+    if (gitDir) {
+      const common = await fs.readFile(path.join(gitDir, 'commondir'), 'utf8').catch(() => '');
+      const folder = common.trim() ? path.resolve(gitDir, common.trim()) : gitDir;
+      return { folder, gitDir };
     }
     if (path.dirname(dir) === dir) return undefined;
   }
@@ -62,12 +78,25 @@ const sha256 = (value: string | Buffer) => createHash('sha256').update(value).di
 
 /** What in a repository's own configuration runs a program, with a digest of it. */
 export async function gitConfigRuns(cwd: string) {
-  const folder = await gitFolder(cwd);
-  if (!folder) return undefined;
-  const text = await fs.readFile(path.join(folder, 'config'), 'utf8').catch(() => '');
-  const found = configEntries(text)
-    .filter(([key]) => runs.test(key) && key !== 'core.fsmonitor')
-    .map(([key, value]) => `${key} = ${value.slice(0, 200)}`);
+  const dirs = await gitFolders(cwd);
+  if (!dirs) return undefined;
+  const { folder, gitDir } = dirs;
+  const configFiles = [
+    ...new Set([
+      path.join(folder, 'config'),
+      path.join(gitDir, 'config.worktree'),
+      path.join(folder, 'config.worktree'),
+    ]),
+  ];
+  const matched: [string, string][] = [];
+  for (const configFile of configFiles) {
+    const text = await fs.readFile(configFile, 'utf8').catch(() => '');
+    if (!text) continue;
+    for (const [key, value] of configEntries(text))
+      if (runs.test(key) && key !== 'core.fsmonitor') matched.push([key, value]);
+  }
+  const found = matched.map(([key, value]) => `${key} = ${value.slice(0, 200)}`);
+  const fullValues = matched.map(([key, value]) => `${key} = ${value}`);
   const hooks = path.join(folder, 'hooks');
   const names = await fs.readdir(hooks).catch(() => [] as string[]);
   const hashes: string[] = [];
@@ -78,7 +107,7 @@ export async function gitConfigRuns(cwd: string) {
     hashes.push(sha256(await fs.readFile(path.join(hooks, name)).catch(() => '')));
   }
   return found.length
-    ? { folder, found, digest: sha256(JSON.stringify([found, hashes])) }
+    ? { folder, found, digest: sha256(JSON.stringify([fullValues, hashes])) }
     : undefined;
 }
 

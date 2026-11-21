@@ -322,8 +322,15 @@ export async function createVaultHost({ dataDir, emit, ask }: VaultHostOptions) 
     status: () => ({ running: agents.anyBusy }),
   };
 
+  const currentUser = () => {
+    try {
+      return os.userInfo().username;
+    } catch {
+      return process.env.USER || process.env.LOGNAME || '';
+    }
+  };
   const about = (): RemoteHostAbout => ({
-    user: os.userInfo().username,
+    user: currentUser(),
     hostname: os.hostname(),
     platform: process.platform,
     arch: process.arch,

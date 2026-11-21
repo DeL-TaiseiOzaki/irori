@@ -133,7 +133,7 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
     if (rest.length) throw Error(`"irori ${head}" takes no arguments.`);
     return { kind: head };
   }
-  if (!(head in options)) throw Error(`Unknown command "${head}". Run "irori help".`);
+  if (!Object.hasOwn(options, head)) throw Error(`Unknown command "${head}". Run "irori help".`);
   const kind = head as keyof typeof options;
   const values: Record<string, string | true> = {};
   const words: string[] = [];
@@ -146,7 +146,7 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
     const [key, inline] = item.slice(2).split(/=(.*)/s, 2);
     if (!options[kind].includes(key))
       throw Error(`"irori ${kind}" has no --${key}. Run "irori help".`);
-    if (key in values) throw Error(`--${key} is given twice.`);
+    if (Object.hasOwn(values, key)) throw Error(`--${key} is given twice.`);
     if (flags.has(key)) {
       if (inline !== undefined) throw Error(`--${key} takes no value.`);
       values[key] = true;

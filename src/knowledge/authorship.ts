@@ -49,6 +49,10 @@ export function lineKey(line: string): string | null {
  * is not in the text is an edit the tool itself will refuse. Pi matches its
  * `oldText` loosely, so an edit only Pi would apply is one this does not see.
  */
+/** Cap on simulated edit output and edit count so a hostile replace_all cannot amplify memory. */
+const editedTextLimit = 4 * 1024 * 1024;
+const editedStepsLimit = 500;
+
 export function editedText(tool: string, input: unknown, current: string): string | undefined {
   const value = (input ?? {}) as Record<string, unknown>;
   const replace = (text: string | undefined, edit: unknown) => {
@@ -58,13 +62,25 @@ export function editedText(tool: string, input: unknown, current: string): strin
     const all = e.replace_all ?? e.replaceAll;
     if (text === undefined || typeof from !== 'string' || typeof to !== 'string') return;
     if (!from || !text.includes(from)) return;
-    return all === true ? text.split(from).join(to) : text.replace(from, () => to);
+    if (all === true) {
+      const parts = text.split(from);
+      const nextLength = text.length + (parts.length - 1) * (to.length - from.length);
+      if (nextLength > editedTextLimit) return;
+      return parts.join(to);
+    }
+    if (text.length + (to.length - from.length) > editedTextLimit) return;
+    return text.replace(from, () => to);
   };
   const name = tool.toLowerCase();
-  if (name === 'write') return typeof value.content === 'string' ? value.content : undefined;
+  if (name === 'write')
+    return typeof value.content === 'string' && value.content.length <= editedTextLimit
+      ? value.content
+      : undefined;
   if (name === 'edit' && !Array.isArray(value.edits)) return replace(current, value);
-  if ((name === 'edit' || name === 'multiedit') && Array.isArray(value.edits))
+  if ((name === 'edit' || name === 'multiedit') && Array.isArray(value.edits)) {
+    if (value.edits.length > editedStepsLimit) return undefined;
     return value.edits.reduce<string | undefined>((text, edit) => replace(text, edit), current);
+  }
 }
 
 /** The person's lines in `current`, 1-indexed, that `edited` no longer carries. */
@@ -92,9 +108,11 @@ export async function personLinesNotice(
   const file = editedPath(input);
   if (file === undefined) return;
   const space = files.get(scopeId);
-  const absolute = path.resolve(space.root, file);
-  if (!within(space.root, absolute)) return;
-  const relative = path.relative(space.root, absolute).split(path.sep).join('/');
+  const realRoot = await fs.realpath(space.root).catch(() => space.root);
+  const resolved = path.resolve(realRoot, file);
+  const absolute = await fs.realpath(resolved).catch(() => resolved);
+  if (!within(realRoot, absolute)) return;
+  const relative = path.relative(realRoot, absolute).split(path.sep).join('/');
   const doc = await files.read(scopeId, relative);
   const view = await store.view({ scopeId, path: relative }, doc.text);
   if (!view.lines.some(Boolean)) return;

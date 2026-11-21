@@ -107,8 +107,14 @@ export const hostArguments = {
       vaultAgent: z.boolean().optional(),
       agentAccess: z.enum(agentAccessModes).optional(),
       // The pane library keys a layout by its prefix, the group id and every panel id.
-      layouts: z.record(z.string().max(160), z.string().max(4096)).optional(),
-      skillAudiences: z.record(z.string().max(64), skillAudience).optional(),
+      layouts: z
+        .record(z.string().max(160), z.string().max(4096))
+        .refine((value) => Object.keys(value).length <= 200)
+        .optional(),
+      skillAudiences: z
+        .record(z.string().max(64), skillAudience)
+        .refine((value) => Object.keys(value).length <= 500)
+        .optional(),
       yourAi: yourAiChoice.optional(),
       routineRuntimes: routineRuntimeList.optional(),
       windowItems: windowItemChoices.optional(),
@@ -405,14 +411,16 @@ export const hostArguments = {
       .object({
         workspaceId: id,
         digest: version.optional(),
-        agents: z.record(
-          id,
-          z.object({
-            agent: z.enum(agentIds),
-            model: agentModel.optional(),
-            effort: agentEffort.optional(),
-          }),
-        ),
+        agents: z
+          .record(
+            id,
+            z.object({
+              agent: z.enum(agentIds),
+              model: agentModel.optional(),
+              effort: agentEffort.optional(),
+            }),
+          )
+          .refine((value) => Object.keys(value).length <= 200),
       })
       .strict(),
   ]),
@@ -456,7 +464,11 @@ export const hostArguments = {
     id,
     z.boolean(),
     z
-      .record(z.string(), z.union([z.string().max(16000), z.array(z.string().max(16000)).max(100)]))
+      .record(
+        z.string().max(256),
+        z.union([z.string().max(16000), z.array(z.string().max(16000)).max(100)]),
+      )
+      .refine((value) => Object.keys(value).length <= 100)
       .optional(),
   ]),
 } satisfies { [K in keyof HostRequests]: z.ZodType<Parameters<HostRequests[K]>> };

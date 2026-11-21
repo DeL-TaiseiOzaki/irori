@@ -4728,11 +4728,7 @@ function App() {
           const chosen = [...(event.target.files ?? [])];
           event.target.value = '';
           if (target && chosen.length)
-            act.bringIn(
-              target.space,
-              target.directory,
-              Promise.resolve(chosen.map((file) => ({ name: file.name, file }))),
-            );
+            act.bringIn(target.space, target.directory, readDropped(chosen));
         }}
       />
       {newEntry && (

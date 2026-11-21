@@ -20,6 +20,7 @@ import chokidar, { type FSWatcher } from 'chokidar';
 import { dispatchHost, type HostHandlers } from '../domain/host-requests';
 import { webAddress } from '../domain/links';
 import { FileService, watcherIgnored, watchRegistrationChanges } from './files';
+import { resolveWithin, safeRelativeParts } from './path-guard';
 import { vaultReads } from './vault-reads';
 import { RemoteHosts } from './remote-hosts';
 import { readSshConfigHosts } from './ssh-config';
@@ -1191,9 +1192,7 @@ app
           changed(toScopeId, () => moveToVault(scopeId, from, toScopeId, directory)),
         ),
       copyEntryPath: async (scopeId, target, absolute) => {
-        const parts = target.split('/').filter(Boolean);
-        if (parts.some((part) => part === '.' || part === '..'))
-          throw Error(t('vault の中のパスではありません。', 'Not a path inside the vault.'));
+        const parts = safeRelativeParts(target);
         // The shared Schema and the irori agent's keep their files outside any vault.
         const root = (await schemaFolder(scopeId)).root;
         const text = absolute ? path.join(root, ...parts) : parts.join('/');
@@ -1203,10 +1202,7 @@ app
       revealEntry: async (scopeId, target) =>
         shell.showItemInFolder(
           scopeId === sharedSchemaId || you.rootOf(scopeId)
-            ? path.join(
-                (await schemaFolder(scopeId)).root,
-                ...target.split('/').filter((part) => part && part !== '..'),
-              )
+            ? await resolveWithin((await schemaFolder(scopeId)).root, target)
             : await files.resolve(scopeId, target, true),
         ),
       addLocalFolder: (input) => addCloud(input.scopeId, () => cloud.addLocal(input)),

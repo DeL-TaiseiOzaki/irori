@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { hostArguments, type HostHandlers } from '../domain/host-requests';
 import { attachmentByteLimit, attachmentRef } from '../domain/attachments';
+import { agentEffort, agentModel } from '../domain/conversation';
 import { agentAccessModes, agentIds, type AgentEvent } from '../domain/types';
 import { categoryText } from '../domain/brains';
 import { languages } from '../domain/i18n';
@@ -106,8 +107,8 @@ export const sentFileLimit = 20 * 1024 * 1024;
 export const handedTask = z.object({
   scopeId: id,
   agent: z.enum(agentIds),
-  model: z.string().min(1).max(200).optional(),
-  effort: z.string().min(1).max(40).optional(),
+  model: agentModel.optional(),
+  effort: agentEffort.optional(),
   access: z.enum(agentAccessModes),
   task: z.string().min(1).max(32000),
 });
@@ -152,6 +153,8 @@ export const attachRequest = z.object({
   language: z.enum(languages),
   /** The last event this device got, to be sent what came after it. */
   resume: z.number().int().min(0).optional(),
+  /** Host-scoped secret held only by the desktop client and this daemon's memory. */
+  secret: z.string().min(16).max(128).optional(),
 });
 export type AttachRequest = z.infer<typeof attachRequest>;
 export interface AttachReply {
