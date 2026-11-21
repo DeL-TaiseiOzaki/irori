@@ -98,8 +98,6 @@ export interface RemoteLinkOptions {
   onProgress(detail: string): void;
   /** The connection ended after it was open, by itself or because `close` was called. */
   onClosed(): void;
-  /** Host-scoped secret sent in `$attach` to authenticate against `host.sock`. */
-  secret?: string;
 }
 
 /**
@@ -362,7 +360,6 @@ export class RemoteLink {
         version: bundle.version,
         language: this.options.language(),
         ...(this.seq !== undefined && { resume: this.seq }),
-        ...(this.options.secret && { secret: this.options.secret }),
       },
     ]);
     if (reply.version !== bundle.version) {

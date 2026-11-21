@@ -152,8 +152,6 @@ export const attachRequest = z.object({
   language: z.enum(languages),
   /** The last event this device got, to be sent what came after it. */
   resume: z.number().int().min(0).optional(),
-  /** Host-scoped secret held only by the desktop client and this daemon's memory. */
-  secret: z.string().min(16).max(128).optional(),
 });
 export type AttachRequest = z.infer<typeof attachRequest>;
 export interface AttachReply {

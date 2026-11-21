@@ -12,7 +12,7 @@
 import net from 'node:net';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { promises as fs, readFileSync } from 'node:fs';
 import { setLanguage } from '../domain/i18n';
 import type { HostEvent } from '../domain/types';
@@ -20,13 +20,6 @@ import { createVaultHost, type HostQuestion } from './host';
 import { attachRequest, attachedLine, busyLine, replacingLine, type AttachReply } from './protocol';
 import { decode, lineLimit, readFrames, writeFrame } from './wire';
 import { connect, releasePlace, takePlace } from './host-place';
-
-function secretsMatch(expected: string, actual: string | undefined) {
-  if (!actual) return false;
-  const a = Buffer.from(expected, 'utf8');
-  const b = Buffer.from(actual, 'utf8');
-  return a.length === b.length && timingSafeEqual(a, b);
-}
 
 /**
  * The version of this vault host: the digest of its one built file, which the
@@ -90,7 +83,6 @@ async function serve(dataDir: string) {
     process.exit(0);
   };
 
-  let sessionSecret: string | undefined;
   const server = net.createServer((socket) => {
     readFrames(
       socket,
@@ -117,11 +109,6 @@ async function serve(dataDir: string) {
             }
             if (method === '$attach') {
               const request = attachRequest.parse(args[0]);
-              if (sessionSecret !== undefined) {
-                if (!secretsMatch(sessionSecret, request.secret)) throw Error('Unauthorized');
-              } else if (request.secret) {
-                sessionSecret = request.secret;
-              }
               setLanguage(request.language);
               if (device && device !== socket) device.destroy();
               device = socket;

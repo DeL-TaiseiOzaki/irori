@@ -7,9 +7,9 @@ hollowed-out or broken paths, UI/CSS regressions, and duplicated core helpers.
   config approvals (including Codex, Antigravity, OpenCode tools, symlink
   targets, `protocol.ext.allow`, `config.worktree`, and continuations); added
   `src/host/path-guard.ts`; hardened `SchemaHookRunner`, `AgentSetup`,
-  `ssh-config` wildcard matching, SSH wire/socket authentication, dropped-folder
-  depth limits, `DeviceSettings` map bounds, and Office viewer DOM/style
-  sanitization.
+  `ssh-config` wildcard matching, SSH wire/socket bounds and shutdown checks,
+  dropped-folder depth limits, `DeviceSettings` map bounds, and Office viewer
+  DOM/style sanitization.
 - Cleanup and fixes: removed retired Google Drive migration/leftover recovery
   paths (`CloudRecovery.tsx`, `src/cloud/leftovers.ts`; [ADR 023](decisions/023-retire-drive-sign-in.md)
   amended); fixed `PageProperties` custom property input (replacing

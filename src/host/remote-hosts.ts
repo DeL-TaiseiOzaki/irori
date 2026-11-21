@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { t, type Language } from '../domain/i18n';
 import type {
@@ -67,7 +67,6 @@ const hostRecord = z.object({
   name: z.string().min(1).max(60),
   destination: sshDestination,
   port: z.number().int().min(1).max(65535).optional(),
-  secret: z.string().min(32).max(128).optional(),
   vaults: z.array(vaultRecord).max(200).default([]),
 });
 type HostRecord = z.infer<typeof hostRecord>;
@@ -272,7 +271,6 @@ export class RemoteHosts implements RemoteVaults {
         name: value.name,
         destination: value.destination,
         ...(value.port && { port: value.port }),
-        secret: previous?.secret ?? randomBytes(32).toString('hex'),
         vaults: previous?.vaults ?? [],
       };
       const moved =
@@ -370,15 +368,10 @@ export class RemoteHosts implements RemoteVaults {
           asked = true;
           return this.question(id, question, gone);
         });
-    if (!record.secret) {
-      record.secret = randomBytes(32).toString('hex');
-      void this.queue.run(() => this.save()).catch(() => {});
-    }
     const link = new RemoteLink({
       launcher: this.options.launcher(record, session),
       payload: this.options.payload,
       language: this.options.language,
-      secret: record.secret,
       onEvent: (event) => this.event(id, event),
       ask: (question, params) => this.options.ask(this.shown(this.record(id)), question, params),
       onProgress: (detail) => this.set(id, 'connecting', detail),
