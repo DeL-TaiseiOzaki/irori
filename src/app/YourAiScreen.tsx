@@ -395,16 +395,14 @@ export function YourAiScreen({
             </p>
           )}
         </div>
-        <footer className="you-update">
-          <p className="you-update-state" role="status">
-            {running && (
-              <>
-                <Icon name="loader" size={12} className="you-spin" />
-                {t('作業中…', 'Working…')}
-              </>
-            )}
-          </p>
-        </footer>
+        {running && (
+          <footer className="you-update">
+            <p className="you-update-state" role="status">
+              <Icon name="loader" size={12} className="you-spin" />
+              {t('作業中…', 'Working…')}
+            </p>
+          </footer>
+        )}
       </section>
     </div>
   );

@@ -4,7 +4,6 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { SerialQueue } from '../host/serial-queue';
 import {
-  cloudDeclaration,
   entryNameError,
   localDeclaration,
   mountNameError,
@@ -24,7 +23,6 @@ import type {
   AddRepository,
   Attachment,
   CloudAccess,
-  CloudAttachment,
   CloudConnection,
   Document,
   Entry,
@@ -46,11 +44,6 @@ const localBindingSchema = z.object({
   path: z.string().min(1),
 });
 type LocalBinding = z.infer<typeof localBindingSchema>;
-// A retired Drive connection's device record (ADR 023): only the empty folder irori
-// once made as its mount point is read from it, so that folder can be removed.
-const retiredBindingSchema = z.object({
-  placeholder: z.object({ dev: z.number(), ino: z.number() }).optional(),
-});
 function assertCloudPath(rel: string) {
   if (
     !rel ||
@@ -64,13 +57,6 @@ const connectionFolderError = () =>
     t(
       '接続フォルダ自体はここでは変更できません。',
       'The connection folder itself cannot be changed here.',
-    ),
-  );
-const retiredError = () =>
-  Error(
-    t(
-      'Google Drive への直接接続は終了しました。このコンピューターのフォルダに切り替えてください。',
-      'Connecting to Google Drive directly has ended. Switch to a folder on this computer.',
     ),
   );
 /**
@@ -193,9 +179,6 @@ export class CloudService {
       );
     return this.queue.run(fn);
   }
-  private declarationFile(scopeId: string) {
-    return this.metadataFile(scopeId, 'cloud-mounts.json');
-  }
   private async metadataFile(scopeId: string, name: string) {
     const space = await this.files.get(scopeId);
     const dir = await this.files.resolve(scopeId, '.irori');
@@ -210,47 +193,8 @@ export class CloudService {
     }
     return filename;
   }
-  async declarations(scopeId: string): Promise<CloudAttachment[]> {
-    const space = await this.files.get(scopeId);
-    let records: CloudAttachment[];
-    try {
-      records = z
-        .array(cloudDeclaration)
-        .max(100)
-        .parse(await readLocalJson(await this.declarationFile(scopeId), []));
-    } catch (error) {
-      // Parser output names positions and schema paths, not what the person can do.
-      if (!(error instanceof SyntaxError || error instanceof z.ZodError)) throw error;
-      throw Error(
-        t(
-          `「${space.name}」の Drive 接続の記録（.irori/cloud-mounts.json）を読み取れません。`,
-          `Cannot read the Drive connection record (.irori/cloud-mounts.json) of "${space.name}".`,
-        ),
-      );
-    }
-    const ids = new Set<string>();
-    const paths = new Set<string>();
-    for (const record of records) {
-      const name = nameKey(`${record.contentsRoot}/${record.name}`);
-      if (
-        record.scopeId !== scopeId ||
-        !space.contents.includes(record.contentsRoot) ||
-        ids.has(record.mountId) ||
-        paths.has(name)
-      )
-        throw Error(
-          t(
-            'クラウド接続宣言の識別情報またはパスが重複・不一致です。',
-            'A cloud connection declaration has a duplicate or mismatched identity or path.',
-          ),
-        );
-      ids.add(record.mountId);
-      paths.add(name);
-    }
-    return records;
-  }
   /**
-   * Folders on this device, then retired Drive connections waiting to be switched.
+   * Folders on this device and connected GitHub repositories.
    * A folder this vault waits for, or one whose link no longer checks out, is
    * looked for again first, so the screen and `irori list` show it as it now is.
    */
@@ -261,33 +205,23 @@ export class CloudService {
   /** `relink`: a mounted folder whose link no longer checks out is linked again. Never from inside the queue. */
   private async list(scopeId: string, relink: boolean): Promise<CloudConnection[]> {
     const local = await this.localDeclarations(scopeId);
-    return [
-      ...(await Promise.all(
-        local.map(async (record) => {
-          const key = this.key(scopeId, record.mountId);
-          await this.refresh(key, relink);
-          const binding = await this.localBinding(scopeId, record.mountId);
-          const current = this.mounted.get(key);
-          const known = this.states.get(key);
-          return {
-            ...record,
-            // Disconnected from a folder this device no longer names: none is chosen here.
-            ...(known && (binding || known.state !== 'disconnected')
-              ? known
-              : { state: binding ? ('disconnected' as const) : ('unconfigured' as const) }),
-            ...(current ? { writable: current.writable, linked: true } : {}),
-          };
-        }),
-      )),
-      ...(await this.declarations(scopeId)).map((record) => ({
-        ...record,
-        state: 'retired' as const,
-        detail: t(
-          'Google Drive への直接接続は終了しました',
-          'Direct Google Drive connection ended',
-        ),
-      })),
-    ];
+    return Promise.all(
+      local.map(async (record) => {
+        const key = this.key(scopeId, record.mountId);
+        await this.refresh(key, relink);
+        const binding = await this.localBinding(scopeId, record.mountId);
+        const current = this.mounted.get(key);
+        const known = this.states.get(key);
+        return {
+          ...record,
+          // Disconnected from a folder this device no longer names: none is chosen here.
+          ...(known && (binding || known.state !== 'disconnected')
+            ? known
+            : { state: binding ? ('disconnected' as const) : ('unconfigured' as const) }),
+          ...(current ? { writable: current.writable, linked: true } : {}),
+        };
+      }),
+    );
   }
   /**
    * Checks a mounted connection's link and folder. When they no longer check out,
@@ -515,87 +449,7 @@ export class CloudService {
       );
     }
   }
-  private retiredBindingFile(scopeId: string, mountId: string) {
-    return path.join(this.files.dataDir, 'cloud-bindings', `${scopeId}-${mountId}.json`);
-  }
-  /**
-   * Removes the empty folder irori made as a retired Drive connection's mount point,
-   * when it is still that folder. Anything else at that place stays.
-   */
-  private async releasePlaceholder(record: CloudAttachment) {
-    const parent = await this.parent(record);
-    if (!parent) return;
-    const parsed = retiredBindingSchema.safeParse(
-      await readLocalJson(this.retiredBindingFile(record.scopeId, record.mountId), null).catch(
-        () => null,
-      ),
-    );
-    const placeholder = parsed.success ? parsed.data.placeholder : undefined;
-    const target = path.join(parent, record.name);
-    const info = await fs.lstat(target).catch(() => undefined);
-    if (
-      !placeholder ||
-      !info?.isDirectory() ||
-      info.isSymbolicLink() ||
-      info.dev !== placeholder.dev ||
-      info.ino !== placeholder.ino
-    )
-      return;
-    await fs.chmod(target, 0o700);
-    try {
-      await fs.rmdir(target);
-    } catch (error) {
-      await fs.chmod(target, info.mode & 0o777);
-      if (!['ENOTEMPTY', 'EEXIST'].includes((error as NodeJS.ErrnoException).code ?? ''))
-        throw error;
-    }
-  }
-  /** Drops a retired Drive connection's records; its files stay in Drive. */
-  private async forgetRetired(record: CloudAttachment) {
-    const records = await this.declarations(record.scopeId);
-    await this.releasePlaceholder(record);
-    await writeLocalJson(
-      await this.declarationFile(record.scopeId),
-      records.filter((item) => item.mountId !== record.mountId),
-    );
-    await fs.rm(this.retiredBindingFile(record.scopeId, record.mountId), { force: true });
-  }
-  /**
-   * Switches a retired Drive connection to a folder on this device, usually the
-   * same Drive folder as Drive for desktop keeps it. Its name and place in contents
-   * stay, so pages that point at `contents/<name>/...` still find their files.
-   */
-  switchToLocal(scopeId: string, mountId: string, chosen: string) {
-    return this.mutate(async () => {
-      const record = (await this.declarations(scopeId)).find((item) => item.mountId === mountId);
-      if (!record) throw Error('Unknown cloud connection');
-      const space = await this.files.get(scopeId);
-      const target = await this.localTarget(chosen);
-      const records = await this.localDeclarations(scopeId);
-      const local = localDeclaration.parse({
-        schemaVersion: 1,
-        mountId: record.mountId,
-        scopeId,
-        provider: 'local',
-        folderName: folderLabel(target),
-        contentsRoot: record.contentsRoot,
-        name: record.name,
-        access: record.access,
-      });
-      if (records.some((item) => item.mountId === mountId))
-        throw Error('Duplicate cloud connection identity');
-      await this.forgetRetired(record);
-      await this.writeLocal(scopeId, records, [...records, local]);
-      await writeLocalJson(this.localBindingFile(scopeId, mountId), {
-        scopeId,
-        mountId,
-        root: space.root,
-        path: target,
-      });
-      this.forget(this.key(scopeId, mountId));
-    });
-  }
-  /** Renames a folder connection, or unregisters a connection of either kind when no name is given. */
+  /** Renames a folder connection, or unregisters it when no name is given. */
   edit(scopeId: string, mountId: string, name?: string) {
     return this.mutate(async () => {
       const key = this.key(scopeId, mountId);
@@ -609,12 +463,8 @@ export class CloudService {
       const local = (await this.localDeclarations(scopeId)).find(
         (item) => item.mountId === mountId,
       );
-      if (local) return this.editLocal(local, name);
-      const record = (await this.declarations(scopeId)).find((item) => item.mountId === mountId);
-      if (!record) throw Error('Unknown cloud connection');
-      if (name !== undefined) throw retiredError();
-      await this.forgetRetired(record);
-      this.forget(key);
+      if (!local) throw Error('Unknown cloud connection');
+      return this.editLocal(local, name);
     });
   }
   /**
@@ -673,13 +523,10 @@ export class CloudService {
     }
     return records;
   }
-  /** Refuses a name another connection of either kind already uses in that contents folder. */
+  /** Refuses a name another connection already uses in that contents folder. */
   private async assertNameFree(record: Attachment) {
     const key = nameKey(`${record.contentsRoot}/${record.name}`);
-    const others = [
-      ...(await this.declarations(record.scopeId)),
-      ...(await this.localDeclarations(record.scopeId)),
-    ];
+    const others = await this.localDeclarations(record.scopeId);
     if (
       others.some(
         (item) =>
@@ -1208,8 +1055,6 @@ export class CloudService {
   private async mount(scopeId: string, mountId: string) {
     const local = (await this.localDeclarations(scopeId)).find((item) => item.mountId === mountId);
     if (local) return this.link(local);
-    if ((await this.declarations(scopeId)).some((item) => item.mountId === mountId))
-      throw retiredError();
     throw Error('Unknown cloud connection');
   }
   disconnect(scopeId: string, mountId: string) {
@@ -1247,8 +1092,6 @@ export class CloudService {
         (item) => item.mountId === mountId,
       );
       if (local) return this.setLocalAccess(local, access);
-      if ((await this.declarations(scopeId)).some((item) => item.mountId === mountId))
-        throw retiredError();
       throw Error('Unknown cloud connection');
     });
   }
@@ -1612,7 +1455,7 @@ export class CloudService {
           record.state === 'mounted' ? undefined : (record.detail ?? t('未接続', 'Not connected')),
         ...(record.state === 'mounted' && record.writable ? { writable: true } : {}),
         connection: true,
-        ...(record.provider !== 'google-drive' ? { local: true } : {}),
+        local: true,
         ...(record.provider === 'github' ? { repository: true } : {}),
       }));
     // The work folder shows as a connection does: opened and changed, never renamed as an entry.
@@ -1762,12 +1605,43 @@ export class CloudService {
     });
   }
   /** Removes a stray: a link by itself, never what it leads to; anything else to the system trash. */
-  removeStray(scopeId: string, contentsRoot: string, name: string) {
-    return this.mutate(async () => {
+  async removeStray(scopeId: string, contentsRoot: string, name: string) {
+    const refused = await this.mutate(async () => {
       const { stray, entry } = await this.stray(scopeId, contentsRoot, name);
-      if (stray.kind === 'link') return fs.unlink(entry);
+      if (stray.kind === 'link') {
+        await fs.unlink(entry);
+        return undefined;
+      }
       if (!this.trash) throw Error(t('ごみ箱を使えません。', 'The trash is not available.'));
-      await this.trash(entry);
+      try {
+        await this.trash(entry);
+      } catch (error) {
+        return {
+          entry,
+          directory: stray.kind === 'folder',
+          error: error instanceof Error ? error : Error(String(error)),
+        };
+      }
+      return undefined;
+    });
+    if (!refused) return;
+    const confirmed = await this.confirmPermanentDelete?.({
+      name,
+      directory: refused.directory,
+      reason: refused.error.message,
+    });
+    if (!confirmed)
+      throw Error(
+        t(
+          `ゴミ箱に移せなかったため、削除しませんでした（${refused.error.message}）。`,
+          `Not deleted: it could not be moved to the trash (${refused.error.message}).`,
+        ),
+      );
+    await this.mutate(async () => {
+      const { entry } = await this.stray(scopeId, contentsRoot, name);
+      if (entry !== refused.entry)
+        throw Error(t('削除する項目が変わりました。', 'The entry changed.'));
+      await fs.rm(entry, { recursive: true });
     });
   }
   async close() {

@@ -291,6 +291,7 @@
 .git-sidebar .git-more-history {
   margin: 6px 10px;
 }
+.git-list .git-empty,
 .git-empty {
   padding: 24px 16px;
   text-align: center;

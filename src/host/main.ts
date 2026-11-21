@@ -40,7 +40,6 @@ import { platformInstaller } from './update-installers';
 import { version as appVersion } from '../../package.json';
 import { ImageService, imageType } from './images';
 import { KnowledgeStore } from '../knowledge/store';
-import { DriveLeftovers } from '../cloud/leftovers';
 import { AgentService } from '../agents/service';
 import { YourAiService } from './you';
 import { DeviceIdentity } from './device';
@@ -295,7 +294,6 @@ app
     const knowledge = new KnowledgeStore(files.dataDir, (ref) =>
       files.resolve(ref.scopeId, ref.path),
     );
-    const leftovers = new DriveLeftovers(files.dataDir);
     // The notes are read through the Git service declared below, once a note is open.
     const authorship = new AuthorshipStore(files.dataDir, (ref) =>
       git.noted(ref.scopeId, ref.path),
@@ -1039,19 +1037,6 @@ app
       locateSource: (source) => knowledge.locate(source),
       rebindSource: (source, next) => changeFiles(() => knowledge.rebind(source, next)),
       registerArtifact: (source, runId) => changeFiles(() => knowledge.artifact(source, runId)),
-      recoverableCloudWrites: () => leftovers.prepared(),
-      unsentDriveChanges: async () => (await leftovers.unsent()).length,
-      exportUnsentDriveChanges: async () => {
-        const choice = await dialog.showOpenDialog(front(), {
-          title: t('保存先のフォルダ', 'Folder to save to'),
-          properties: ['openDirectory', 'createDirectory'],
-        });
-        if (choice.canceled || !choice.filePaths[0]) return null;
-        const stamp = new Date().toISOString().slice(0, 19).replace(/[-:]/g, '').replace('T', '-');
-        const folder = path.join(choice.filePaths[0], `irori-drive-unsent-${stamp}`);
-        const count = await leftovers.exportUnsent(folder);
-        return { folder, count };
-      },
       // Validation runs at the boundary; the host checks the address again
       // rather than trusting that it did.
       openUrl: async (url) => {
@@ -1210,7 +1195,6 @@ app
       cloneRepository: (...args) => addCloud(args[0], () => cloud.cloneRepository(...args)),
       updateRepository: (...args) => changeCloud(args[0], () => cloud.updateRepository(...args)),
       bindLocalFolder: (...args) => addCloud(args[0], () => cloud.bindLocal(...args)),
-      switchCloudToLocal: (...args) => addCloud(args[0], () => cloud.switchToLocal(...args)),
       spaces: () => [...files.list(), ...remote.list()],
       remoteHosts: () => remote.hosts(),
       answerRemoteHost: (hostId, questionId, answer) => remote.answer(hostId, questionId, answer),
@@ -1506,7 +1490,16 @@ app
         return (...args: unknown[]) => {
           const [first] = args;
           const scopeId =
-            first && typeof first === 'object' && 'scopeId' in first ? first.scopeId : first;
+            first && typeof first === 'object'
+              ? 'scopeId' in first
+                ? first.scopeId
+                : 'owner' in first
+                  ? first.owner
+                  : first
+              : first;
+          // Operations targeting a second vault (copyEntry / moveToVault) refuse remote destinations cleanly.
+          if ((method === 'copyEntry' || method === 'moveToVault') && remote.has(args[2]))
+            throw Error(RemoteHosts.notYet());
           // A conversation of a vault agent on an SSH host is kept, and changed, there.
           if (isByConversation(method) && remote.keeps(first)) return remote.agent(method, args);
           if (!remote.has(scopeId) || servedHere.has(method)) return handler(...args);

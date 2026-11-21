@@ -398,6 +398,7 @@ export class RemoteHosts implements RemoteVaults {
           live.retries = 0;
           this.set(id, 'connected');
           await this.refresh(id, link).catch(() => {});
+          await this.resume(id, link).catch(() => {});
           // The events missed while away came before the answer to that request; a run
           // still open after them, on a host where nothing runs, ended unseen.
           if (!reply.running) this.lost(id);
@@ -452,10 +453,7 @@ export class RemoteHosts implements RemoteVaults {
       live.retry = undefined;
       live.failed = undefined;
       // Nobody is asked for a retry of irori's own: a host that needs an answer waits for the person.
-      this.link(id, true).then(
-        (link) => this.resume(id, link),
-        () => this.retry(id),
-      );
+      this.link(id, true).catch(() => this.retry(id));
     }, wait);
   }
   /** After a reconnection: where each hand-off stands, and what it still asks. */
@@ -762,7 +760,7 @@ export class RemoteHosts implements RemoteVaults {
     };
     while (live.handOffs.get(runId) === entry && !this.closing) {
       try {
-        const link = await this.link(id);
+        const link = await this.link(id, true);
         const ended = await link.request<HandOffResult>('awaitHandOff', [runId]);
         void link.request('forgetHandOff', [runId]).catch(() => {});
         return done(ended);

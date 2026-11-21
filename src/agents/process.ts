@@ -250,7 +250,7 @@ async function executable(command: string, env = agentEnv()) {
     process.platform === 'win32'
       ? ['', ...(env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD').toLowerCase().split(';')]
       : [''];
-  for (const dir of (env.PATH ?? '').split(path.delimiter))
+  for (const dir of (env[pathKey(env)] ?? '').split(path.delimiter))
     if (dir)
       for (const suffix of suffixes) {
         const found = await stat(path.join(dir, command + suffix));

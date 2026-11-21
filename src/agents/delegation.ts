@@ -87,7 +87,6 @@ export const editedPath = (input: unknown) => fileOf(input, ['file_path', 'fileP
 
 /** Claude Code's tools that write a file, as its hook matcher names them. */
 export const writeToolMatcher = 'Write|Edit|MultiEdit|NotebookEdit';
-export const writeTools = new RegExp(`^(${writeToolMatcher})$`);
 
 /**
  * The handed vault `irori call` names: by its vault agent name, or by its

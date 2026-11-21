@@ -81,9 +81,6 @@ const cols = z.number().int().min(2).max(500),
 
 // This registry is also the preload allowlist. Every HostAPI request must have a validator.
 export const hostArguments = {
-  recoverableCloudWrites: z.tuple([]),
-  unsentDriveChanges: z.tuple([]),
-  exportUnsentDriveChanges: z.tuple([]),
   draftRead: z.tuple([draftKey]),
   draftWrite: z.tuple([draftKey, draftValue, draftRevision]),
   checkForUpdates: z.tuple([]),
@@ -247,7 +244,6 @@ export const hostArguments = {
   cloneRepository: z.tuple([id, id, path.min(1)]),
   updateRepository: z.tuple([id, id]),
   bindLocalFolder: z.tuple([id, id, path.min(1)]),
-  switchCloudToLocal: z.tuple([id, id, path.min(1)]),
   renameCloud: z.tuple([id, id, z.string().max(200)]),
   removeCloud: z.tuple([id, id]),
   contentsStrays: z.tuple([id]),

@@ -111,7 +111,7 @@ async function serve(dataDir: string) {
               writeFrame(socket, {
                 id,
                 ok: true,
-                value: { version: vaultHostVersion, running: host.running },
+                value: { version: vaultHostVersion, running: host.running || host.waiting },
               });
               return;
             }

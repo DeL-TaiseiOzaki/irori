@@ -136,7 +136,6 @@ export const hostOperations = {
     z.instanceof(Uint8Array).refine((bytes) => bytes.byteLength <= attachmentByteLimit),
   ]),
   respond: hostArguments.respond,
-  status: z.tuple([]),
 } as const;
 export type HostOperation = keyof typeof hostOperations;
 

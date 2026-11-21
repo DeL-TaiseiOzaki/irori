@@ -952,16 +952,10 @@ export class AgentService {
             id,
             version: v,
             available: true,
-            tested:
-              id === 'codex'
-                ? v.includes('0.154.0')
-                : id === 'claude'
-                  ? v.includes('2.1.232')
-                  : false,
             detail: '',
           };
         } catch (e) {
-          return { id, version: '', available: false, tested: false, detail: String(e) };
+          return { id, version: '', available: false, detail: String(e) };
         }
       }),
     );

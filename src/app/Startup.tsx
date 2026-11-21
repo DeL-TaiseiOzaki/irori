@@ -11,7 +11,6 @@ import { Icon } from './Icon';
 import { useResource } from './useResource';
 import { useAction } from './useAction';
 import { UpdateNotice } from './UpdateNotice';
-import { CloudRecovery } from './CloudRecovery';
 import { LanguageSwitch, Settings } from './Settings';
 import { t } from '../domain/i18n';
 import { ErrorMessage, errorText } from './ErrorMessage';
@@ -696,7 +695,6 @@ export function Startup({
         </main>
         <footer className="start-footer">
           <UpdateNotice host={host} />
-          <CloudRecovery />
           <LanguageSwitch onError={(e) => setError(errorText(e))} />
           <Settings
             start

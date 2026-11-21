@@ -42,26 +42,6 @@ export interface KnowledgeHistory {
   runs: RunRecord[];
   artifacts: ArtifactRecord[];
 }
-export const pendingWrite = z.object({
-  id: z.uuid(),
-  ownerId: z.uuid(),
-  mountId: z.uuid(),
-  folderId: z.string().min(1),
-  // Older preparations remain readable/restorable, but cannot be delivered unbound.
-  accountId: z.uuid().optional(),
-  driveId: z.string().min(1).optional(),
-  name: z.string().min(1).max(240),
-  source: sourceVersion,
-  createdAt: z.iso.datetime(),
-  state: z.enum(['pending', 'uploading', 'confirmed', 'failed']),
-  confirmedAt: z.iso.datetime().optional(),
-  detail: z.string().optional(),
-});
-export type PendingWrite = z.infer<typeof pendingWrite>;
-export interface CloudWriteRecovery {
-  entries: PendingWrite[];
-  unreadable: number;
-}
 
 /**
  * The lines the person wrote or revised, each with when irori saw it, and

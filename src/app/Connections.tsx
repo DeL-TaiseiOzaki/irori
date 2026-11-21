@@ -20,7 +20,6 @@ function states(): Record<CloudConnection['state'], string> {
     waiting: t('フォルダを待っています', 'Waiting for the folder'),
     mounted: t('接続済み', 'Connected'),
     error: t('接続エラー', 'Connection error'),
-    retired: t('終了', 'Ended'),
   };
 }
 function stateLabel(connection: CloudConnection) {
@@ -112,11 +111,7 @@ function folderName(folder: string) {
 
 /** The icon of a connection's kind. */
 function sourceIcon(connection: CloudConnection) {
-  return connection.provider === 'github'
-    ? 'branch'
-    : connection.provider === 'local'
-      ? 'folder'
-      : 'cloud';
+  return connection.provider === 'github' ? 'branch' : 'folder';
 }
 
 /**
@@ -482,282 +477,233 @@ export function Connections({
             {connections.length === 0 && (
               <p className="connect-hint">{t('まだ接続先がありません。', 'No connections yet.')}</p>
             )}
-            {connections.map((connection) => {
-              const retired = connection.state === 'retired';
-              return (
-                <div className="connection-card" key={connection.mountId}>
-                  <div className="connection-head">
-                    <Icon name={sourceIcon(connection)} size={16} />
-                    <strong>{connection.name}</strong>
-                    <span className="connection-state" data-state={connection.state}>
-                      {stateLabel(connection)}
-                    </span>
-                  </div>
-                  <span className="connection-path mono">
-                    {connection.contentsRoot}/{connection.name}/
+            {connections.map((connection) => (
+              <div className="connection-card" key={connection.mountId}>
+                <div className="connection-head">
+                  <Icon name={sourceIcon(connection)} size={16} />
+                  <strong>{connection.name}</strong>
+                  <span className="connection-state" data-state={connection.state}>
+                    {stateLabel(connection)}
                   </span>
-                  <div className="connection-meta">
-                    <span>
-                      {retired
-                        ? 'Google Drive'
-                        : connection.provider === 'github'
-                          ? 'GitHub'
-                          : t('このコンピューター', 'This computer')}
-                    </span>
-                    <span className="connect-dot" aria-hidden="true" />
-                    <span>
-                      {connection.provider === 'github'
-                        ? `${githubRepository(connection.url)}${connection.branch ? ` · ${connection.branch}` : ''}`
-                        : connection.folderName}
-                    </span>
-                    <span className="connect-dot" aria-hidden="true" />
-                    <span className="connection-access" title={accessNote(connection.access)}>
-                      <Icon
-                        name={connection.access === 'read-write' ? 'penLine' : 'lock'}
-                        size={12}
-                      />
-                      {connection.access === 'read-write'
-                        ? t('編集可', 'Editable')
-                        : t('読み取り専用', 'Read-only')}
-                    </span>
-                  </div>
-                  {connection.detail && <p className="connect-hint">{connection.detail}</p>}
-                  {cloning === connection.mountId && <CloningNote />}
-                  {updated?.mountId === connection.mountId && (
-                    <p className="connect-hint" role="status">
-                      {updated.text}
-                    </p>
-                  )}
-                  {retired ? (
-                    <div className="connection-actions">
+                </div>
+                <span className="connection-path mono">
+                  {connection.contentsRoot}/{connection.name}/
+                </span>
+                <div className="connection-meta">
+                  <span>
+                    {connection.provider === 'github'
+                      ? 'GitHub'
+                      : t('このコンピューター', 'This computer')}
+                  </span>
+                  <span className="connect-dot" aria-hidden="true" />
+                  <span>
+                    {connection.provider === 'github'
+                      ? `${githubRepository(connection.url)}${connection.branch ? ` · ${connection.branch}` : ''}`
+                      : connection.folderName}
+                  </span>
+                  <span className="connect-dot" aria-hidden="true" />
+                  <span className="connection-access" title={accessNote(connection.access)}>
+                    <Icon
+                      name={connection.access === 'read-write' ? 'penLine' : 'lock'}
+                      size={12}
+                    />
+                    {connection.access === 'read-write'
+                      ? t('編集可', 'Editable')
+                      : t('読み取り専用', 'Read-only')}
+                  </span>
+                </div>
+                {connection.detail && <p className="connect-hint">{connection.detail}</p>}
+                {cloning === connection.mountId && <CloningNote />}
+                {updated?.mountId === connection.mountId && (
+                  <p className="connect-hint" role="status">
+                    {updated.text}
+                  </p>
+                )}
+                <div className="connection-actions">
+                  {connection.provider === 'github' && connection.state === 'unconfigured' ? (
+                    <button
+                      className="stage-text-button framed"
+                      disabled={busy}
+                      onClick={() =>
+                        void perform(async () => {
+                          const folder = await host.chooseFolder();
+                          if (!folder) return;
+                          await clone(connection.mountId, () =>
+                            host.cloneRepository(space.scopeId, connection.mountId, folder),
+                          );
+                          await host.connectCloud(space.scopeId, connection.mountId);
+                        })
+                      }
+                    >
+                      {t('取得', 'Clone')}
+                    </button>
+                  ) : connection.state === 'mounted' ? (
+                    <>
                       <button
                         className="stage-text-button framed"
+                        disabled={busy}
+                        onClick={() =>
+                          void perform(() =>
+                            host.openCloudFolder(space.scopeId, connection.mountId),
+                          )
+                        }
+                      >
+                        {t('フォルダを開く', 'Open folder')}
+                      </button>
+                      {connection.provider === 'github' && (
+                        <button
+                          className="stage-text-button framed"
+                          disabled={disabled}
+                          onClick={() =>
+                            void perform(async () => {
+                              setUpdated(undefined);
+                              const result = await host.updateRepository(
+                                space.scopeId,
+                                connection.mountId,
+                              );
+                              setUpdated({
+                                mountId: connection.mountId,
+                                text: result.commits
+                                  ? t(
+                                      `${result.branch} に ${result.commits} 件のコミットを取り込みました。`,
+                                      `Brought ${result.commits} commits into ${result.branch}.`,
+                                    )
+                                  : t(
+                                      `${result.branch} にリモートの新しいコミットはありません。`,
+                                      `No new commits on the remote for ${result.branch}.`,
+                                    ),
+                              });
+                            })
+                          }
+                        >
+                          <Icon name="refresh" size={13} />
+                          {t('最新にする', 'Update')}
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <button
+                      className="stage-text-button framed"
+                      disabled={busy || connection.state === 'unconfigured'}
+                      onClick={() =>
+                        void perform(() => host.connectCloud(space.scopeId, connection.mountId))
+                      }
+                    >
+                      {t('再接続', 'Reconnect')}
+                    </button>
+                  )}
+                  <button
+                    className="stage-text-button framed"
+                    disabled={held(connection) || connection.state === 'connecting'}
+                    title={accessNote(
+                      connection.access === 'read-write' ? 'read-only' : 'read-write',
+                    )}
+                    onClick={() =>
+                      void perform(() =>
+                        host.setCloudAccess(
+                          space.scopeId,
+                          connection.mountId,
+                          connection.access === 'read-write' ? 'read-only' : 'read-write',
+                        ),
+                      )
+                    }
+                  >
+                    {connection.access === 'read-write'
+                      ? t('読み取り専用にする', 'Make read-only')
+                      : t('編集を許可', 'Allow editing')}
+                  </button>
+                  <MoreMenu label={t('接続先の操作', 'Connection actions')} host={sheet}>
+                    {(connection.state === 'mounted' ||
+                      connection.state === 'waiting' ||
+                      connection.state === 'error') && (
+                      <Menu.Item
+                        disabled={held(connection)}
+                        onClick={() =>
+                          void perform(() =>
+                            host.disconnectCloud(space.scopeId, connection.mountId),
+                          )
+                        }
+                      >
+                        {t('接続を解除', 'Disconnect')}
+                      </Menu.Item>
+                    )}
+                    {connection.state !== 'mounted' && (
+                      <Menu.Item
                         disabled={busy}
                         onClick={() =>
                           void perform(async () => {
                             const folder = await host.chooseFolder();
-                            if (!folder) return;
-                            await host.switchCloudToLocal(
-                              space.scopeId,
-                              connection.mountId,
-                              folder,
-                            );
-                            await host.connectCloud(space.scopeId, connection.mountId);
+                            if (folder)
+                              await host.bindLocalFolder(space.scopeId, connection.mountId, folder);
                           })
                         }
                       >
-                        {t('フォルダに切り替える', 'Switch to a folder')}
-                      </button>
-                      <MoreMenu label={t('接続先の操作', 'Connection actions')} host={sheet}>
-                        <Menu.Item
-                          disabled={busy}
-                          onClick={() =>
-                            void perform(() => host.removeCloud(space.scopeId, connection.mountId))
-                          }
-                        >
-                          {t('登録を解除', 'Remove registration')}
-                        </Menu.Item>
-                      </MoreMenu>
-                    </div>
-                  ) : (
-                    <div className="connection-actions">
-                      {connection.provider === 'github' && connection.state === 'unconfigured' ? (
-                        <button
-                          className="stage-text-button framed"
-                          disabled={busy}
-                          onClick={() =>
-                            void perform(async () => {
-                              const folder = await host.chooseFolder();
-                              if (!folder) return;
-                              await clone(connection.mountId, () =>
-                                host.cloneRepository(space.scopeId, connection.mountId, folder),
-                              );
-                              await host.connectCloud(space.scopeId, connection.mountId);
-                            })
-                          }
-                        >
-                          {t('取得', 'Clone')}
-                        </button>
-                      ) : connection.state === 'mounted' ? (
-                        <>
-                          <button
-                            className="stage-text-button framed"
-                            disabled={busy}
-                            onClick={() =>
-                              void perform(() =>
-                                host.openCloudFolder(space.scopeId, connection.mountId),
-                              )
-                            }
-                          >
-                            {t('フォルダを開く', 'Open folder')}
-                          </button>
-                          {connection.provider === 'github' && (
-                            <button
-                              className="stage-text-button framed"
-                              disabled={disabled}
-                              onClick={() =>
-                                void perform(async () => {
-                                  setUpdated(undefined);
-                                  const result = await host.updateRepository(
-                                    space.scopeId,
-                                    connection.mountId,
-                                  );
-                                  setUpdated({
-                                    mountId: connection.mountId,
-                                    text: result.commits
-                                      ? t(
-                                          `${result.branch} に ${result.commits} 件のコミットを取り込みました。`,
-                                          `Brought ${result.commits} commits into ${result.branch}.`,
-                                        )
-                                      : t(
-                                          `${result.branch} にリモートの新しいコミットはありません。`,
-                                          `No new commits on the remote for ${result.branch}.`,
-                                        ),
-                                  });
-                                })
-                              }
-                            >
-                              <Icon name="refresh" size={13} />
-                              {t('最新にする', 'Update')}
-                            </button>
-                          )}
-                        </>
-                      ) : (
-                        <button
-                          className="stage-text-button framed"
-                          disabled={busy || connection.state === 'unconfigured'}
-                          onClick={() =>
-                            void perform(() => host.connectCloud(space.scopeId, connection.mountId))
-                          }
-                        >
-                          {t('再接続', 'Reconnect')}
-                        </button>
-                      )}
-                      <button
-                        className="stage-text-button framed"
-                        disabled={held(connection) || connection.state === 'connecting'}
-                        title={accessNote(
-                          connection.access === 'read-write' ? 'read-only' : 'read-write',
-                        )}
-                        onClick={() =>
-                          void perform(() =>
-                            host.setCloudAccess(
-                              space.scopeId,
-                              connection.mountId,
-                              connection.access === 'read-write' ? 'read-only' : 'read-write',
-                            ),
-                          )
-                        }
-                      >
-                        {connection.access === 'read-write'
-                          ? t('読み取り専用にする', 'Make read-only')
-                          : t('編集を許可', 'Allow editing')}
-                      </button>
-                      <MoreMenu label={t('接続先の操作', 'Connection actions')} host={sheet}>
-                        {(connection.state === 'mounted' ||
-                          connection.state === 'waiting' ||
-                          connection.state === 'error') && (
-                          <Menu.Item
-                            disabled={held(connection)}
-                            onClick={() =>
-                              void perform(() =>
-                                host.disconnectCloud(space.scopeId, connection.mountId),
-                              )
-                            }
-                          >
-                            {t('接続を解除', 'Disconnect')}
-                          </Menu.Item>
-                        )}
-                        {connection.state !== 'mounted' && (
-                          <Menu.Item
-                            disabled={busy}
-                            onClick={() =>
-                              void perform(async () => {
-                                const folder = await host.chooseFolder();
-                                if (folder)
-                                  await host.bindLocalFolder(
-                                    space.scopeId,
-                                    connection.mountId,
-                                    folder,
-                                  );
-                              })
-                            }
-                          >
-                            {connection.provider === 'github'
-                              ? t('手元のクローンを選ぶ', 'Choose a clone')
-                              : t('フォルダを選び直す', 'Choose folder again')}
-                          </Menu.Item>
-                        )}
-                        <Menu.Item
-                          disabled={
-                            busy ||
-                            connection.state === 'mounted' ||
-                            connection.state === 'connecting'
-                          }
-                          onClick={() => {
-                            setEditing(connection.mountId);
-                            setNewName(connection.name);
-                          }}
-                        >
-                          {t('名前を変更', 'Rename')}
-                        </Menu.Item>
-                        <Menu.Item
-                          disabled={
-                            busy ||
-                            connection.state === 'mounted' ||
-                            connection.state === 'connecting'
-                          }
-                          onClick={() =>
-                            void perform(() => host.removeCloud(space.scopeId, connection.mountId))
-                          }
-                        >
-                          {t('登録を解除', 'Remove registration')}
-                        </Menu.Item>
-                      </MoreMenu>
-                    </div>
-                  )}
-                  {editing === connection.mountId && (
-                    <form
-                      className="connection-rename"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        void perform(async () => {
-                          await host.renameCloud(space.scopeId, connection.mountId, newName);
-                          setEditing(undefined);
-                        });
+                        {connection.provider === 'github'
+                          ? t('手元のクローンを選ぶ', 'Choose a clone')
+                          : t('フォルダを選び直す', 'Choose folder again')}
+                      </Menu.Item>
+                    )}
+                    <Menu.Item
+                      disabled={
+                        busy || connection.state === 'mounted' || connection.state === 'connecting'
+                      }
+                      onClick={() => {
+                        setEditing(connection.mountId);
+                        setNewName(connection.name);
                       }}
                     >
-                      <input
-                        aria-label={t('新しい名前', 'New name')}
-                        value={newName}
-                        disabled={busy}
-                        onChange={(e) => setNewName(e.target.value)}
-                        required
-                      />
-                      <div className="connection-actions">
-                        <button
-                          type="button"
-                          className="stage-text-button framed small"
-                          disabled={busy}
-                          onClick={() => setEditing(undefined)}
-                        >
-                          {t('キャンセル', 'Cancel')}
-                        </button>
-                        <button
-                          className="solid-button"
-                          disabled={busy || !!mountNameError(newName)}
-                        >
-                          {t('保存', 'Save')}
-                        </button>
-                      </div>
-                      {mountNameError(newName) && (
-                        <small role="alert">{mountNameError(newName)}</small>
-                      )}
-                    </form>
-                  )}
+                      {t('名前を変更', 'Rename')}
+                    </Menu.Item>
+                    <Menu.Item
+                      disabled={
+                        busy || connection.state === 'mounted' || connection.state === 'connecting'
+                      }
+                      onClick={() =>
+                        void perform(() => host.removeCloud(space.scopeId, connection.mountId))
+                      }
+                    >
+                      {t('登録を解除', 'Remove registration')}
+                    </Menu.Item>
+                  </MoreMenu>
                 </div>
-              );
-            })}
+                {editing === connection.mountId && (
+                  <form
+                    className="connection-rename"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void perform(async () => {
+                        await host.renameCloud(space.scopeId, connection.mountId, newName);
+                        setEditing(undefined);
+                      });
+                    }}
+                  >
+                    <input
+                      aria-label={t('新しい名前', 'New name')}
+                      value={newName}
+                      disabled={busy}
+                      onChange={(e) => setNewName(e.target.value)}
+                      required
+                    />
+                    <div className="connection-actions">
+                      <button
+                        type="button"
+                        className="stage-text-button framed small"
+                        disabled={busy}
+                        onClick={() => setEditing(undefined)}
+                      >
+                        {t('キャンセル', 'Cancel')}
+                      </button>
+                      <button className="solid-button" disabled={busy || !!mountNameError(newName)}>
+                        {t('保存', 'Save')}
+                      </button>
+                    </div>
+                    {mountNameError(newName) && (
+                      <small role="alert">{mountNameError(newName)}</small>
+                    )}
+                  </form>
+                )}
+              </div>
+            ))}
             {strays.length > 0 && (
               <>
                 <h3>

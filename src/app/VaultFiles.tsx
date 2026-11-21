@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Menu } from '@base-ui/react/menu';
 import {
   Group as PaneGroup,
@@ -15,10 +15,14 @@ import { VaultSections } from './BrainPanel';
 import { Crumbs, fileCrumbs } from './NoteBar';
 import { Icon } from './Icon';
 import { RemoteVaultPlace } from './RemoteHosts';
-import { StagePreview, type PreviewTarget } from './StagePreview';
+import type { PreviewTarget } from './StagePreview';
 import { layoutStorage } from './device-settings';
 import { useResource } from './useResource';
 import { useLanguage } from './useLanguage';
+
+const StagePreview = lazy(() =>
+  import('./StagePreview').then((module) => ({ default: module.StagePreview })),
+);
 
 const host = window.irori;
 const noConnections: never[] = [];
@@ -183,14 +187,16 @@ export function VaultFiles({
                   </button>
                 </div>
               </header>
-              <StagePreview
-                key={`${file.scopeId}:${file.path}`}
-                space={fileSpace}
-                path={file.path}
-                revision={scopeRevision(revisions, file.scopeId)}
-                target={file.target}
-                onError={onError}
-              />
+              <Suspense fallback={<p className="hint">{t('開いています…', 'Opening…')}</p>}>
+                <StagePreview
+                  key={`${file.scopeId}:${file.path}`}
+                  space={fileSpace}
+                  path={file.path}
+                  revision={scopeRevision(revisions, file.scopeId)}
+                  target={file.target}
+                  onError={onError}
+                />
+              </Suspense>
             </>
           ) : (
             <p className="vault-files-empty">

@@ -118,6 +118,7 @@ export function PageProperties({
   const [folded, setFolded] = useState(currentPropertiesFolded);
   const [problem, setProblem] = useState('');
   const [adding, setAdding] = useState('');
+  const [customName, setCustomName] = useState<string | undefined>();
   const declaration = declared?.declaration ?? null;
   const parsed = useMemo(() => parseProperties(yaml), [yaml]);
   const values = parsed.values;
@@ -333,8 +334,7 @@ export function PageProperties({
                   const key = event.target.value;
                   setAdding('');
                   if (key === '\u0000other') {
-                    const name = window.prompt(t('プロパティ名', 'Property name'))?.trim();
-                    if (name && !(name in values)) set([name], '');
+                    setCustomName('');
                   } else if (key) set([key], emptyOf(kindOf(definitions[key], undefined)));
                 }}
               >
@@ -346,6 +346,42 @@ export function PageProperties({
                 ))}
                 <option value={'\u0000other'}>{t('その他の名前…', 'Another name…')}</option>
               </select>
+            )}
+            {!readOnly && !showRaw && customName !== undefined && (
+              <span className="properties-custom">
+                <input
+                  type="text"
+                  autoFocus
+                  aria-label={t('プロパティ名', 'Property name')}
+                  placeholder={t('プロパティ名', 'Property name')}
+                  value={customName}
+                  onChange={(event) => setCustomName(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      const name = customName.trim();
+                      if (name && !(name in values)) set([name], '');
+                      setCustomName(undefined);
+                    } else if (event.key === 'Escape') {
+                      event.preventDefault();
+                      setCustomName(undefined);
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const name = customName.trim();
+                    if (name && !(name in values)) set([name], '');
+                    setCustomName(undefined);
+                  }}
+                >
+                  {t('追加', 'Add')}
+                </button>
+                <button type="button" onClick={() => setCustomName(undefined)}>
+                  {t('戻る', 'Cancel')}
+                </button>
+              </span>
             )}
             {!parsed.error && (
               <button type="button" className="properties-toggle" onClick={() => setRaw(!raw)}>
