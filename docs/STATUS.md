@@ -1,5 +1,37 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Security hardening, retired/broken cleanup, and core simplification, 2026-11-21
+(**0.2.91**, pending pull request): audited the codebase for security gaps,
+hollowed-out or broken paths, UI/CSS regressions, and duplicated core helpers.
+- Security hardening (`tests/security-hardening.test.ts`): expanded Git and CLI
+  config approvals (including Codex, Antigravity, OpenCode tools, symlink
+  targets, `protocol.ext.allow`, `config.worktree`, and continuations); added
+  `src/host/path-guard.ts`; hardened `SchemaHookRunner`, `AgentSetup`,
+  `ssh-config` wildcard matching, SSH wire/socket authentication, dropped-folder
+  depth limits, `DeviceSettings` map bounds, and Office viewer DOM/style
+  sanitization.
+- Cleanup and fixes: removed retired Google Drive migration/leftover recovery
+  paths (`CloudRecovery.tsx`, `src/cloud/leftovers.ts`; [ADR 023](decisions/023-retire-drive-sign-in.md)
+  amended); fixed `PageProperties` custom property input (replacing
+  `window.prompt`), `FindScope` visibility and hidden conditions, `AgentColumn`
+  effect cleanup and `tabRevisions` refresh, `SchemaDialog` file open and remote
+  locking, targeted new-note scope, CSS selector specificity regressions, and
+  vault-host `$version` busy reporting (`host.running || host.waiting`); aligned
+  [ADR 050](decisions/050-vault-agents-and-their-sub-agents.md) and
+  [ADR 058](decisions/058-every-schema-setting-reaches-every-cli.md) wording
+  with current behavior.
+- Simplification (`tests/simplify-core.test.ts`): consolidated `DeviceSettings`
+  schemas in `src/domain/settings.ts` (preserving IPC map bounds), shared JSONL
+  process streaming in `src/agents/json-lines.ts`, shared OpenCode config
+  helpers in `src/agents/opencode-config.ts`, and unified `SerialQueue` /
+  `local-json` usage across approvals and keystore.
+- Verified on Linux: `npm run build` and `npm run format:check` pass. Full
+  `npm test` ran 821 tests (811 passed, 7 skipped; `git-host-load` passed on
+  rerun; `ssh-config` failed on shared-host umask permissions and one
+  `remote-hosts` test matched an unrelated `sleep 30` on the shared host).
+  `npm run test:ui` could not run locally (no `xvfb-run`/display server) and
+  relies on pull request CI.
+
 Minimal session cards, 2026-11-21 (**0.2.90**,
 [#366](https://github.com/DeL-TaiseiOzaki/irori/pull/366), published as `v0.2.90-preview.1`;
 ADR 069 decision 4 revised): the
