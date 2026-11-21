@@ -1,5 +1,11 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Sub-sessions indented, 2026-11-21 (**0.2.89**): screenshots of 0.2.88 showed a
+hand-off's and a sub-agent's cards in line with their parent's.
+`.session-lane ul` outweighed `.session-subs`, so the nested list lost its
+indent and rule; `.session-lane .session-subs` restores them, and
+`session-board-ui-smoke.ts` checks the indent and the rule.
+
 The session board, 2026-11-20 (**0.2.88**,
 [#363](https://github.com/DeL-TaiseiOzaki/irori/pull/363), published as `v0.2.88-preview.1`;
 [ADR 069](decisions/069-session-board.md)):

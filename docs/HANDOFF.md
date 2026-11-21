@@ -1,5 +1,8 @@
 # irori continuation handoff
 
+**Sub-sessions indented, 0.2.89**: the session board's hand-off and sub-agent
+cards stand under their parent again (a CSS weight fix; see STATUS).
+
 **The session board, 0.2.88** ([ADR 069](decisions/069-session-board.md)). Next:
 Published as `v0.2.88-preview.1`; its UI smokes ran on Linux only, here and in CI.
 1. Real Claude Code, Codex and Antigravity CLI sub-agents were checked in the
