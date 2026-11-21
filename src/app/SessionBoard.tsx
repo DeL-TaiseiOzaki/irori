@@ -1,4 +1,5 @@
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useState, type SyntheticEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { agentNames, type Space } from '../domain/types';
 import { t } from '../domain/i18n';
 import {
@@ -51,6 +52,24 @@ function Dot({ state, queued }: { state: SessionState | SubAgent['state']; queue
   );
 }
 
+/** How long the run on show has gone on, or when an ended one last changed. */
+function elapsedWords(item: SessionCard, now: number) {
+  const running = item.state === 'running' || item.state === 'waiting' || item.state === 'queued';
+  const words = sinceWords(running ? (item.startedAt ?? item.changedAt) : item.changedAt, now);
+  const fresh = words === t('今', 'now');
+  if (running) return fresh ? t('1分未満', 'under a minute') : words;
+  return fresh
+    ? t('たった今更新', 'updated just now')
+    : t(`${words}前に更新`, `updated ${words} ago`);
+}
+
+/** The card a pointer or the keyboard is on, and where its panel stands. */
+interface Detail {
+  id: string;
+  top: number;
+  left: number;
+}
+
 /**
  * The session board (ADR 069): a narrow column left of the agents' columns that
  * holds every conversation of the workspace that is doing something, as a small
@@ -80,14 +99,27 @@ export const SessionBoard = memo(function SessionBoard({
     const timer = setInterval(() => setNow(Date.now()), 60000);
     return () => clearInterval(timer);
   }, []);
-  const total = boardCards(lanes).length;
+  const all = boardCards(lanes);
+  const total = all.length;
+  // A card names only what was asked, by whom and on which CLI; pointing at it,
+  // or focusing it, shows the rest beside the board.
+  const [detail, setDetail] = useState<Detail>();
+  const shownDetail = detail && all.find((item) => item.id === detail.id);
+  const showDetail = (id: string) => (event: SyntheticEvent<HTMLElement>) => {
+    const box = event.currentTarget.getBoundingClientRect();
+    setDetail({
+      id,
+      top: Math.max(8, Math.min(box.top, window.innerHeight - 280)),
+      left: box.right + 6,
+    });
+  };
+  const hideDetail = () => setDetail(undefined);
   const shown = sessionLanes.filter((lane) => lanes[lane].length);
   const owner = (scopeId: string) =>
     scopeId === youId ? undefined : spaces.find((space) => space.scopeId === scopeId);
 
   const renderCard = (item: SessionCard, sub = false) => {
     const space = owner(item.scopeId);
-    const ownerName = space?.name ?? 'irori agent';
     const working = item.state === 'running' || item.state === 'waiting';
     const subAgents =
       working || item.state === 'done' || item.state === 'stopped' || item.state === 'failed'
@@ -97,9 +129,13 @@ export const SessionBoard = memo(function SessionBoard({
       <li key={item.id}>
         <button
           className={`session-card ${item.state} ${sub ? 'sub hand-off' : ''} ${current.includes(item.id) ? 'current' : ''}`}
-          title={`${item.title} · ${ownerName} · ${agentNames[item.agent]}`}
-          aria-label={`${item.title} · ${sessionStateWords(item.state, item.queued)}`}
+          aria-label={`${item.request} · ${space?.name ?? 'irori agent'} · ${agentNames[item.agent]} · ${sessionStateWords(item.state, item.queued)}`}
+          aria-describedby={detail?.id === item.id ? 'session-detail' : undefined}
           onClick={() => onOpen(item)}
+          onMouseEnter={showDetail(item.id)}
+          onMouseLeave={hideDetail}
+          onFocus={showDetail(item.id)}
+          onBlur={hideDetail}
         >
           <span className="session-card-head">
             {space ? (
@@ -109,21 +145,10 @@ export const SessionBoard = memo(function SessionBoard({
                 <Icon name="agent" size={10} strokeWidth={2.2} />
               </span>
             )}
-            <span className="session-card-title">{item.title}</span>
+            <span className="session-card-title">{item.request}</span>
             <Dot state={item.state} queued={item.queued} />
           </span>
-          {item.prompt && item.state !== 'idle' && (
-            <span className="session-card-prompt">
-              {t('依頼', 'You')}: {item.prompt}
-            </span>
-          )}
-          {item.line && <span className="session-card-line">{item.line}</span>}
-          <span className="session-card-foot">
-            {sub && <span className="session-kind">{t('引き継ぎ', 'Hand-off')}</span>}
-            <span className="session-card-owner">{ownerName}</span>
-            <span>{agentNames[item.agent]}</span>
-            <span className="session-card-time">{sinceWords(item.changedAt, now)}</span>
-          </span>
+          <span className="session-card-foot">{agentNames[item.agent]}</span>
         </button>
         {(item.children.length > 0 || subAgents.length > 0) && (
           <ul
@@ -197,6 +222,37 @@ export const SessionBoard = memo(function SessionBoard({
           );
         })}
       </div>
+      {shownDetail &&
+        createPortal(
+          <div
+            id="session-detail"
+            className="session-detail"
+            role="tooltip"
+            style={{ top: detail.top, left: detail.left }}
+          >
+            <dl>
+              <dt>{t('依頼', 'Request')}</dt>
+              <dd>{shownDetail.request}</dd>
+              {shownDetail.ask && (
+                <>
+                  <dt>{t('質問', 'Asks')}</dt>
+                  <dd className="session-detail-ask">{shownDetail.ask}</dd>
+                </>
+              )}
+              {shownDetail.reply && (
+                <>
+                  <dt>{t('最後の返事', 'Last reply')}</dt>
+                  <dd>{shownDetail.reply.trim()}</dd>
+                </>
+              )}
+              <dt>{t('経過時間', 'Elapsed')}</dt>
+              <dd>{elapsedWords(shownDetail, now)}</dd>
+              <dt>{t('モデル', 'Model')}</dt>
+              <dd>{shownDetail.model ?? t('既定のモデル', 'Default model')}</dd>
+            </dl>
+          </div>,
+          document.body,
+        )}
     </aside>
   );
 });

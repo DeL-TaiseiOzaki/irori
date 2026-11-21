@@ -25,14 +25,14 @@ export interface SessionLive {
   runId?: string;
   /** Requests the run waits on: permissions and questions, by id. */
   requests: string[];
-  /** The person's instruction that started the run, in one line. */
+  /** The person's instruction that started the run. */
   prompt?: string;
-  /** The step the run took last: a tool and what it is about, or a status. */
-  step?: string;
+  /** When this device saw the run begin; absent for a run it read already going. */
+  startedAt?: number;
   /** The end of the newest reply. */
   reply?: string;
   replyId?: string;
-  /** The latest request's words, while one is open. */
+  /** What the latest open request asks: its questions, or the permission and what it is for. */
   ask?: string;
   /** How the last run ended; absent while one runs or before any ended. */
   outcome?: RunOutcome;
@@ -213,7 +213,10 @@ export function foldSubAgents(agents: SubAgent[], event: AgentEvent): SubAgent[]
   return add(agents, { call: event.call, label, ...(kind && { kind }) });
 }
 
-const replyLimit = 240;
+const replyLimit = 600;
+const textLimit = 4000;
+const clip = (text: string, limit: number) =>
+  text.length > limit ? `${text.slice(0, limit)}…` : text;
 
 /** One conversation's state after one more of its events. */
 export function foldSession(
@@ -227,7 +230,8 @@ export function foldSession(
     return {
       runId: event.runId,
       requests: [],
-      prompt: firstLine(event.text, 200),
+      prompt: clip(event.text.trim(), textLimit),
+      startedAt: now,
       changedAt: now,
       subAgents: [],
     };
@@ -261,7 +265,19 @@ export function foldSession(
     return {
       ...running,
       requests: [...running.requests, id],
-      ask: firstLine(event.text, 200),
+      ask: clip(
+        [
+          event.text,
+          // A question's own words, or the file or command a permission is for.
+          ...(event.questions?.length
+            ? event.questions.map((question) => question.title)
+            : [eventTarget(event.details)]),
+        ]
+          .map((part) => part.trim())
+          .filter(Boolean)
+          .join('\n'),
+        1000,
+      ),
       changedAt: now,
     };
   }
@@ -269,26 +285,13 @@ export function foldSession(
   if (event.delegate) return running;
   if (event.type === 'tool') {
     const subAgents = foldSubAgents(running.subAgents, event);
-    if (subAgents) {
-      if (subAgents === running.subAgents) return running;
-      // A sub-agent that began is the run's step; the newest one names it.
-      const started = subAgents.filter(
-        (agent) => !running.subAgents.some((item) => item.call === agent.call),
-      );
-      const last = started[started.length - 1];
-      return { ...running, subAgents, ...(last && { step: last.label || event.text }) };
-    }
-    if (event.result) return running;
-    const target = eventTarget(event.details);
-    return { ...running, step: target ? `${event.text} · ${target}` : event.text };
+    return subAgents && subAgents !== running.subAgents ? { ...running, subAgents } : running;
   }
   if (event.type === 'text') {
     const reply =
       (running.replyId === event.id && event.id ? (running.reply ?? '') : '') + event.text;
     return { ...running, reply: reply.slice(-replyLimit), replyId: event.id };
   }
-  if ((event.type === 'status' || event.type === 'error') && event.text.trim())
-    return { ...running, step: firstLine(event.text, 200) };
   return running;
 }
 
@@ -316,7 +319,14 @@ export function liveFromConversation(
       outcome: undefined,
       subAgents: [],
     };
-  live = { ...live, runId: conversation.activeRunId, requests: [], ask: undefined };
+  // Its saved events carry no times: when it began is not known here.
+  live = {
+    ...live,
+    runId: conversation.activeRunId,
+    requests: [],
+    ask: undefined,
+    startedAt: undefined,
+  };
   for (const request of conversation.requests ?? []) live = foldSession(live, request, now);
   return live;
 }
@@ -340,10 +350,19 @@ export interface SessionCard {
   state: SessionState;
   lane: SessionLane;
   queued: number;
-  /** The line under the title: the request it waits on, its step, its last reply. */
-  line?: string;
-  /** What the person asked for in the run on show. */
-  prompt?: string;
+  /**
+   * What was asked: the person's request of the run on show, or a hand-off's
+   * task (its first message also carries irori's words to the vault agent).
+   */
+  request: string;
+  /** The model chosen for it; null for the CLI's own default. */
+  model: string | null;
+  /** When the run on show began, as this device saw it. */
+  startedAt?: number;
+  /** The end of its newest reply. */
+  reply?: string;
+  /** What the request it waits on asks. */
+  ask?: string;
   /** Work the irori agent handed to a vault from it. */
   handOff: boolean;
   /** When its lane last changed, for ordering. */
@@ -386,12 +405,6 @@ const laneOf: Record<SessionState, SessionLane> = {
 function card(row: SessionRow, input: BoardInput): SessionCard {
   const live = input.live[row.id];
   const state = stateOf(row, live, input.seen[row.id]);
-  const line =
-    state === 'waiting'
-      ? live?.ask
-      : state === 'running'
-        ? (live?.step ?? live?.reply)
-        : (firstLine(live?.reply?.split('\n').filter(Boolean).at(-1)) ?? live?.step);
   return {
     id: row.id,
     scopeId: row.scopeId,
@@ -400,8 +413,11 @@ function card(row: SessionRow, input: BoardInput): SessionCard {
     state,
     lane: laneOf[state],
     queued: row.queued,
-    ...(line && { line }),
-    ...(live?.prompt && { prompt: live.prompt }),
+    request: (row.origin !== 'hand-off' && live?.prompt) || row.title,
+    model: row.model,
+    ...(live?.startedAt && { startedAt: live.startedAt }),
+    ...(live?.reply && { reply: live.reply }),
+    ...(state === 'waiting' && live?.ask && { ask: live.ask }),
     handOff: row.origin === 'hand-off',
     changedAt: Math.max(live?.changedAt ?? 0, Date.parse(row.updatedAt) || 0),
     children: [],

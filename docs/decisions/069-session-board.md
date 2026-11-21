@@ -28,8 +28,8 @@ rule. Its board is a separate drawer or window; the owner asked for a column.
 ## Decisions
 
 1. **The board is a column left of the agents' columns**, in the dock beside a
-   vault's page and in irori mode, 212 px wide by default (176 to 360, resizable
-   like a column). Showing it widens the dock or irori mode's side by as much.
+   vault's page and in irori mode, 212 px wide by default (176 to 360; its
+   handle drags it like a column's). Showing it widens the dock or irori mode's side by as much.
 2. **It lists the workspace's conversations**: the irori agent's of this
    workspace and every vault's. One shows while it runs, waits for the person,
    has queued instructions, ended since the person last looked at it, or is
@@ -40,10 +40,14 @@ rule. Its board is a separate drawer or window; the owner asked for a column.
    **実行中** (a run, or queued instructions), **完了** (a run ended since the
    person last looked) and **開いている** (open, nothing to report). The last one
    folds on its heading. Within a lane the most recent change comes first.
-4. **A card** shows the vault's tile or the irori agent's mark, the title, a
-   state dot, the person's request of the run on show, one line of what the
-   agent is doing (the request it waits on, its last step, or its last reply),
-   whose it is, its CLI and how long ago it changed. A click shows the
+4. **A card** shows only the vault's tile or the irori agent's mark, the
+   request (the person's request of the run on show, in two lines at most; a
+   hand-off's task), a state dot and its CLI. Pointing at a card, or focusing
+   it, shows a panel beside the board with the whole request, what a waiting
+   request asks (a question's words, or the file or command a permission is
+   for), the end of the last reply, how long the run has gone on (or when an
+   ended one last changed) and the model. The owner asked for this on
+   2026-11-21, to keep the cards minimal (0.2.90). A click shows the
    conversation in the first column, going to its vault or to irori mode, and
    counts as looking at it. A conversation on show in a column on screen is
    looked at while it is there, so its finished run does not wait in 完了.

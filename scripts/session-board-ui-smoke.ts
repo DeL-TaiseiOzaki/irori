@@ -106,7 +106,31 @@ try {
     lane(page, '実行中').locator('.session-card').filter({ hasText: '最初の話題' }),
   ).toHaveCount(1);
   await expect(card(page, '最初の話題').getByRole('img', { name: '実行中' })).toHaveCount(1);
-  await expect(card(page, '最初の話題')).toContainText('ボード検証');
+  // A card names only the request and its CLI; pointing at it shows the rest beside it.
+  await expect(card(page, '最初の話題').locator('.session-card-foot')).toHaveText('Pi');
+  await expect(card(page, '最初の話題')).not.toContainText('ボード検証');
+  const detail = page.getByRole('tooltip');
+  await card(page, '最初の話題').hover();
+  await expect(detail).toContainText('最初の話題\nrun: sleep 4');
+  await expect(detail).toContainText('経過時間');
+  await expect(detail).toContainText('既定のモデル');
+  const cardBox = (await card(page, '最初の話題').boundingBox())!;
+  const detailBox = (await detail.boundingBox())!;
+  if (detailBox.x < cardBox.x + cardBox.width)
+    throw Error('The panel covers the card it tells about');
+  await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height + 400);
+  await expect(detail).toHaveCount(0);
+
+  // The board's width follows its handle.
+  const handle = page.getByRole('separator', { name: 'セッションボードの幅' });
+  const handleBox = (await handle.boundingBox())!;
+  const before = (await board(page).boundingBox())!.width;
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handleBox.x + 80, handleBox.y + handleBox.height / 2, { steps: 8 });
+  await page.mouse.up();
+  const after = (await board(page).boundingBox())!.width;
+  if (after < before + 60) throw Error(`The board did not widen: ${before} → ${after}`);
 
   // Another conversation runs beside it; its CLI's own sub-agent is a framed card under it.
   await panel(page).getByRole('button', { name: '新しい会話', exact: true }).click();
@@ -165,7 +189,9 @@ try {
     lane(page, '要対応').locator('.session-card').filter({ hasText: '三つ目 dialog' }),
   ).toHaveCount(1);
   await expect(card(page, '三つ目 dialog').getByRole('img', { name: '許可待ち' })).toHaveCount(1);
-  await expect(card(page, '三つ目 dialog')).toContainText('Fixture confirmation');
+  await card(page, '三つ目 dialog').hover();
+  await expect(page.getByRole('tooltip')).toContainText('質問');
+  await expect(page.getByRole('tooltip')).toContainText('Fixture confirmation');
   await page.screenshot({ path: 'test-results/irori-session-board-attention.png' });
   await panel(page).getByRole('button', { name: '停止', exact: true }).click();
   await expect(lane(page, '要対応')).toHaveCount(0);
