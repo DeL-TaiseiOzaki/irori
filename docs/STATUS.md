@@ -1,6 +1,8 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Minimal session cards, 2026-11-21 (**0.2.90**, ADR 069 decision 4 revised): the
+Minimal session cards, 2026-11-21 (**0.2.90**,
+[#366](https://github.com/DeL-TaiseiOzaki/irori/pull/366), published as `v0.2.90-preview.1`;
+ADR 069 decision 4 revised): the
 owner asked for cards with only the vault's icon, the request and the CLI, and
 the rest on hover. `SessionCard.request` (a hand-off's task), `model`,
 `startedAt`, `reply` and `ask` feed a panel drawn in a portal beside the board;
@@ -8,12 +10,22 @@ the live state keeps the whole request and no longer a one-line step. The run's
 start is when this device saw it; a run read already going shows time since its
 last change. The board's handle drags its width, as `session-board-ui-smoke.ts`
 now checks.
+- Published from `380ec0b` (pull request run `44860283089`, publish run
+  `44861225023`). Anonymous downloads matched `SHA256SUMS.txt`: Windows
+  179,424,256 bytes, Mac 145,740,029 bytes, `irori-0.2.90-full.nupkg`
+  178,593,651 bytes; the live page links v0.2.90-preview.1.
 
-Sub-sessions indented, 2026-11-21 (**0.2.89**): screenshots of 0.2.88 showed a
+Sub-sessions indented, 2026-11-21 (**0.2.89**,
+[#365](https://github.com/DeL-TaiseiOzaki/irori/pull/365), published as `v0.2.89-preview.1`):
+screenshots of 0.2.88 showed a
 hand-off's and a sub-agent's cards in line with their parent's.
 `.session-lane ul` outweighed `.session-subs`, so the nested list lost its
 indent and rule; `.session-lane .session-subs` restores them, and
 `session-board-ui-smoke.ts` checks the indent and the rule.
+- Published from `79f0a94` (pull request run `44856319548`, publish run
+  `44860670677`). Anonymous downloads matched `SHA256SUMS.txt`: Windows
+  179,424,256 bytes, Mac 145,741,514 bytes, `irori-0.2.89-full.nupkg`
+  178,593,194 bytes.
 
 The session board, 2026-11-20 (**0.2.88**,
 [#363](https://github.com/DeL-TaiseiOzaki/irori/pull/363), published as `v0.2.88-preview.1`;
