@@ -1,4 +1,4 @@
-import { StringDecoder } from 'node:string_decoder';
+import { runJsonLineProcess } from './json-lines';
 import { launch } from './process';
 import { Tail } from './tail';
 import type { NativeContext } from './adapter';
@@ -54,14 +54,7 @@ export async function runHermes(ctx: NativeContext) {
   const inputs = new Map<string, unknown>();
   const stderr = new Tail(6000);
   child.stderr!.on('data', (chunk) => stderr.add(String(chunk)));
-  const receive = (line: string) => {
-    let event: Record<string, unknown>;
-    try {
-      event = JSON.parse(line);
-    } catch {
-      return; // Not a protocol record; stdout is meant to hold only records.
-    }
-    if (!event || typeof event !== 'object' || Array.isArray(event)) return;
+  const receive = (event: Record<string, unknown>) => {
     if (event.type === 'system' && event.subtype === 'init') save(event.session_id);
     if (event.type === 'text') {
       const text = textOf(event);
@@ -92,31 +85,7 @@ export async function runHermes(ctx: NativeContext) {
       save(event.session_id);
     }
   };
-  const exit = await new Promise<number | null>((resolve, reject) => {
-    const decoder = new StringDecoder('utf8');
-    let buffer = '';
-    child.stdout!.on('data', (chunk: Buffer) => {
-      buffer += decoder.write(chunk);
-      let newline;
-      while ((newline = buffer.indexOf('\n')) >= 0) {
-        const line = buffer.slice(0, newline).trim();
-        buffer = buffer.slice(newline + 1);
-        if (line) receive(line);
-      }
-      if (buffer.length > 8 * 1024 * 1024) {
-        buffer = '';
-        reject(Error('Agent protocol record exceeds limit'));
-      }
-    });
-    child.on('error', reject);
-    child.on('close', (code) => {
-      const rest = (buffer + decoder.end()).trim();
-      if (rest) receive(rest);
-      resolve(code);
-    });
-    child.stdin!.on('error', () => {}); // A process that exits early closes its stdin.
-    child.stdin!.end(ctx.prompt);
-  });
+  const exit = await runJsonLineProcess(child, ctx.prompt, receive);
   await saving;
   ctx.signal.throwIfAborted();
   if (!result)

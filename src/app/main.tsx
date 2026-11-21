@@ -150,44 +150,26 @@ const StagePreview = lazy(() =>
 // Panels only some sessions open. Loading them on first use keeps their code,
 // and the libraries they alone pull in, out of the first paint. Each keeps its
 // own name so the panels below read the same as before.
-const GitPanelView = lazy(() => import('./GitPanel').then((m) => ({ default: m.GitPanel })));
-function GitPanel(props: ComponentProps<typeof GitPanelView>) {
-  return (
-    <Suspense fallback={null}>
-      <GitPanelView {...props} />
-    </Suspense>
-  );
+function lazyView<C extends React.ComponentType<any>>(load: () => Promise<{ default: C }>) {
+  const View = lazy(load);
+  return function LazyView(props: ComponentProps<C>) {
+    return (
+      <Suspense fallback={null}>
+        <View {...props} />
+      </Suspense>
+    );
+  };
 }
-const ConnectionsView = lazy(() =>
+const GitPanel = lazyView(() => import('./GitPanel').then((m) => ({ default: m.GitPanel })));
+const Connections = lazyView(() =>
   import('./Connections').then((m) => ({ default: m.Connections })),
 );
-function Connections(props: ComponentProps<typeof ConnectionsView>) {
-  return (
-    <Suspense fallback={null}>
-      <ConnectionsView {...props} />
-    </Suspense>
-  );
-}
-const SearchPanelView = lazy(() =>
+const SearchPanel = lazyView(() =>
   import('./SearchPanel').then((m) => ({ default: m.SearchPanel })),
 );
-function SearchPanel(props: ComponentProps<typeof SearchPanelView>) {
-  return (
-    <Suspense fallback={null}>
-      <SearchPanelView {...props} />
-    </Suspense>
-  );
-}
-const KnowledgePanelView = lazy(() =>
+const KnowledgePanel = lazyView(() =>
   import('./KnowledgePanel').then((m) => ({ default: m.KnowledgePanel })),
 );
-function KnowledgePanel(props: ComponentProps<typeof KnowledgePanelView>) {
-  return (
-    <Suspense fallback={null}>
-      <KnowledgePanelView {...props} />
-    </Suspense>
-  );
-}
 import type { PageEditorHandle } from './PageEditor';
 import { FindScope, type FindScopeHandle } from './FindBar';
 import './tokens.css';

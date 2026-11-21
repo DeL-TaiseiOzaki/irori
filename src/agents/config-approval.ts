@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import writeFileAtomic from 'write-file-atomic';
 import { t } from '../domain/i18n';
 import type { AgentId } from '../domain/types';
+import { readLocalJson, writeLocalJson } from '../host/local-json';
+import { SerialQueue } from '../host/serial-queue';
 
 /**
  * The files in the folder a CLI works in that make it run commands, start
@@ -120,18 +121,16 @@ export async function findConfig(
  * waits for their answer, and does not start when they refuse.
  */
 export class ConfigApprovals {
-  private queue: Promise<unknown> = Promise.resolve();
+  private queue = new SerialQueue();
   constructor(
     private file: string,
     private ask: (found: FoundConfig[]) => Promise<boolean>,
   ) {}
   private async allowed(): Promise<Record<string, string>> {
-    try {
-      const value = JSON.parse(await fs.readFile(this.file, 'utf8'));
-      return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-    } catch {
-      return {};
-    }
+    const value = await readLocalJson(this.file, {}).catch(() => ({}));
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, string>)
+      : {};
   }
   private async changed(agent: AgentId, places: ConfigPlace[], extra: FoundConfig[]) {
     const allowed = await this.allowed();
@@ -167,17 +166,14 @@ export class ConfigApprovals {
     decide: (changed: FoundConfig[]) => Promise<boolean>,
   ): Promise<FoundConfig[]> {
     // One question at a time, so two runs of one vault do not ask twice.
-    const next = this.queue.then(async () => {
+    return this.queue.run(async () => {
       const { allowed, changed } = await this.changed(agent, places, extra);
       if (!changed.length) return changed;
       if (!(await decide(changed))) throw new ConfigRefused();
       for (const item of changed) allowed[item.root] = item.digest;
-      await fs.mkdir(path.dirname(this.file), { recursive: true, mode: 0o700 });
-      await writeFileAtomic(this.file, JSON.stringify(allowed, null, 2) + '\n', { mode: 0o600 });
+      await writeLocalJson(this.file, allowed);
       return changed;
     });
-    this.queue = next.catch(() => {});
-    return next;
   }
 }
 

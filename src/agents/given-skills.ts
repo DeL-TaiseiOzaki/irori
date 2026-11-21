@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import writeFileAtomic from 'write-file-atomic';
 import type { LinkedSkill } from './claude-skills';
+import { addOpenCodePlugin } from './opencode-config';
 
 /**
  * The shared Schema's skills as skills of Codex, OpenCode and the Antigravity
@@ -137,13 +138,8 @@ export async function openCodeSkillPaths(
   await writeFileAtomic(file, openCodeScript);
   // OpenCode reads a plugin from an absolute path named in this variable's JSON,
   // merged after its own files; plugins already named there stay.
-  const content = JSON.parse(env.OPENCODE_CONFIG_CONTENT ?? '{}');
   return {
-    ...env,
+    ...addOpenCodePlugin(env, file),
     IRORI_SKILL_PATHS: JSON.stringify(folders),
-    OPENCODE_CONFIG_CONTENT: JSON.stringify({
-      ...content,
-      plugin: [...(content.plugin ?? []), file],
-    }),
   };
 }

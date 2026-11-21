@@ -25,6 +25,7 @@ import { agentIds, agentNames } from '../domain/types';
 import { defaultAgentAccess, requireAgentAccess } from '../domain/agent-access';
 import { runPi } from './pi';
 import { runOpenCode } from './opencode';
+import { mergeOpenCodeConfig } from './opencode-config';
 import { runHermes } from './hermes';
 import { runAntigravity } from './antigravity';
 import { codexServer, initializeCodex, refuseCodex } from './codex';
@@ -2070,22 +2071,20 @@ export class AgentService {
       run.codexRoles = await writeCodexRoles(this.files.dataDir, run.id, foreign);
     if (agent === 'opencode') {
       const env = run.env ?? agentEnv();
-      const content = JSON.parse(env.OPENCODE_CONFIG_CONTENT ?? '{}');
-      run.env = {
-        ...env,
-        OPENCODE_CONFIG_CONTENT: JSON.stringify({
-          ...content,
-          agent: {
-            ...Object.fromEntries(
-              foreign.map((item) => [
-                item.name,
-                { description: item.description, prompt: item.instructions, mode: 'subagent' },
-              ]),
-            ),
-            ...content.agent,
-          },
-        }),
-      };
+      run.env = mergeOpenCodeConfig(env, (content) => ({
+        ...content,
+        agent: {
+          ...Object.fromEntries(
+            foreign.map((item) => [
+              item.name,
+              { description: item.description, prompt: item.instructions, mode: 'subagent' },
+            ]),
+          ),
+          ...(content.agent && typeof content.agent === 'object' && !Array.isArray(content.agent)
+            ? content.agent
+            : {}),
+        },
+      }));
     }
   }
   private async execute(run: Run, input: StartRun) {

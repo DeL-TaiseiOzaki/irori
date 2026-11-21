@@ -1,35 +1,20 @@
 import { z } from 'zod';
-import {
-  agentAccessModes,
-  agentIds,
-  lineSpacings,
-  markdownFonts,
-  pageMargins,
-  textSizes,
-  themes,
-} from './types';
+import { agentIds } from './types';
 import type { HostRequests } from './host-bridge';
 import { sourceDestination, sourceRef, sourceVersion } from './knowledge';
-import { agentEffort, agentModel, startInput, yourAiChoice } from './conversation';
+import { agentEffort, agentModel, startInput } from './conversation';
 import { searchQuery } from './search';
 import { draftKey, draftValue, draftRevision } from './drafts';
 import { noteRef } from './note-operations';
 import { externalUrl } from './links';
-import { languages } from './i18n';
 import { linkHref } from './note-links';
-import { skillAudience, skillName } from './skills';
-import { windowItemChoices } from './window-items';
+import { skillName } from './skills';
+import { deviceSettingsPatchSchema } from './settings';
 import { brainLook, categoryText } from './brains';
 import { remoteAnswerLimit, remoteHostInput, remotePath } from './remote-hosts';
 import { knowledgeFolderName, layerLabelChanges } from './layers';
 import { githubOwnerPattern, validGitEmail, validGitName, validRepositoryName } from './git';
-import {
-  routineRef,
-  routineRuntimeList,
-  secretName,
-  secretValue,
-  storedSecretName,
-} from './routines';
+import { routineRef, secretName, secretValue, storedSecretName } from './routines';
 import { newComment } from './comments';
 import { attachmentByteLimit } from './attachments';
 import { broughtChunkBytes } from './connections';
@@ -91,32 +76,7 @@ export const hostArguments = {
   restartToUpdate: z.tuple([]),
   openUrl: z.tuple([externalUrl]),
   deviceSettings: z.tuple([]),
-  saveDeviceSettings: z.tuple([
-    z.object({
-      theme: z.enum(themes).optional(),
-      language: z.enum(languages).optional(),
-      markdownFont: z.enum(markdownFonts).optional(),
-      pageMargins: z.enum(pageMargins).optional(),
-      textSize: z.enum(textSizes).optional(),
-      lineSpacing: z.enum(lineSpacings).optional(),
-      editorAssistance: z.boolean().optional(),
-      propertiesFolded: z.boolean().optional(),
-      vaultAgent: z.boolean().optional(),
-      agentAccess: z.enum(agentAccessModes).optional(),
-      // The pane library keys a layout by its prefix, the group id and every panel id.
-      layouts: z
-        .record(z.string().max(160), z.string().max(4096))
-        .refine((value) => Object.keys(value).length <= 200)
-        .optional(),
-      skillAudiences: z
-        .record(z.string().max(64), skillAudience)
-        .refine((value) => Object.keys(value).length <= 500)
-        .optional(),
-      yourAi: yourAiChoice.optional(),
-      routineRuntimes: routineRuntimeList.optional(),
-      windowItems: windowItemChoices.optional(),
-    }),
-  ]),
+  saveDeviceSettings: z.tuple([deviceSettingsPatchSchema]),
   moveNote: z.tuple([noteRef, path, z.boolean()]),
   trashNote: z.tuple([noteRef]),
   trashedNotes: z.tuple([id]),

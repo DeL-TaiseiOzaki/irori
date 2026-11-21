@@ -1,6 +1,64 @@
 import type { ChildProcess } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
 
+const lineLimit = 8 * 1024 * 1024;
+
+/**
+ * Feeds `stdinText` to a one-shot JSONL CLI child process, delivers each JSON
+ * object line from stdout to `onRecord` (ignoring non-JSON / non-object lines),
+ * bounds individual lines to 8 MiB, and resolves with the exit code.
+ */
+export function runJsonLineProcess(
+  child: ChildProcess,
+  stdinText: string,
+  onRecord: (record: Record<string, unknown>) => void,
+): Promise<number | null> {
+  const receive = (line: string) => {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      return; // Not a protocol record; stdout is meant to hold only records.
+    }
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed))
+      onRecord(parsed as Record<string, unknown>);
+  };
+  return new Promise<number | null>((resolve, reject) => {
+    const decoder = new StringDecoder('utf8');
+    let buffer = '';
+    let settled = false;
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+    child.stdout!.on('data', (chunk: Buffer) => {
+      if (settled) return;
+      buffer += decoder.write(chunk);
+      let newline;
+      while ((newline = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, newline).trim();
+        buffer = buffer.slice(newline + 1);
+        if (line) receive(line);
+      }
+      if (buffer.length > lineLimit) {
+        buffer = '';
+        fail(Error('Agent protocol record exceeds limit'));
+      }
+    });
+    child.on('error', fail);
+    child.on('close', (code) => {
+      if (settled) return;
+      settled = true;
+      const rest = (buffer + decoder.end()).trim();
+      if (rest) receive(rest);
+      resolve(code);
+    });
+    child.stdin!.on('error', () => {}); // A process that exits early closes its stdin.
+    child.stdin!.end(stdinText);
+  });
+}
+
 // Codex and Pi have different envelopes, but share bounded JSONL and request lifetimes.
 export class JsonLineConnection {
   private next = 0;

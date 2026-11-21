@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import writeFileAtomic from 'write-file-atomic';
 import { t } from '../domain/i18n';
+import { readLocalJson, writeLocalJson } from '../host/local-json';
+import { SerialQueue } from '../host/serial-queue';
 
 /**
  * Settings of a repository's own `.git/config` that make Git run a program:
@@ -113,7 +114,7 @@ export async function gitConfigRuns(cwd: string) {
 
 /** Runs Git in a repository only with the person's leave for what its configuration runs. */
 export class GitConfigApprovals {
-  private queue: Promise<unknown> = Promise.resolve();
+  private queue = new SerialQueue();
   /** Refused this session, so automatic reads do not ask again until it changes. */
   private refused = new Map<string, string>();
   constructor(
@@ -121,12 +122,10 @@ export class GitConfigApprovals {
     private ask: (folder: string, found: string[]) => Promise<boolean>,
   ) {}
   private async allowed(): Promise<Record<string, string>> {
-    try {
-      const value = JSON.parse(await fs.readFile(this.file, 'utf8'));
-      return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-    } catch {
-      return {};
-    }
+    const value = await readLocalJson(this.file, {}).catch(() => ({}));
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, string>)
+      : {};
   }
   async check(cwd: string) {
     const runs = await gitConfigRuns(cwd);
@@ -139,7 +138,7 @@ export class GitConfigApprovals {
         ),
       );
     if (this.refused.get(runs.folder) === runs.digest) throw refusal();
-    const next = this.queue.then(async () => {
+    return this.queue.run(async () => {
       const allowed = await this.allowed();
       if (allowed[runs.folder] === runs.digest) return;
       if (this.refused.get(runs.folder) === runs.digest) throw refusal();
@@ -148,11 +147,8 @@ export class GitConfigApprovals {
         throw refusal();
       }
       allowed[runs.folder] = runs.digest;
-      await fs.mkdir(path.dirname(this.file), { recursive: true, mode: 0o700 });
-      await writeFileAtomic(this.file, JSON.stringify(allowed, null, 2) + '\n', { mode: 0o600 });
+      await writeLocalJson(this.file, allowed);
     });
-    this.queue = next.catch(() => {});
-    return next;
   }
 }
 
