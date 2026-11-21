@@ -3,7 +3,11 @@
 **Minimal session cards, 0.2.90**: a card is the icon, the request and the CLI;
 hovering shows the request, ask, last reply, elapsed time and model. Published
 as `v0.2.90-preview.1` after `v0.2.89-preview.1`; UI smokes ran on Linux only.
-Next: try the board on the owner's Windows 11 and Mac.
+Next: try the board on the owner's Windows 11 and Mac. Not covered: a
+sub-agent's card has no panel (its label and kind only, and only the first line
+of what it was asked is kept); the board's width is saved with the dock's layout
+but was not checked across a restart; a run read already going shows the time
+since its last change, not since it began.
 
 **Sub-sessions indented, 0.2.89**: the session board's hand-off and sub-agent
 cards stand under their parent again (a CSS weight fix; see STATUS).
