@@ -1,8 +1,9 @@
 # irori continuation handoff
 
 **Minimal session cards, 0.2.90**: a card is the icon, the request and the CLI;
-hovering shows the request, ask, last reply, elapsed time and model. Builds on
-0.2.89 (#365). Not tried on macOS or Windows.
+hovering shows the request, ask, last reply, elapsed time and model. Published
+as `v0.2.90-preview.1` after `v0.2.89-preview.1`; UI smokes ran on Linux only.
+Next: try the board on the owner's Windows 11 and Mac.
 
 **Sub-sessions indented, 0.2.89**: the session board's hand-off and sub-agent
 cards stand under their parent again (a CSS weight fix; see STATUS).
