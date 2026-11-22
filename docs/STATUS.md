@@ -1,5 +1,11 @@
 # Implementation status — notes, native agents and connection onboarding
 
+The session board at the right, 2026-11-22 (**0.2.92**, ADR 069 amended): the
+owner asked for the board right of the agents' columns rather than left of them.
+`sessionPane` and its handle follow the columns in both docks, the board's rule
+is on its left, and a card's panel opens leftwards. The window item already
+turned it off; its place is now エージェントの列の右.
+
 Security hardening, retired/broken cleanup, and core simplification, 2026-11-21
 (**0.2.91**, pending pull request): audited the codebase for security gaps,
 hollowed-out or broken paths, UI/CSS regressions, and duplicated core helpers.

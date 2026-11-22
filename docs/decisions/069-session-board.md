@@ -27,9 +27,12 @@ rule. Its board is a separate drawer or window; the owner asked for a column.
 
 ## Decisions
 
-1. **The board is a column left of the agents' columns**, in the dock beside a
+1. **The board is a column right of the agents' columns**, in the dock beside a
    vault's page and in irori mode, 212 px wide by default (176 to 360; its
-   handle drags it like a column's). Showing it widens the dock or irori mode's side by as much.
+   handle drags it like a column's). Showing it widens the dock or irori mode's
+   side by as much. It stood left of the columns until the owner asked on
+   2026-11-22 for it at their right (0.2.92), at the window's edge; a card's
+   panel opens to the board's left.
 2. **It lists the workspace's conversations**: the irori agent's of this
    workspace and every vault's. One shows while it runs, waits for the person,
    has queued instructions, ended since the person last looked at it, or is
@@ -73,7 +76,7 @@ rule. Its board is a separate drawer or window; the owner asked for a column.
    sub-agents are declared in its Schema, and a hand-off runs as the vault agent
    its Schema defines. It names what kind of session a card is, never a state.
 7. **A window item.** `sessions` (セッションボード) under 表示 → 画面に出すもの,
-   in a new place, **エージェントの列の左**. It is on for a new device: the
+   in a new place, **エージェントの列の右**. It is on for a new device: the
    board is the work, not a developer's control. Off, conversations still open
    as tabs and columns.
 8. **Nothing new is stored.** The board reads the owners' lists from the host
@@ -100,6 +103,12 @@ rule. Its board is a separate drawer or window; the owner asked for a column.
   sub-agents were not recognised before that run: Codex no longer reported
   `spawnAgent`, and irori's Antigravity adapter dropped the `subagent` step.
 - The window items count nine, four on for a new device.
+
+## Amendments
+
+- 2026-11-22 (0.2.92): the board moved right of the agents' columns at the
+  owner's request (decisions 1 and 7). It was already a window item the owner
+  could turn off.
 
 ## Later
 

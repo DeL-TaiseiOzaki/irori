@@ -2248,7 +2248,7 @@ function App() {
   const windowItems = useWindowItems();
   const boardShown = windowItems.sessions && !!workspace;
   const dockPanes = useMemo(
-    () => [...(boardShown ? ['sessions'] : []), ...columns.map((column) => column.id)],
+    () => [...columns.map((column) => column.id), ...(boardShown ? ['sessions'] : [])],
     [columns, boardShown],
   );
   const dockLayout = useDefaultLayout({
@@ -2266,7 +2266,7 @@ function App() {
     storage: layoutStorage,
   });
   const yourPanes = useMemo(
-    () => [...(boardShown ? ['sessions'] : []), ...yourColumns.map((column) => column.id)],
+    () => [...yourColumns.map((column) => column.id), ...(boardShown ? ['sessions'] : [])],
     [yourColumns, boardShown],
   );
   const yourLayout = useDefaultLayout({
@@ -2850,7 +2850,7 @@ function App() {
     [yourKey, yourColumns, shown, yourRows.data],
   );
   // The session board (ADR 069): every conversation of the workspace that is doing
-  // something, as a card left of the agents' columns.
+  // something, as a card right of the agents' columns.
   const boardOwners = useMemo<BoardOwner[]>(
     () => [
       ...(you?.state === 'ready' ? [{ scopeId: you.id, irori: true }] : []),
@@ -2944,8 +2944,6 @@ function App() {
       defaultLayout={yourLayout.defaultLayout}
       onLayoutChanged={yourLayout.onLayoutChanged}
     >
-      {sessionPane}
-      {sessionHandle}
       {yourColumns.map((column, index) => [
         index > 0 && (
           <PaneSeparator
@@ -2985,6 +2983,8 @@ function App() {
           />
         </Pane>,
       ])}
+      {sessionHandle}
+      {sessionPane}
     </PaneGroup>
   );
   // What the rail shows of each brain's AI; the same function while nothing changed.
@@ -4285,8 +4285,6 @@ function App() {
                   defaultLayout={dockLayout.defaultLayout}
                   onLayoutChanged={dockLayout.onLayoutChanged}
                 >
-                  {sessionPane}
-                  {sessionHandle}
                   {columns.map((column, index) => {
                     const owner = ownerOf(column);
                     return [
@@ -4335,6 +4333,8 @@ function App() {
                       </Pane>,
                     ];
                   })}
+                  {sessionHandle}
+                  {sessionPane}
                 </PaneGroup>
               </Pane>
             </>
