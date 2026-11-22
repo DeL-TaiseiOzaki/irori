@@ -1,10 +1,16 @@
 # Implementation status — notes, native agents and connection onboarding
 
-The session board at the right, 2026-11-22 (**0.2.92**, ADR 069 amended): the
+The session board at the right, 2026-11-22 (**0.2.92**,
+[#370](https://github.com/DeL-TaiseiOzaki/irori/pull/370), published as `v0.2.92-preview.1`;
+ADR 069 amended): the
 owner asked for the board right of the agents' columns rather than left of them.
 `sessionPane` and its handle follow the columns in both docks, the board's rule
 is on its left, and a card's panel opens leftwards. The window item already
 turned it off; its place is now エージェントの列の右.
+- Published from `60a1f41` (pull request run `45005372583`, publish run
+  `45006839092`). Anonymous downloads matched `SHA256SUMS.txt`: Windows
+  179,426,816 bytes, Mac 145,738,115 bytes, `irori-0.2.92-full.nupkg`
+  178,596,501 bytes; the live page links v0.2.92-preview.1.
 
 Security hardening, retired/broken cleanup, and core simplification, 2026-11-21
 (**0.2.91**, pending pull request): audited the codebase for security gaps,
