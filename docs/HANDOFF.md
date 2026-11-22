@@ -1,7 +1,8 @@
 # irori continuation handoff
 
 **The session board at the right, 0.2.92**: the board stands right of the
-agents' columns; its panel opens to its left. Not tried on macOS or Windows.
+agents' columns; its panel opens to its left. Published as
+`v0.2.92-preview.1`; UI smokes ran on Linux only. Not tried on macOS or Windows.
 
 **Audit hardening, cleanup, and simplification, 0.2.91**: hardened Git/agent
 config approval, path/IPC bounds, SSH wire/socket auth, `SchemaHookRunner`,
