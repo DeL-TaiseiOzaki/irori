@@ -778,7 +778,7 @@ export function Overview({
   /** The irori agent's columns in this workspace (ADR 034). */
   yourDock: ReactNode;
   yourColumnCount: number;
-  /** The session board before the irori agent's columns, when shown (ADR 069). */
+  /** The session board after the irori agent's columns, when shown (ADR 069). */
   yourBoard?: { width: number; minimum: number };
   /** The irori agent's conversations the map follows: those on show and those running. */
   yourWatched: string[];

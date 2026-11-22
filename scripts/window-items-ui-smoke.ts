@@ -108,7 +108,7 @@ try {
   for (const group of [
     'エージェントへの指示の入力欄',
     '会話の上部',
-    'エージェントの列の左',
+    'エージェントの列の右',
     'ステータスバー（ウィンドウの下端）',
   ])
     await expect(sheet.getByRole('heading', { name: group, exact: true })).toBeVisible();

@@ -9,7 +9,7 @@ file.
 
 ## What the person sees
 
-- The **session board** left of the agents' columns lists the workspace's
+- The **session board** right of the agents' columns lists the workspace's
   conversations that run, wait, ended unseen or are open, as cards in the lanes
   要対応, 実行中, 完了 and 開いている; a hand-off and a CLI's own sub-agent show
   under their conversation's card ([ADR 069](decisions/069-session-board.md)).
