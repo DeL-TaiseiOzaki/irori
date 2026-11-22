@@ -67,11 +67,12 @@ function elapsedWords(item: SessionCard, now: number) {
 interface Detail {
   id: string;
   top: number;
-  left: number;
+  /** From the window's right edge: the board stands at the right, its panel left of it. */
+  right: number;
 }
 
 /**
- * The session board (ADR 069): a narrow column left of the agents' columns that
+ * The session board (ADR 069): a narrow column right of the agents' columns that
  * holds every conversation of the workspace that is doing something, as a small
  * card in its lane. A hand-off and a CLI's own sub-agent show under the card of
  * the conversation that started them, framed in the sub-session colour.
@@ -110,7 +111,7 @@ export const SessionBoard = memo(function SessionBoard({
     setDetail({
       id,
       top: Math.max(8, Math.min(box.top, window.innerHeight - 280)),
-      left: box.right + 6,
+      right: window.innerWidth - box.left + 6,
     });
   };
   const hideDetail = () => setDetail(undefined);
@@ -228,7 +229,7 @@ export const SessionBoard = memo(function SessionBoard({
             id="session-detail"
             className="session-detail"
             role="tooltip"
-            style={{ top: detail.top, left: detail.left }}
+            style={{ top: detail.top, right: detail.right }}
           >
             <dl>
               <dt>{t('依頼', 'Request')}</dt>

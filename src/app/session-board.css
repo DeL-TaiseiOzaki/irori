@@ -1,5 +1,5 @@
 /*
- * The session board (ADR 069): a narrow column of small cards left of the agents'
+ * The session board (ADR 069): a narrow column of small cards right of the agents'
  * columns. A card is framed by its state as ADR 053 colours states (attention,
  * danger; running is neutral and told by motion); a sub-session (a hand-off or a
  * CLI's own sub-agent) is framed in the Schema's identity colour, since a
@@ -15,7 +15,7 @@
   display: flex;
   flex-direction: column;
   background: var(--panel);
-  border-right: 1px solid var(--hair);
+  border-left: 1px solid var(--hair);
   color: var(--tx);
 }
 .session-board-head {
@@ -268,7 +268,7 @@
   opacity: 1;
 }
 
-/* What a card leaves out, beside the board while a pointer or focus is on it.
+/* What a card leaves out, left of the board while a pointer or focus is on it.
    Fixed, so the board's scrolling lanes do not clip it. */
 .session-detail {
   position: fixed;

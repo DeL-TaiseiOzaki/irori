@@ -13,7 +13,7 @@ import { SettingsService } from '../src/host/settings';
 import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // The session board (ADR 069): every conversation of the workspace that is doing
-// something shows as a card in its lane, left of the agents' columns. A run moves
+// something shows as a card in its lane, right of the agents' columns. A run moves
 // its card from 実行中 to 完了 while another conversation is on show, a card opens
 // its conversation, a request puts its card under 要対応, a CLI's own sub-agent
 // shows as a framed card under its conversation, and the settings take the board
@@ -93,8 +93,8 @@ try {
   await expect(board(page)).toBeVisible();
   const boardBox = await board(page).boundingBox();
   const panelBox = await panel(page).boundingBox();
-  if (!boardBox || !panelBox || boardBox.x >= panelBox.x)
-    throw Error('The session board is not left of the agent column');
+  if (!boardBox || !panelBox || boardBox.x <= panelBox.x)
+    throw Error('The session board is not right of the agent column');
   await expect(board(page)).toContainText('動いている会話はありません');
   await panel(page).getByLabel('エージェント', { exact: true }).selectOption('pi');
 
@@ -116,7 +116,8 @@ try {
   await expect(detail).toContainText('既定のモデル');
   const cardBox = (await card(page, '最初の話題').boundingBox())!;
   const detailBox = (await detail.boundingBox())!;
-  if (detailBox.x < cardBox.x + cardBox.width)
+  // The board stands at the window's right edge: its panel opens to its left.
+  if (detailBox.x + detailBox.width > cardBox.x)
     throw Error('The panel covers the card it tells about');
   await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height + 400);
   await expect(detail).toHaveCount(0);
@@ -127,7 +128,7 @@ try {
   const before = (await board(page).boundingBox())!.width;
   await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
   await page.mouse.down();
-  await page.mouse.move(handleBox.x + 80, handleBox.y + handleBox.height / 2, { steps: 8 });
+  await page.mouse.move(handleBox.x - 80, handleBox.y + handleBox.height / 2, { steps: 8 });
   await page.mouse.up();
   const after = (await board(page).boundingBox())!.width;
   if (after < before + 60) throw Error(`The board did not widen: ${before} → ${after}`);
