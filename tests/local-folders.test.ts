@@ -13,7 +13,7 @@ import {
 } from 'node:fs/promises';
 import path from 'node:path';
 import { CloudService, folderLabel, type WaitTiming } from '../src/cloud/service';
-import { fixture, retiredDeclaration, writeRetired } from './fixtures/cloud';
+import { fixture } from './fixtures/cloud';
 
 /** A vault with a folder outside it, standing for one a sync app keeps on this device. */
 async function local(t: any) {
@@ -108,14 +108,12 @@ test('Folders overlapping a vault or irori data, and taken names, are refused', 
   await assert.rejects(add(files.dataDir), /重なる/);
   await assert.rejects(add(path.join(base, 'missing')), /見つかりません/);
   await assert.rejects(add('relative/path'), /見つかりません/);
-  // A retired Drive connection still holds its name until it is switched or unregistered.
-  await writeRetired(space, retiredDeclaration(space, { name: 'Drive' }));
-  await assert.rejects(add(folder, 'drive'), /同じ名前/);
   await mkdir(path.join(space.root, 'contents', 'Kept'), { recursive: true });
   await assert.rejects(add(folder, 'kept'), /同じ名前/);
   const { mountId } = await add(folder, 'Research');
   await assert.rejects(add(folder, 'RESEARCH'), /同じ名前/);
-  await assert.rejects(cloud.edit(space.scopeId, mountId, 'Drive'), /同じ名前/);
+  await add(folder, 'Taken');
+  await assert.rejects(cloud.edit(space.scopeId, mountId, 'TAKEN'), /同じ名前/);
 });
 
 test('A replaced link or folder is refused, and links inside the folder are not followed', async (t) => {
@@ -491,4 +489,21 @@ test('A connected folder keeps its name without an email address, and its links 
   await cloud.connect(space.scopeId, mountId);
   const exclude = await readFile(path.join(space.root, '.git', 'info', 'exclude'), 'utf8');
   assert.ok(exclude.split('\n').includes('/contents/'));
+});
+
+test('removeStray falls back to permanent deletion only when trash fails and the user confirms', async (t) => {
+  const { files, space } = await local(t);
+  const stray = path.join(space.root, 'contents', 'Stuck');
+  await mkdir(stray, { recursive: true });
+  await writeFile(path.join(stray, 'file.md'), 'data');
+  let allow = false;
+  const cloud = new CloudService(files, async () => {
+    throw Error('trash unavailable');
+  });
+  cloud.confirmPermanentDelete = async () => allow;
+  await assert.rejects(cloud.removeStray(space.scopeId, 'contents', 'Stuck'), /trash unavailable/);
+  assert.equal(await readFile(path.join(stray, 'file.md'), 'utf8'), 'data');
+  allow = true;
+  await cloud.removeStray(space.scopeId, 'contents', 'Stuck');
+  await assert.rejects(lstat(stray), { code: 'ENOENT' });
 });

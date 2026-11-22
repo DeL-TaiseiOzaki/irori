@@ -3,12 +3,16 @@
  * scripts, frames and network loads; this also strips what a crafted file could use
  * to act rather than to show, so the viewer never depends on the CSP alone.
  */
-const removed = 'script,iframe,frame,object,embed,link,meta,base,form,input,button,textarea,select';
+const removed =
+  'script,iframe,frame,object,embed,link,meta,base,form,input,button,textarea,select,template,animate,set,style';
 
-function safeUrl(name: string, value: string) {
+const isAnchor = (element: Element) =>
+  element instanceof HTMLAnchorElement || element instanceof SVGAElement;
+
+function safeUrl(element: Element, name: string, value: string) {
   const url = value.trim();
-  if (name === 'href') return /^(https?:|mailto:|#)/i.test(url);
-  return /^data:image\/(png|jpe?g|gif|webp|bmp|svg\+xml);/i.test(url) || url.startsWith('#');
+  if (name === 'href') return isAnchor(element) && /^(https?:|mailto:|#)/i.test(url);
+  return /^data:image\/(png|jpe?g|gif|webp|bmp);/i.test(url) || url.startsWith('#');
 }
 
 export function neutralize(root: ParentNode) {
@@ -18,13 +22,31 @@ export function neutralize(root: ParentNode) {
       const lower = name.toLowerCase();
       if (lower.startsWith('on') || lower === 'srcset' || lower === 'formaction')
         element.removeAttribute(name);
+      else if (lower === 'style' && /url\s*\(|@import|expression\s*\(/i.test(value))
+        element.removeAttribute(name);
       else if (
         ['href', 'src', 'xlink:href', 'action', 'poster', 'background'].includes(lower) &&
-        !safeUrl(lower, value)
+        !safeUrl(element, lower, value)
       )
         element.removeAttribute(name);
     }
-    if (element instanceof HTMLAnchorElement) element.removeAttribute('target');
+    if (isAnchor(element)) element.removeAttribute('target');
+  }
+}
+
+/** Keeps only inert `<style>` sheets inside a viewer's style container, stripping imports and external URLs. */
+export function neutralizeStyles(container: ParentNode) {
+  for (const child of [...container.childNodes]) {
+    if (child instanceof HTMLStyleElement) {
+      child.textContent = (child.textContent ?? '')
+        .replace(/@import\b[^;]*;?/gi, '')
+        .replace(
+          /url\s*\(\s*(['"]?)\s*(?!data:image\/(?:png|jpe?g|gif|webp|bmp);)[^)]*\1\s*\)/gi,
+          'none',
+        );
+    } else {
+      child.remove();
+    }
   }
 }
 
@@ -44,7 +66,8 @@ export function safeFragment(html: string) {
 export function followLinks(root: HTMLElement | ShadowRoot, open: (url: string) => void) {
   const click = (event: Event) => {
     const link = (event.composedPath() as Element[]).find(
-      (node): node is HTMLAnchorElement => node instanceof HTMLAnchorElement,
+      (node): node is HTMLAnchorElement | SVGAElement =>
+        node instanceof HTMLAnchorElement || node instanceof SVGAElement,
     );
     if (!link) return;
     event.preventDefault();

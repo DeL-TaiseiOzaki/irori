@@ -1,6 +1,10 @@
 # 023 — irori no longer signs in to Google Drive
 
 Date: 2026-10-02. Status: owner decision; implemented for 0.1.67.
+Amended 2026-11-21 (0.2.91): decisions 2–4's temporary migration UI and rclone
+unsent-cache recovery (`CloudRecovery.tsx`, `src/cloud/leftovers.ts`, and
+retired-Drive switching paths) have been removed now that Drive sign-in has been
+retired for over 120 releases.
 Replaces decision 7 of [ADR 019](019-local-folder-connections.md) and the
 in-app sign-in of [ADR 012](012-drive-editing.md) and [ADR 013](013-drive-folders-in-kbs.md).
 Replaces D1 of the Google data-policy proposal in draft PR #146.

@@ -466,7 +466,10 @@ export function AgentColumn({
       })().catch((error) => {
         if (current) setConversationError(errorText(error));
       });
-    if (!target) return;
+    if (!target)
+      return () => {
+        current = false;
+      };
     const id = target.id;
     flushPending.current = flush;
     document.addEventListener('visibilitychange', shown);

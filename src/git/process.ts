@@ -216,7 +216,16 @@ export class GitProcess {
     env.LC_ALL = 'C';
     const child = launch(
       this.command,
-      ['--no-pager', '-c', 'core.fsmonitor=false', '-c', 'color.ui=false', ...args],
+      [
+        '--no-pager',
+        '-c',
+        'core.fsmonitor=false',
+        '-c',
+        'color.ui=false',
+        '-c',
+        'protocol.ext.allow=never',
+        ...args,
+      ],
       cwd,
       env,
     );

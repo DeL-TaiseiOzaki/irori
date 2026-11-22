@@ -150,44 +150,26 @@ const StagePreview = lazy(() =>
 // Panels only some sessions open. Loading them on first use keeps their code,
 // and the libraries they alone pull in, out of the first paint. Each keeps its
 // own name so the panels below read the same as before.
-const GitPanelView = lazy(() => import('./GitPanel').then((m) => ({ default: m.GitPanel })));
-function GitPanel(props: ComponentProps<typeof GitPanelView>) {
-  return (
-    <Suspense fallback={null}>
-      <GitPanelView {...props} />
-    </Suspense>
-  );
+function lazyView<C extends React.ComponentType<any>>(load: () => Promise<{ default: C }>) {
+  const View = lazy(load);
+  return function LazyView(props: ComponentProps<C>) {
+    return (
+      <Suspense fallback={null}>
+        <View {...props} />
+      </Suspense>
+    );
+  };
 }
-const ConnectionsView = lazy(() =>
+const GitPanel = lazyView(() => import('./GitPanel').then((m) => ({ default: m.GitPanel })));
+const Connections = lazyView(() =>
   import('./Connections').then((m) => ({ default: m.Connections })),
 );
-function Connections(props: ComponentProps<typeof ConnectionsView>) {
-  return (
-    <Suspense fallback={null}>
-      <ConnectionsView {...props} />
-    </Suspense>
-  );
-}
-const SearchPanelView = lazy(() =>
+const SearchPanel = lazyView(() =>
   import('./SearchPanel').then((m) => ({ default: m.SearchPanel })),
 );
-function SearchPanel(props: ComponentProps<typeof SearchPanelView>) {
-  return (
-    <Suspense fallback={null}>
-      <SearchPanelView {...props} />
-    </Suspense>
-  );
-}
-const KnowledgePanelView = lazy(() =>
+const KnowledgePanel = lazyView(() =>
   import('./KnowledgePanel').then((m) => ({ default: m.KnowledgePanel })),
 );
-function KnowledgePanel(props: ComponentProps<typeof KnowledgePanelView>) {
-  return (
-    <Suspense fallback={null}>
-      <KnowledgePanelView {...props} />
-    </Suspense>
-  );
-}
 import type { PageEditorHandle } from './PageEditor';
 import { FindScope, type FindScopeHandle } from './FindBar';
 import './tokens.css';
@@ -1031,15 +1013,15 @@ function App() {
   const [add, setAdd] = useState(false),
     [noteName, setNoteName] = useState(''),
     [noteDirectory, setNoteDirectory] = useState('Knowledge_Base/Notes'),
+    [noteScopeId, setNoteScopeId] = useState<string>(),
     // The type a new page starts from; undefined until chosen, '' for a note without one.
     [noteType, setNoteType] = useState<string>(),
     [newNote, setNewNote] = useState(false);
+  const newNoteScope = noteScopeId ?? active?.scopeId;
   // The types the vault declares, offered when a note is created there (ADR 015 D6).
-  const newNoteDeclared = useResource(
-    () => host.pageProperties(active!.scopeId),
-    [active?.scopeId],
-    { enabled: !!active && newNote },
-  );
+  const newNoteDeclared = useResource(() => host.pageProperties(newNoteScope!), [newNoteScope], {
+    enabled: !!newNoteScope && newNote,
+  });
   const noteTypes = Object.keys(newNoteDeclared.data?.declaration?.types ?? {});
   // A choice made in another vault does not carry over to one that lacks the type.
   const chosenNoteType =
@@ -1135,7 +1117,7 @@ function App() {
     if (level === 'you' && you?.state === 'missing') goToLevel('overview');
     // A file pointed at is shown once; the screen opened again starts at its instructions.
     if (level !== 'you' && youPointed) setYouPointed(undefined);
-  });
+  }, [level, you?.state, youPointed]);
   const yourAiRunning = !!you && runningScopes.includes(you.id);
   // The shared Schema's skills join each vault's own in its composer; its own,
   // retired ones among them, win (ADR 027).
@@ -1499,8 +1481,9 @@ function App() {
       }
     }
   }
+  const sendNextQueuedNow = useRef(sendNextQueued);
+  sendNextQueuedNow.current = sendNextQueued;
   useEffect(() => {
-    // A window opened for a tab dragged out of another shows it once the vaults are known.
     void refreshSpaces()
       .then(async () => setArriving(await host.movedTab()))
       .catch(report);
@@ -1569,7 +1552,7 @@ function App() {
           incoming.outcome === 'completed' &&
           !displayed.current.has(incoming.conversationId)
         )
-          void sendNextQueued(incoming.scopeId, incoming.conversationId);
+          void sendNextQueuedNow.current(incoming.scopeId, incoming.conversationId);
       }
     });
   }, []);
@@ -1591,6 +1574,7 @@ function App() {
   }, []);
   function closeNewNote() {
     setNewNote(false);
+    setNoteScopeId(undefined);
     setCloudNoteTarget(undefined);
   }
   async function save(): Promise<boolean> {
@@ -1822,9 +1806,11 @@ function App() {
         setError(t('送信中は vault を切り替えられません。', "Can't switch vaults while sending."));
         return false;
       }
-      // Any file may be text; one whose bytes are not, or are too many, goes to its application.
+      // Any file may be text; one whose bytes are not, or a viewer file over 100 MiB, goes to its application.
       const next = opensInIrori(entry.path)
         ? await host.read(space.scopeId, entry.path).catch((error) => {
+            const detail = error instanceof Error ? error.message : String(error);
+            if (viewerKind(entry.path) && /100 MiB/i.test(detail)) return undefined;
             if (textFilePattern.test(entry.path) || viewerKind(entry.path)) throw error;
             return undefined;
           })
@@ -2008,11 +1994,7 @@ function App() {
           report(error);
           return [];
         })) {
-          if (
-            connection.state !== 'unconfigured' &&
-            connection.state !== 'mounted' &&
-            connection.state !== 'retired'
-          ) {
+          if (connection.state !== 'unconfigured' && connection.state !== 'mounted') {
             await host.connectCloud(id, connection.mountId).catch(() => {
               setStatus(t('接続できないクラウドがあります。', 'A cloud could not connect.'));
             });
@@ -2547,6 +2529,7 @@ function App() {
         setCloudNoteTarget({ scopeId: space.scopeId, directory });
         setNewNote(true);
       } else {
+        setNoteScopeId(space.scopeId);
         setNoteDirectory(directory);
         setNewNote(true);
       }
@@ -4099,7 +4082,12 @@ function App() {
                     {stageColumns(
                       <>
                         {doc && (
-                          <FindScope ref={findInFile} hidden={view !== 'note'}>
+                          <FindScope
+                            ref={findInFile}
+                            hidden={
+                              view !== 'note' || level !== 'brain' || stageHidden || gitReview
+                            }
+                          >
                             <div className="document-scroll" hidden={view !== 'note'}>
                               {searchNotice && (
                                 <p className="hint" role="status">
@@ -4581,10 +4569,23 @@ function App() {
           spaces={vaultAgent ? workspaceSpaces : []}
           // It shows the shared Schema, the irori agent's and every vault's: a change in any of them.
           revision={anyRevision(revisions) + youRevision}
-          // A Schema is edited as a note is, during runs too (ADR 020 D5).
-          locked={(scopeId) =>
-            connecting || (scopeId !== you?.id && scopeId !== sharedSchemaId && gitBusy)
-          }
+          // A Schema is edited as a note is, during runs too (ADR 020 D5), except on SSH hosts.
+          locked={(scopeId) => {
+            const target = spaces.find((item) => item.scopeId === scopeId);
+            return (
+              connecting ||
+              !!target?.host ||
+              (scopeId !== you?.id && scopeId !== sharedSchemaId && gitBusy)
+            );
+          }}
+          onOpenFile={(scopeId, file) => {
+            const target = spaces.find((item) => item.scopeId === scopeId);
+            if (target) void open(target, fileEntry(file, 'schema'));
+            else if (scopeId === you?.id) {
+              setYouPointed({ path: file, n: (youPointed?.n ?? 0) + 1 });
+              goToLevel('you');
+            }
+          }}
           onClose={() => setSchemaOpen(undefined)}
         />
       )}
@@ -4637,7 +4638,7 @@ function App() {
             className="modal"
             onSubmit={(e) => {
               e.preventDefault();
-              if ((active || cloudNoteTarget) && !creatingNote) {
+              if ((newNoteScope || cloudNoteTarget) && !creatingNote) {
                 setCreatingNote(true);
                 void (async () => {
                   if (!(await save()))
@@ -4649,7 +4650,7 @@ function App() {
                         noteName,
                       )
                     : host.createNote(
-                        active!.scopeId,
+                        newNoteScope!,
                         noteName,
                         noteDirectory,
                         chosenNoteType || undefined,
@@ -4728,11 +4729,7 @@ function App() {
           const chosen = [...(event.target.files ?? [])];
           event.target.value = '';
           if (target && chosen.length)
-            act.bringIn(
-              target.space,
-              target.directory,
-              Promise.resolve(chosen.map((file) => ({ name: file.name, file }))),
-            );
+            act.bringIn(target.space, target.directory, readDropped(chosen));
         }}
       />
       {newEntry && (

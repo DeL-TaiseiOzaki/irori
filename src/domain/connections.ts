@@ -58,22 +58,6 @@ export const nameKey = (name: string) => name.normalize('NFC').toLowerCase();
 export const mountName = z
   .string()
   .refine((value) => !mountNameError(value), 'Invalid mountpoint name');
-export const providerId = z.string().regex(/^[A-Za-z0-9_-]{1,256}$/);
-export const cloudDeclaration = z
-  .object({
-    schemaVersion: z.literal(1),
-    mountId: z.uuid(),
-    scopeId: z.uuid(),
-    provider: z.literal('google-drive'),
-    folderId: providerId,
-    parentId: providerId,
-    driveId: providerId.optional(),
-    folderName: z.string().max(1024),
-    contentsRoot: z.string().min(1).max(4096),
-    name: mountName,
-    access: z.enum(['read-only', 'read-write']),
-  })
-  .strict();
 /** A folder on this device in contents. Its path is kept per device, never here. */
 export const localDeclaration = z
   .object({

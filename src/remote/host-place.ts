@@ -32,12 +32,11 @@ export async function takePlace(dataDir: string, socketPath: string) {
       () => false,
     );
     if (answering) return undefined;
-    const written = await fs.stat(file).then(
-      (info) => info.mtimeMs,
-      () => 0,
-    );
-    if (Date.now() - written < startingFor) return undefined;
-    // Left by a host that ended without tidying up.
+    const info = await fs.stat(file).catch(() => undefined);
+    if (!info || Date.now() - info.mtimeMs < startingFor) return undefined;
+    // Left by a host that ended without tidying up; verify the file was not replaced concurrently.
+    const latest = await fs.stat(file).catch(() => undefined);
+    if (!latest || latest.ino !== info.ino || latest.mtimeMs !== info.mtimeMs) return undefined;
     await fs.rm(file, { force: true });
   }
   return undefined;

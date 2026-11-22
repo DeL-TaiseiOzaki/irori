@@ -1,5 +1,13 @@
 # irori continuation handoff
 
+**Audit hardening, cleanup, and simplification, 0.2.91**: hardened Git/agent
+config approval, path/IPC bounds, SSH wire/socket auth, `SchemaHookRunner`,
+`AgentSetup`, and viewer sanitization; fixed hollowed-out/broken UI and remote
+host paths and removed retired Drive migration leftovers ([ADR 023](decisions/023-retire-drive-sign-in.md)
+amended); consolidated `DeviceSettings` schemas, JSONL process streaming,
+OpenCode config helpers, and `SerialQueue`/`local-json` usage. Open as a pull
+request against `main`; `npm run test:ui` must pass in CI before merge.
+
 **Minimal session cards, 0.2.90**: a card is the icon, the request and the CLI;
 hovering shows the request, ask, last reply, elapsed time and model. Published
 as `v0.2.90-preview.1` after `v0.2.89-preview.1`; UI smokes ran on Linux only.

@@ -15,7 +15,7 @@ export type Frame =
   | { answer: number; value: unknown };
 
 /** The longest line read: a viewer's file of 100 MiB as base64, with room to spare. */
-const lineLimit = 160 * 1024 * 1024;
+export const lineLimit = 160 * 1024 * 1024;
 
 export function encode(frame: Frame) {
   return (
@@ -28,11 +28,19 @@ export function encode(frame: Frame) {
 }
 
 export function decode(line: string): Frame {
-  return JSON.parse(line, (_, value) =>
-    value && typeof value === 'object' && typeof value.$bytes === 'string'
-      ? new Uint8Array(Buffer.from(value.$bytes, 'base64'))
+  if (line.length > lineLimit) throw Error('Frame exceeds line limit');
+  const parsed: unknown = JSON.parse(line, (_, value) =>
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.keys(value).length === 1 &&
+    typeof (value as Record<string, unknown>).$bytes === 'string'
+      ? new Uint8Array(Buffer.from((value as Record<string, string>).$bytes, 'base64'))
       : value,
   );
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+    throw Error('Frame must be a JSON object');
+  return parsed as Frame;
 }
 
 /**
@@ -54,6 +62,7 @@ export function readFrames(stream: Readable, on: (frame: Frame) => void, end: ()
     for (let at = buffer.indexOf('\n'); at >= 0 && !ended; at = buffer.indexOf('\n')) {
       const line = buffer.slice(0, at);
       buffer = buffer.slice(at + 1);
+      if (line.length > lineLimit) return finish();
       if (!line.trim()) continue;
       let frame: Frame;
       try {

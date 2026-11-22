@@ -13,13 +13,17 @@ export const claudeSettingsFile = '.claude/settings.json';
 export const hookEvents = [
   'PreToolUse',
   'PostToolUse',
+  'PostToolUseFailure',
+  'PermissionRequest',
   'UserPromptSubmit',
   'Stop',
+  'SubagentStart',
   'SubagentStop',
   'SessionStart',
   'SessionEnd',
   'Notification',
   'PreCompact',
+  'PostCompact',
 ] as const;
 
 /** What the host lists for the Schema section beside the skills it already reads. */

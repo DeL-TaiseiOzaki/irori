@@ -319,11 +319,18 @@ export async function createVaultHost({ dataDir, emit, ask }: VaultHostOptions) 
     forgetHandOff: (runId) => void forget(runId),
     attach: (ref, bytes) => agents.attachments.keep(ref, bytes),
     respond: (...args) => agents.respond(...args),
-    status: () => ({ running: agents.anyBusy }),
   };
 
+  const currentUser = () => {
+    try {
+      return os.userInfo().username;
+    } catch {
+      // Container/sandbox uids may have no passwd entry; fall back to env.
+      return process.env.USER || process.env.LOGNAME || '';
+    }
+  };
   const about = (): RemoteHostAbout => ({
-    user: os.userInfo().username,
+    user: currentUser(),
     hostname: os.hostname(),
     platform: process.platform,
     arch: process.arch,

@@ -1441,7 +1441,7 @@
   margin-left: 8px;
   font-size: 11.5px;
 }
-.message-link-error {
+.message-markdown .message-link-error {
   margin: 6px 0 0;
   color: var(--danger-on-nav);
   font-size: 11.5px;

@@ -3,7 +3,7 @@ import { renderAsync } from 'docx-preview';
 import { t } from '../../domain/i18n';
 import { domFinder, findHighlightStyle, useFinder } from '../FindBar';
 import type { ViewProps } from './common';
-import { followLinks, neutralize } from './safe-dom';
+import { followLinks, neutralize, neutralizeStyles } from './safe-dom';
 
 /**
  * A Word document laid out as pages. It renders into a shadow root so the styles the
@@ -28,7 +28,7 @@ export default function WordView({ bytes, zoom, width, onInfo, onLink }: ViewPro
     frame.textContent = `.docx-wrapper { background: transparent !important; padding: 20px 0 !important; }
       .docx-wrapper > section.docx { box-shadow: 0 0 0 1px rgba(24, 26, 30, 0.08), 0 8px 24px rgba(24, 26, 30, 0.12) !important; }
       ${findHighlightStyle}`;
-    root.replaceChildren(styles, frame, body);
+    root.replaceChildren(frame);
     let live = true;
     setError('');
     renderAsync(bytes, body, styles, {
@@ -44,6 +44,8 @@ export default function WordView({ bytes, zoom, width, onInfo, onLink }: ViewPro
       () => {
         if (!live) return;
         neutralize(body);
+        neutralizeStyles(styles);
+        root.replaceChildren(styles, frame, body);
         const pages = body.querySelectorAll('section.docx');
         // The declared width, which the zoom applied to the host does not change.
         setPageWidth(

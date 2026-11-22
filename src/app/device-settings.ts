@@ -1,4 +1,5 @@
 import type { DeviceSettings } from '../domain/types';
+import { defaultDeviceSettings } from '../domain/settings';
 import { setLanguage } from '../domain/i18n';
 import type { SkillAudience } from '../domain/skills';
 import {
@@ -15,23 +16,7 @@ const host = window.irori;
  * between sessions. Preferences therefore live in the host's device record, and
  * this module holds the copy the running window reads from.
  */
-let current: DeviceSettings = {
-  theme: 'system',
-  language: 'en',
-  markdownFont: 'sans',
-  pageMargins: 'standard',
-  textSize: 'standard',
-  lineSpacing: 'standard',
-  editorAssistance: true,
-  propertiesFolded: false,
-  vaultAgent: false,
-  agentAccess: 'default',
-  layouts: {},
-  skillAudiences: {},
-  yourAi: { agent: 'claude', models: {} },
-  routineRuntimes: [],
-  windowItems: {},
-};
+let current: DeviceSettings = defaultDeviceSettings();
 
 // What the window shows of its optional controls (ADR 059). One object per
 // state, replaced only when an item changes, so a reader re-renders only then.

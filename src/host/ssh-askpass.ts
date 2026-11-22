@@ -96,11 +96,11 @@ socket.on('data', (chunk) => {
 socket.on('close', () => answered || process.exit(1));
 `;
 
-/** A question's text as it may be shown: printable, and no longer than a screen takes. */
+/** A question's text as it may be shown: printable, free of bidi spoofing, and no longer than a screen takes. */
 const shownText = (value: string) =>
   value
-    // Control characters would let a host redraw what the person reads; line breaks and tabs stay.
-    .replace(/[^\P{Cc}\n\t]/gu, '')
+    // Control and bidi format characters would let a host redraw or spoof what the person reads; line breaks and tabs stay.
+    .replace(/[^\P{Cc}\n\t]|\p{Cf}/gu, '')
     .slice(0, 4000)
     .trim();
 
@@ -178,6 +178,7 @@ export class SshAskpass {
       this.address = path.join(this.folder, 's');
     }
     const server = net.createServer((socket) => this.serve(socket));
+    server.maxConnections = 16;
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject);
       server.listen(this.address, resolve);
@@ -194,20 +195,24 @@ export class SshAskpass {
     let read = false;
     const gone = new AbortController();
     const refuse = () => socket.destroy();
+    socket.setTimeout(10_000, refuse);
     socket.on('error', () => {});
     socket.on('close', () => gone.abort());
     socket.on('data', (chunk) => {
       if (read) return;
+      if (buffer.length + chunk.length > 4 + limits.question) return refuse();
       buffer = Buffer.concat([buffer, chunk]);
       if (buffer.length < 4) return;
       const length = buffer.readUInt32LE(0);
       if (length > limits.question) return refuse();
       if (buffer.length < 4 + length) return;
       read = true;
+      socket.setTimeout(0);
       const [id, hint, ...rest] = buffer
         .subarray(4, 4 + length)
         .toString('utf8')
         .split('\n');
+      buffer = Buffer.alloc(0);
       const session = this.sessions.get(id);
       if (!session) return refuse();
       void this.answer(session, socket, gone, {
@@ -242,7 +247,10 @@ export class SshAskpass {
     reply[0] = answer === undefined ? 0 : 1;
     reply.writeUInt32LE(words.length, 1);
     words.copy(reply, 5);
-    socket.end(reply);
+    socket.end(reply, () => {
+      words.fill(0);
+      reply.fill(0);
+    });
     if (answer !== undefined) return;
     // No answer is not a wrong answer: `ssh` would ask again, so the attempt ends here.
     session.cancelled = true;

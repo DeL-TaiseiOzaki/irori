@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
+  hookEvents,
   readHooks,
   readSkillText,
   settingKind,
@@ -86,6 +87,24 @@ test('A skill form writes name, description and instructions and keeps other met
   for (const value of ['true', 'null', '42', ' padded', '- item', 'a: b', 'a #b', "it's"])
     assert.notEqual(yamlString(value), value, value);
   assert.equal(yamlString('Plain words, and more'), 'Plain words, and more');
+});
+
+test('Schema settings offer every hook event irori runs', () => {
+  for (const event of [
+    'PreToolUse',
+    'PostToolUse',
+    'PostToolUseFailure',
+    'PermissionRequest',
+    'SubagentStart',
+    'PostCompact',
+    'UserPromptSubmit',
+    'Stop',
+    'SessionStart',
+  ] as const) {
+    assert.ok(hookEvents.includes(event), event);
+    const json = writeHooks(undefined, [{ event, type: 'command', command: 'echo ok', extra: {} }]);
+    assert.deepEqual(readHooks(json), [{ event, type: 'command', command: 'echo ok', extra: {} }]);
+  }
 });
 
 test('Hooks are read from and written to .claude/settings.json without touching other keys', () => {

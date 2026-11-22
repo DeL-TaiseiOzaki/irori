@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { hostArguments, type HostHandlers } from '../domain/host-requests';
 import { attachmentByteLimit, attachmentRef } from '../domain/attachments';
+import { agentEffort, agentModel } from '../domain/conversation';
 import { agentAccessModes, agentIds, type AgentEvent } from '../domain/types';
 import { categoryText } from '../domain/brains';
 import { languages } from '../domain/i18n';
@@ -106,8 +107,8 @@ export const sentFileLimit = 20 * 1024 * 1024;
 export const handedTask = z.object({
   scopeId: id,
   agent: z.enum(agentIds),
-  model: z.string().min(1).max(200).optional(),
-  effort: z.string().min(1).max(40).optional(),
+  model: agentModel.optional(),
+  effort: agentEffort.optional(),
   access: z.enum(agentAccessModes),
   task: z.string().min(1).max(32000),
 });
@@ -135,7 +136,6 @@ export const hostOperations = {
     z.instanceof(Uint8Array).refine((bytes) => bytes.byteLength <= attachmentByteLimit),
   ]),
   respond: hostArguments.respond,
-  status: z.tuple([]),
 } as const;
 export type HostOperation = keyof typeof hostOperations;
 

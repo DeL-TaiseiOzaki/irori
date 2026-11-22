@@ -1,4 +1,4 @@
-import { promises as fs, statSync } from 'node:fs';
+import { promises as fs, realpathSync, statSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { ChildProcess } from 'node:child_process';
@@ -127,11 +127,30 @@ export function matcherTakes(matcher: string | undefined, value: string, also: s
       .filter(Boolean);
     return names.some((name) => list.includes(name));
   }
+  if (matcher.length > 500) return false;
   try {
     const pattern = new RegExp(matcher);
     return names.some((name) => pattern.test(name));
   } catch {
     return false;
+  }
+}
+
+/** Canonicalizes a path (or its deepest existing ancestor) so symlinks cannot escape path rules. */
+function canonicalPath(root: string, file: string) {
+  const resolved = path.resolve(root, file);
+  let probe = resolved;
+  const tail: string[] = [];
+  for (;;) {
+    try {
+      const real = realpathSync(probe);
+      return (tail.length ? path.join(real, ...tail.reverse()) : real).split(path.sep).join('/');
+    } catch {
+      const parent = path.dirname(probe);
+      if (parent === probe) return resolved.split(path.sep).join('/');
+      tail.push(path.basename(probe));
+      probe = parent;
+    }
   }
 }
 
@@ -198,23 +217,40 @@ export function ruleTakes(
       return true;
     }
   }
-  const file = [input.file_path, input.path, input.notebook_path].find(
-    (value): value is string => typeof value === 'string' && !!value,
-  );
-  if (ruleTools[name] || file !== undefined) {
-    if (file === undefined) return true;
-    const absolute = path.resolve(root, file).split(path.sep).join('/');
+  const candidates = [
+    ...[input.file_path, input.path, input.notebook_path].filter(
+      (value): value is string => typeof value === 'string' && !!value,
+    ),
+    ...(Array.isArray(input.files)
+      ? input.files.filter((value): value is string => typeof value === 'string' && !!value)
+      : []),
+  ];
+  if (ruleTools[name] || candidates.length > 0) {
+    if (!candidates.length) return true;
+    const realRoot = canonicalPath(root, '.');
     const pattern = spec.startsWith('//')
       ? spec.slice(1)
       : spec.startsWith('~/')
         ? `${home.split(path.sep).join('/')}/${spec.slice(2)}`
-        : `${root.split(path.sep).join('/')}/${spec.replace(/^\.?\//, '')}`;
+        : `${realRoot}/${spec.replace(/^\.?\//, '')}`;
+    const lexicalPattern =
+      !spec.startsWith('//') && !spec.startsWith('~/')
+        ? `${root.split(path.sep).join('/')}/${spec.replace(/^\.?\//, '')}`
+        : pattern;
     // A pattern without a slash of its own matches a name at any depth, as in .gitignore.
     const loose = !spec.replace(/^\.?\//, '').includes('/') && !spec.startsWith('//');
-    return (
-      globPattern(pattern).test(absolute) ||
-      (loose && globPattern(`**/${spec.replace(/^\.?\//, '')}`).test(absolute))
-    );
+    const reReal = globPattern(pattern);
+    const reLex = lexicalPattern === pattern ? reReal : globPattern(lexicalPattern);
+    const reLoose = loose ? globPattern(`**/${spec.replace(/^\.?\//, '')}`) : undefined;
+    return candidates.some((file) => {
+      const lexical = path.resolve(root, file).split(path.sep).join('/');
+      const canonical = canonicalPath(root, file);
+      return (
+        reReal.test(canonical) ||
+        reLex.test(lexical) ||
+        (!!reLoose && (reLoose.test(canonical) || reLoose.test(lexical)))
+      );
+    });
   }
   return true;
 }
@@ -326,12 +362,30 @@ function collect(stream: NodeJS.ReadableStream | null | undefined) {
   return () => text;
 }
 
+/** Internal irori bridge secrets that http hooks must never expand into outbound headers. */
+const hiddenHookEnv = new Set(['IRORI_COMMAND', 'IRORI_SSH_ASKPASS_SESSION', 'IRORI_SSH_ASKPASS']);
+
 /** `$NAME` and `${NAME}` in an http hook's header, for the variables it lists; others become empty. */
 function headerValue(value: string, allowed: string[], env: NodeJS.ProcessEnv) {
   return value.replace(/\$\{(\w+)\}|\$(\w+)/g, (_, braced: string, bare: string) => {
     const name = braced ?? bare;
-    return allowed.includes(name) ? (env[name] ?? '') : '';
+    return allowed.includes(name) && !hiddenHookEnv.has(name) ? (env[name] ?? '') : '';
   });
+}
+
+/** Rejects cloud instance metadata endpoints that an untrusted http hook must never reach. */
+function isBlockedMetadataUrl(raw: string) {
+  try {
+    const host = new URL(raw).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    return (
+      host.startsWith('169.254.') ||
+      host === 'fd00:ec2::254' ||
+      host === 'metadata.google.internal' ||
+      host === 'metadata.goog'
+    );
+  } catch {
+    return true;
+  }
 }
 
 /**
@@ -620,6 +674,13 @@ export class SchemaHookRunner {
   ): Promise<Finished> {
     if (!hook.url || !/^https?:\/\//i.test(hook.url))
       return { code: null, stdout: '', stderr: '', error: 'an http hook needs an http(s) url' };
+    if (isBlockedMetadataUrl(hook.url))
+      return {
+        code: null,
+        stdout: '',
+        stderr: '',
+        error: 'an http hook cannot target link-local or metadata addresses',
+      };
     const allowed = hook.allowedEnvVars ?? [];
     try {
       const response = await fetch(hook.url, {
