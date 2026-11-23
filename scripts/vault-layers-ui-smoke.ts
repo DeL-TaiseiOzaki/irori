@@ -100,9 +100,8 @@ try {
   expect((await scope()).layers).toEqual(['Knowledge_Base']);
   await expect(section('Knowledge')).toBeVisible();
   await expect(section('Contents')).toHaveCount(0);
-  await expect(
-    section('Knowledge').getByRole('button', { name: 'note.md', exact: true }),
-  ).toBeVisible();
+  // A note shows by its title again, as in every knowledge tree.
+  await expect(section('Knowledge').getByText('note', { exact: true })).toBeVisible();
 
   // All three again: the declaration keeps no field for it.
   await open();
