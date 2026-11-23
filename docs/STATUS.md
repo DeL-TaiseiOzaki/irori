@@ -14,7 +14,8 @@ choice. Nothing on disk moves.
 - Verified on Linux: `npm run build`, `npm run format:check`, and `npm test`
   except the `ssh -G` test that fails on this shared host without the change.
   `scripts/vault-layers-ui-smoke.ts` is new and was not run here (no display);
-  pull request CI runs it.
+  it passed with the other UI smokes in pull request CI run `45163225150`
+  ([#373](https://github.com/DeL-TaiseiOzaki/irori/pull/373)).
 - Not covered: the vault's root as a contents folder (code at the top level of a
   vault shows under Schema); creating or moving files in the Schema file view;
   a real CLI agent reading the changed introduction.
