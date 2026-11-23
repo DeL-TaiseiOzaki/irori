@@ -8,8 +8,12 @@ export const defaultKnowledgeFolder = 'Knowledge_Base';
 export const rootKnowledgeFolder = '.';
 /** The contents folder irori declares when it registers a KB. */
 export const defaultContentsFolder = 'contents';
-/** The layers whose folder and shown name a vault may change; Schema keeps both. */
+/**
+ * The layers whose folder and shown name a vault may change, and which a vault
+ * may leave out (ADR 070); Schema keeps its name and places, and every vault has it.
+ */
 export type NamedLayer = Exclude<Layer, 'schema'>;
+export const namedLayers: readonly NamedLayer[] = ['Knowledge_Base', 'contents'];
 const defaultLabels: Record<Layer, string> = {
   schema: 'Schema',
   Knowledge_Base: 'Knowledge',
@@ -50,7 +54,35 @@ interface LayerDeclaration {
   contents: string[];
   knowledge?: string;
   labels?: Partial<Record<NamedLayer, string>>;
+  layers?: readonly NamedLayer[];
 }
+
+/**
+ * Whether the vault has the layer (ADR 070). A vault that declares no `layers`
+ * has all three, as every vault did before; Schema is never left out.
+ */
+export function hasLayer(space: Pick<LayerDeclaration, 'layers'> | undefined, layer: Layer) {
+  return layer === 'schema' || !space?.layers || space.layers.includes(layer);
+}
+/** The Knowledge and Contents layers the vault has, in irori's order. */
+export const vaultLayers = (space: Pick<LayerDeclaration, 'layers'> | undefined) =>
+  namedLayers.filter((layer) => hasLayer(space, layer));
+/**
+ * `layers` as `.irori/scope.json` keeps it: in irori's order without repeats,
+ * and absent when the vault has both, so an unchanged vault's file stays as it was.
+ */
+export function declaredLayers(layers: readonly NamedLayer[] | null | undefined) {
+  const chosen = namedLayers.filter((layer) => layers?.includes(layer));
+  return !layers || chosen.length === namedLayers.length ? undefined : chosen;
+}
+/** The vault has no such layer: what a request that needs it is refused with. */
+export const noLayer = (space: Pick<LayerDeclaration, 'labels'> & { name: string }, layer: Layer) =>
+  Error(
+    t(
+      `vault「${space.name}」には ${layerLabel(space, layer)} 層がありません。vault の設定の「層」で選べます。`,
+      `The vault "${space.name}" has no ${layerLabel(space, layer)} layer. Its settings choose its layers.`,
+    ),
+  );
 
 /**
  * The folder where the vault's knowledge pages live; everything outside Schema
@@ -111,12 +143,14 @@ export const layerFolderName = z.string().refine((name) => !layerFolderProblem(n
 /** A knowledge folder may also be the vault's root, written `.` (ADR 035). */
 export const knowledgeFolderName = z.union([z.literal(rootKnowledgeFolder), layerFolderName]);
 const labelLength = 40;
-const namedLayers = <T extends z.ZodType>(label: T) =>
+const perNamedLayer = <T extends z.ZodType>(label: T) =>
   z.object({ Knowledge_Base: label, contents: label }).strict();
+/** The Knowledge and Contents layers a vault has; an empty list is a vault of Schema alone. */
+export const layerSelection = z.array(z.enum(['Knowledge_Base', 'contents'])).max(2);
 export const layerLabelText = z.string().trim().min(1).max(labelLength);
-export const layerLabels = namedLayers(layerLabelText.optional());
+export const layerLabels = perNamedLayer(layerLabelText.optional());
 /** A change to the shown names: an empty or `null` one returns to irori's. */
-export const layerLabelChanges = namedLayers(z.string().max(labelLength).nullable().optional());
+export const layerLabelChanges = perNamedLayer(z.string().max(labelLength).nullable().optional());
 
 /** A path moved by a layer folder rename: `from/...` becomes `to/...`, anything else stays. */
 export function renamedPath(p: string, from: string, to: string) {

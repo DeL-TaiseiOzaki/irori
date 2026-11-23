@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { knowledgeFolder, layerLabel } from '../domain/layers';
+import { hasLayer, knowledgeFolder, layerLabel } from '../domain/layers';
 import type { CloudConnection, Entry, Layer, Space } from '../domain/types';
 import type { GitStatus } from '../domain/git';
 import type { AgentSkill } from '../domain/skills';
@@ -148,9 +148,11 @@ export function BrainHome({
   const shown = useWindowItems();
   // A vault on an SSH host is shown, not changed (ADR 061): its home offers no edits.
   const remote = !!space.host;
-  const knowledgeRoot = roots?.entries.some(
-    (entry) => entry.path === knowledgeFolder(space) && entry.directory,
-  );
+  // The layers the vault has (ADR 070): one left out has no card and no action here.
+  const notes = hasLayer(space, 'Knowledge_Base');
+  const knowledgeRoot =
+    notes &&
+    roots?.entries.some((entry) => entry.path === knowledgeFolder(space) && entry.directory);
   const knowledgeRead = useResource(
     () => host.entries(space.scopeId, knowledgeFolder(space)),
     [space.scopeId, knowledgeFolder(space)],
@@ -239,7 +241,7 @@ export function BrainHome({
               {t('読み取り専用', 'Read-only')}
             </span>
           )}
-          {daily && !remote && (
+          {daily && notes && !remote && (
             <button
               className={
                 primary === 'daily' ? 'primary-button home-button' : 'stage-text-button framed'
@@ -251,7 +253,7 @@ export function BrainHome({
               {t('今日のノート', "Today's note")}
             </button>
           )}
-          {!remote && (
+          {notes && !remote && (
             <button
               className={
                 primary === 'note' ? 'primary-button home-button' : 'stage-text-button framed'
@@ -317,39 +319,43 @@ export function BrainHome({
               )}
             </Card>
           )}
-          <Card
-            layer="Knowledge_Base"
-            title={layerLabel(space, 'Knowledge_Base')}
-            action={
-              <>
-                <VaultRepositories
-                  space={space}
-                  connections={connections}
-                  className="stage-button"
-                />
-                <button
-                  className="stage-text-button small"
-                  disabled={locked || held}
-                  onClick={onGraph}
-                >
-                  <Icon name="graph" size={14} />
-                  {t('オントロジー', 'Ontology')}
-                </button>
-              </>
-            }
-          >
-            {knowledge.shown.map((entry) => (
-              <EntryRow key={entry.path} entry={entry} onOpen={onOpen} />
-            ))}
-            {!knowledge.shown.length && (
-              <small className="home-more">{t('ノートはまだありません。', 'No notes yet.')}</small>
-            )}
-            {knowledge.more > 0 && (
-              <small className="home-more">
-                {t(`ほか ${knowledge.more} 件`, `${knowledge.more} more`)}
-              </small>
-            )}
-          </Card>
+          {notes && (
+            <Card
+              layer="Knowledge_Base"
+              title={layerLabel(space, 'Knowledge_Base')}
+              action={
+                <>
+                  <VaultRepositories
+                    space={space}
+                    connections={connections}
+                    className="stage-button"
+                  />
+                  <button
+                    className="stage-text-button small"
+                    disabled={locked || held}
+                    onClick={onGraph}
+                  >
+                    <Icon name="graph" size={14} />
+                    {t('オントロジー', 'Ontology')}
+                  </button>
+                </>
+              }
+            >
+              {knowledge.shown.map((entry) => (
+                <EntryRow key={entry.path} entry={entry} onOpen={onOpen} />
+              ))}
+              {!knowledge.shown.length && (
+                <small className="home-more">
+                  {t('ノートはまだありません。', 'No notes yet.')}
+                </small>
+              )}
+              {knowledge.more > 0 && (
+                <small className="home-more">
+                  {t(`ほか ${knowledge.more} 件`, `${knowledge.more} more`)}
+                </small>
+              )}
+            </Card>
+          )}
         </div>
         <aside className="home-aside">
           {git && !git.available && <p className="home-git-note">{git.detail}</p>}
@@ -429,56 +435,58 @@ export function BrainHome({
               </div>
             </Card>
           )}
-          <Card
-            layer="contents"
-            title={layerLabel(space, 'contents')}
-            action={
-              !remote && (
-                <button className="stage-text-button small" disabled={locked} onClick={onConnect}>
-                  <Icon name="cloudConnect" size={14} />
-                  {t('接続', 'Connect')}
-                </button>
-              )
-            }
-          >
-            {connections.map((connection) => (
-              <div key={connection.mountId} className="home-drive">
-                <div className="home-drive-name">
-                  <Icon
-                    name={
-                      connection.provider === 'github'
-                        ? 'branch'
-                        : connection.provider === 'local'
-                          ? 'folder'
-                          : 'cloud'
-                    }
-                    size={16}
-                  />
-                  <span>{connection.name}</span>
+          {hasLayer(space, 'contents') && (
+            <Card
+              layer="contents"
+              title={layerLabel(space, 'contents')}
+              action={
+                !remote && (
+                  <button className="stage-text-button small" disabled={locked} onClick={onConnect}>
+                    <Icon name="cloudConnect" size={14} />
+                    {t('接続', 'Connect')}
+                  </button>
+                )
+              }
+            >
+              {connections.map((connection) => (
+                <div key={connection.mountId} className="home-drive">
+                  <div className="home-drive-name">
+                    <Icon
+                      name={
+                        connection.provider === 'github'
+                          ? 'branch'
+                          : connection.provider === 'local'
+                            ? 'folder'
+                            : 'cloud'
+                      }
+                      size={16}
+                    />
+                    <span>{connection.name}</span>
+                  </div>
+                  <div className="home-drive-meta">
+                    {connection.state !== 'mounted' ? (
+                      <span>{connection.detail ?? t('未接続', 'Not connected')}</span>
+                    ) : connection.writable ? (
+                      <span>
+                        <Icon name="penLine" size={12} strokeWidth={2} />
+                        {t('編集可', 'Editable')}
+                      </span>
+                    ) : (
+                      <span>
+                        <Icon name="lock" size={12} strokeWidth={2} />
+                        {t('読み取り専用', 'Read-only')}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="home-drive-meta">
-                  {connection.state !== 'mounted' ? (
-                    <span>{connection.detail ?? t('未接続', 'Not connected')}</span>
-                  ) : connection.writable ? (
-                    <span>
-                      <Icon name="penLine" size={12} strokeWidth={2} />
-                      {t('編集可', 'Editable')}
-                    </span>
-                  ) : (
-                    <span>
-                      <Icon name="lock" size={12} strokeWidth={2} />
-                      {t('読み取り専用', 'Read-only')}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-            {!connections.length && (
-              <small className="home-more">
-                {t('接続はまだありません。', 'No connections yet.')}
-              </small>
-            )}
-          </Card>
+              ))}
+              {!connections.length && (
+                <small className="home-more">
+                  {t('接続はまだありません。', 'No connections yet.')}
+                </small>
+              )}
+            </Card>
+          )}
         </aside>
       </div>
       {reach && <SkillReach scopeId={space.scopeId} onClose={() => setReach(false)} />}

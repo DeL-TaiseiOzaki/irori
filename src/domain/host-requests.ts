@@ -12,7 +12,7 @@ import { skillName } from './skills';
 import { deviceSettingsPatchSchema } from './settings';
 import { brainLook, categoryText } from './brains';
 import { remoteAnswerLimit, remoteHostInput, remotePath } from './remote-hosts';
-import { knowledgeFolderName, layerLabelChanges } from './layers';
+import { knowledgeFolderName, layerLabelChanges, layerSelection } from './layers';
 import { githubOwnerPattern, validGitEmail, validGitName, validRepositoryName } from './git';
 import { routineRef, secretName, secretValue, storedSecretName } from './routines';
 import { newComment } from './comments';
@@ -274,6 +274,7 @@ export const hostArguments = {
         category: categoryText.nullable().optional(),
         appearance: brainLook.nullable().optional(),
         labels: layerLabelChanges.nullable().optional(),
+        layers: layerSelection.nullable().optional(),
       })
       .strict(),
   ]),

@@ -35,10 +35,15 @@ import {
   defaultKnowledgeFolder,
   knowledgeFolder,
   knowledgeFolderName,
+  declaredLayers,
+  hasLayer,
   layerFolderProblem,
+  layerLabel,
   layerLabels,
   layerRoots,
+  layerSelection,
   movedPath,
+  noLayer,
   rootKnowledgeFolder,
   type LayerMove,
   type NamedLayer,
@@ -71,6 +76,7 @@ const declaration = z.object({
   contents: z.array(relative).min(1),
   knowledge: knowledgeFolderName.optional(),
   labels: layerLabels.optional(),
+  layers: layerSelection.optional(),
   appearance: brainLook.optional(),
 });
 export const hash = (text: string | Buffer) => createHash('sha256').update(text).digest('hex');
@@ -280,6 +286,8 @@ export class FileService {
     linkedFolders?(scopeId: string): { path: string; target: string }[];
     /** The vault's work folder, as it shows in contents and where it is (ADR 045). */
     workPlace?(scopeId: string): Promise<{ path: string; target: string } | undefined>;
+    /** The folders and repositories the vault's records connect, linked on this device or not. */
+    localDeclarations?(scopeId: string): Promise<unknown[]>;
   };
   private spaces: Space[] = [];
   private bindings: { root: string; scopeId: string }[] = [];
@@ -445,7 +453,7 @@ export class FileService {
     });
   }
   /**
-   * Changes a brain's name, category or look in its `.irori/scope.json`, keeping
+   * Changes a brain's name, category, look or layers in its `.irori/scope.json`, keeping
    * every other field of the file as written — another tool's or a later
    * version's included. The write replaces the file atomically.
    */
@@ -469,6 +477,23 @@ export class FileService {
         }
         if (Object.keys(labels).length) raw.labels = labels;
         else delete raw.labels;
+      }
+      if (change.layers !== undefined) {
+        const layers = declaredLayers(change.layers);
+        // Connected folders are disconnected first: a vault without Contents shows none (ADR 070).
+        if (
+          hasLayer(s, 'contents') &&
+          !hasLayer({ layers }, 'contents') &&
+          (await this.cloud?.localDeclarations?.(id))?.length
+        )
+          throw Error(
+            t(
+              `${layerLabel(s, 'contents')} 層を外す前に、接続しているフォルダとリポジトリの接続を解除してください。`,
+              `Disconnect the connected folders and repositories before leaving out the ${layerLabel(s, 'contents')} layer.`,
+            ),
+          );
+        if (layers) raw.layers = layers;
+        else delete raw.layers;
       }
       const next: Space = { ...declaration.parse(raw), root: s.root };
       // A file of the KB keeps its own mode; only device records are made private.
@@ -563,6 +588,8 @@ export class FileService {
       const problem = atRoot ? undefined : layerFolderProblem(name);
       if (problem) throw Error(problem);
       const s = this.get(id);
+      // A layer the vault left out keeps the folder it declared until it is back (ADR 070).
+      if (!hasLayer(s, layer)) throw noLayer(s, layer);
       const previous = layer === 'contents' ? s.contents[0] : knowledgeFolder(s);
       if (layer === 'Knowledge_Base' && (atRoot || !previous))
         return this.moveKnowledgeRoot(s, previous, atRoot ? '' : name);
@@ -785,6 +812,7 @@ export class FileService {
   async declareContents(id: string, folder: string): Promise<Space> {
     return this.queue.run(async () => {
       const s = this.get(id);
+      if (!hasLayer(s, 'contents')) throw noLayer(s, 'contents');
       const next = folder.replace(/\\/g, '/').replace(/^\.\/|\/+$/g, '');
       const problem = next.split('/').map(layerFolderProblem).find(Boolean);
       if (problem) throw Error(problem);
@@ -1042,6 +1070,7 @@ export class FileService {
   private noteLocation(id: string, rel: string, directory = false) {
     const space = this.get(id);
     if (!(directory && rel === '')) relative.parse(rel);
+    if (!hasLayer(space, 'Knowledge_Base')) throw noLayer(space, 'Knowledge_Base');
     if (
       /[\u0000-\u001f\\:*?"<>|]/.test(rel) ||
       rel.split('/').some((part) => part.startsWith('.') || /[. ]$/.test(part)) ||
@@ -1128,6 +1157,7 @@ export class FileService {
   private knowledgeEntry(id: string, rel: string) {
     const space = this.get(id);
     relative.parse(rel);
+    if (!hasLayer(space, 'Knowledge_Base')) throw noLayer(space, 'Knowledge_Base');
     if (
       classify(space, rel) !== 'Knowledge_Base' ||
       owner(this.spaces, path.join(space.root, rel))?.scopeId !== id

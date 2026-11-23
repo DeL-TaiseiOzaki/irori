@@ -14,8 +14,11 @@ import { handedRemoteVaults } from './remote-vault';
 type Handed = Pick<BrainAgent, 'name' | 'category' | 'agent' | 'root'> & {
   /** The SSH host the vault lives on (ADR 061); `root` is then its folder there. */
   host?: string;
-  /** Its knowledge folder, `.` for the vault's root, and its contents folders. */
-  layers?: { knowledge: string; contents: string[] };
+  /**
+   * Its knowledge folder, `.` for the vault's root, and its contents folders.
+   * A layer the vault left out (ADR 070) has no entry.
+   */
+  layers?: { knowledge?: string; contents?: string[] };
   /** Folders connected in its contents: paths inside the vault, and their places on this device. */
   linked?: ConnectedFolder[];
   /** Those of them connected read-only, by their paths inside the vault. */
@@ -32,8 +35,14 @@ const handedHeader =
 
 const layerList = ({ layers }: Handed) =>
   layers
-    ? `, knowledge ${JSON.stringify(layers.knowledge)}, contents ${
-        layers.contents.map((item) => JSON.stringify(item)).join(', ') || 'none'
+    ? `${
+        layers.knowledge === undefined
+          ? ', no Knowledge layer'
+          : `, knowledge ${JSON.stringify(layers.knowledge)}`
+      }${
+        layers.contents === undefined
+          ? ', no Contents layer'
+          : `, contents ${layers.contents.map((item) => JSON.stringify(item)).join(', ') || 'none'}`
       }`
     : '';
 const linkedList = (brain: Handed) =>

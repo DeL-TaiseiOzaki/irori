@@ -34,6 +34,7 @@ import type {
   WorkFolder,
 } from '../domain/types';
 import { t } from '../domain/i18n';
+import { hasLayer, noLayer } from '../domain/layers';
 
 // Where a local connection's folder is on this device: a path names the person, and
 // often their account, so it stays here and out of the vault's records.
@@ -600,6 +601,7 @@ export class CloudService {
       const error = mountNameError(input.name);
       if (error) throw Error(error);
       const space = await this.files.get(input.scopeId);
+      if (!hasLayer(space, 'contents')) throw noLayer(space, 'contents');
       if (!space.contents.includes(input.contentsRoot))
         throw Error(
           t('contentsの登録先を選択してください。', 'Choose where in contents to register it.'),
@@ -663,6 +665,7 @@ export class CloudService {
       const error = mountNameError(input.name);
       if (error) throw Error(error);
       const space = await this.files.get(input.scopeId);
+      if (!hasLayer(space, 'contents')) throw noLayer(space, 'contents');
       if (!space.contents.includes(input.contentsRoot))
         throw Error(
           t('contentsの登録先を選択してください。', 'Choose where in contents to register it.'),

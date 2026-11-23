@@ -604,6 +604,43 @@ test('layer knowledge . moves the knowledge folder to the vault’s root and bac
   assert.equal(await readFile(path.join(vault, 'Knowledge_Base', 'wiki', 'a.md'), 'utf8'), '# A\n');
 });
 
+test('set --layers chooses the layers a vault has, and list says which it left out', async (t) => {
+  const { base, files, setup } = await device(t);
+  const vault = path.join(base, 'Dev');
+  await mkdir(path.join(vault, 'scripts'), { recursive: true });
+  await writeFile(path.join(vault, 'scripts', 'build.sh'), 'echo build\n');
+  await setup.run(['add', vault, '--name', 'Dev'], base);
+  const id = files.list().find((space) => space.name === 'Dev')!.scopeId;
+
+  // A workspace for code: Schema and Contents, no notes.
+  assert.match(
+    await setup.run(['set', 'Dev', '--layers', 'schema,contents'], base),
+    /^The vault is now "Dev", category .*, with the layers Schema, Contents\./,
+  );
+  assert.deepEqual(files.get(id).layers, ['contents']);
+  const listed = await setup.run(['list'], base);
+  assert.match(listed, /- Dev: .*no Knowledge layer; contents "contents"/);
+  assert.doesNotMatch(listed, /- Dev: .*knowledge "/);
+  await assert.rejects(
+    setup.run(['layer', 'Dev', 'knowledge', 'wiki'], base),
+    /has no Knowledge layer|Knowledge 層がありません/,
+  );
+  // Nothing moved, and the files outside Contents show with Schema.
+  assert.equal(await readFile(path.join(vault, 'scripts', 'build.sh'), 'utf8'), 'echo build\n');
+  assert.equal(
+    (await files.entries(id, '')).find((entry) => entry.path === 'scripts')?.layer,
+    'schema',
+  );
+
+  // All three again: the declaration keeps no field for it.
+  assert.match(
+    await setup.run(['set', 'Dev', '--layers', 'schema,knowledge,contents'], base),
+    /with the layers Schema, Knowledge, Contents\./,
+  );
+  assert.equal(files.get(id).layers, undefined);
+  assert.match(await setup.run(['list'], base), /- Dev: .*knowledge "Knowledge_Base"; contents/);
+});
+
 test('set, layer, workspace, disconnect and remove change what irori holds, never the files', async (t) => {
   const { base, files, workspaces, setup, deps, announced } = await device(t);
   // An Obsidian-like vault: notes in wiki/, attachments beside them, code apart.

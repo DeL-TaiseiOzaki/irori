@@ -5,6 +5,8 @@ Supersedes [ADR 024](024-layer-names.md) decision 9 ("agents are told nothing
 new") and changes how often [ADR 031](031-agents-use-what-irori-does.md)'s
 command preamble is said. Applies [ADR 027](027-shared-schema.md) decision 5
 (whole once per session, then one line) to irori's own words.
+Decision 1 extended by [ADR 070](070-a-vault-chooses-its-layers.md): a vault
+that left a layer out hears the layers it has.
 
 ## Context
 
