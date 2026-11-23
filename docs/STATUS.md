@@ -13,7 +13,7 @@ turned it off; its place is now エージェントの列の右.
   178,596,501 bytes; the live page links v0.2.92-preview.1.
 
 Security hardening, retired/broken cleanup, and core simplification, 2026-11-21
-(**0.2.91**, pending pull request): audited the codebase for security gaps,
+(**0.2.91**, [#369](https://github.com/DeL-TaiseiOzaki/irori/pull/369), published as `v0.2.91-preview.1`): audited the codebase for security gaps,
 hollowed-out or broken paths, UI/CSS regressions, and duplicated core helpers.
 - Security hardening (`tests/security-hardening.test.ts`): expanded Git and CLI
   config approvals (including Codex, Antigravity, OpenCode tools, symlink
@@ -36,12 +36,14 @@ hollowed-out or broken paths, UI/CSS regressions, and duplicated core helpers.
   process streaming in `src/agents/json-lines.ts`, shared OpenCode config
   helpers in `src/agents/opencode-config.ts`, and unified `SerialQueue` /
   `local-json` usage across approvals and keystore.
-- Verified on Linux: `npm run build` and `npm run format:check` pass. Full
-  `npm test` ran 821 tests (811 passed, 7 skipped; `git-host-load` passed on
-  rerun; `ssh-config` failed on shared-host umask permissions and one
-  `remote-hosts` test matched an unrelated `sleep 30` on the shared host).
-  `npm run test:ui` could not run locally (no `xvfb-run`/display server) and
-  relies on pull request CI.
+- Verified on Linux (`npm run build`, `npm run format:check`, and `npm test`
+  with two shared-host environment failures) and in pull request CI run
+  `44914053081` (`verify` including full `npm test`, all 42 `test:ui` smokes,
+  and website checks, plus Linux, macOS, and Windows packaging).
+- Published from `1c74947` (main verify run `44917291079`, publish run
+  `44917291262`; later superseded by `v0.2.92-preview.1`). Release assets:
+  Windows 179,428,352 bytes, Mac 145,736,591 bytes, `irori-0.2.91-full.nupkg`
+  178,597,414 bytes. Not tried on macOS or Windows devices.
 
 Minimal session cards, 2026-11-21 (**0.2.90**,
 [#366](https://github.com/DeL-TaiseiOzaki/irori/pull/366), published as `v0.2.90-preview.1`;
