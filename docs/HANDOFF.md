@@ -1,5 +1,8 @@
 # irori continuation handoff
 
+**The latest 3 runs in a routine's history, 0.2.93**: an opened routine lists
+its latest 3 runs; 20 are still kept on the device. Not tried on macOS or Windows.
+
 **The session board at the right, 0.2.92**: the board stands right of the
 agents' columns; its panel opens to its left. Published as
 `v0.2.92-preview.1`; UI smokes ran on Linux only. Not tried on macOS or Windows.

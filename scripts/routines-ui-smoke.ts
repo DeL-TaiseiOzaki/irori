@@ -368,6 +368,16 @@ try {
   await expect(collect.locator('.routine-history button')).toHaveCount(2);
   await last('Collect', 'succeeded');
   await expect(steps.nth(0).locator('pre')).toHaveText('fetched two\n');
+  // Only the latest 3 runs are listed; the newest is the one shown.
+  for (let run = 0; run < 2; run++) {
+    await collect.getByRole('button', { name: '実行' }).click();
+    await expect(collect.locator('.routine-history button')).toHaveCount(3);
+    await last('Collect', 'succeeded');
+    await expect(collect.locator('.routine-history button').first()).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  }
 
   // The gate ends a run quietly before its later steps.
   const quiet = card('Quiet');

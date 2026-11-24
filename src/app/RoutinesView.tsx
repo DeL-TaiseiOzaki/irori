@@ -35,6 +35,9 @@ import './routines.css';
 const host = window.irori;
 type Conversation = NonNullable<RoutineStepRun['conversation']>;
 
+/** Runs listed under an opened routine; older records stay on the device. */
+const shownRuns = 3;
+
 const runWords: Record<RoutineRunState, () => string> = {
   running: () => t('実行中', 'Running'),
   succeeded: () => t('成功', 'Succeeded'),
@@ -201,7 +204,7 @@ function RoutineDetail({
       )}
       {history.length > 1 && (
         <div className="routine-history" role="group" aria-label={t('履歴', 'History')}>
-          {history.map((run) => (
+          {history.slice(0, shownRuns).map((run) => (
             <button
               key={run.id}
               aria-pressed={run.id === current?.id}
