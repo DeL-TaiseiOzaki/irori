@@ -53,7 +53,8 @@ note to irori's trash.${
 
 You are a vault agent: every form reaches your own vault alone, named by
 its name or "." from its folder. clone, create, add, hosts, workspace, remove,
-run, call, ls, read, search and send are the irori agent's; the person asks it in
+run, stop, skills, install, call, ls, read, search and send are the irori
+agent's; the person asks it in
 irori mode. A secret's
 value, a routine's first review, accounts, updates and agent permissions
 stay with the person.
@@ -103,16 +104,29 @@ there uses the host's own Git sign-in.
 
 irori hosts [<SSH host> [<folder>]]
   The SSH hosts the person added in irori's settings (SSH ホスト), with their
-  vaults. With a host, the folders in a folder of it (its home folder unless
-  one is named), those that are vaults marked: how to find a folder to add.
-  irori connects to the host when it has not; a host that asks for a password
-  asks the person in irori's window.
+  vaults, and the hosts of their ssh configuration not added yet. With a host,
+  the folders in a folder of it (its home folder unless one is named), those
+  that are vaults marked: how to find a folder to add. irori connects to the
+  host when it has not; a host that asks for a password asks the person in
+  irori's window.
+
+irori hosts --add <destination> [--name <name>] [--port <port>]
+  Adds an SSH host: the destination is what follows ssh, user@host or a Host
+  of the person's ssh configuration. Only when the person asked for it.
 
 irori move <path> <new path or folder>
   Moves or renames a note, file or folder in a vault's knowledge, as the
   explorer does: links into it are rewritten, and its comments, a note's
   images beside it and irori's records follow. Paths are taken from your
-  working folder.
+  working folder. Into a folder of another vault's knowledge it keeps its
+  name and its comments and images go with it, but links to and from it
+  break: links never cross vaults. The command says how many.
+
+irori copy <path> <folder>
+  Copies a file or folder of a vault's knowledge or contents into a folder of
+  any vault's knowledge or editable contents, under its name or the first free
+  one, never over an entry. A copy within knowledge keeps its links leading
+  where the original's did.
 
 irori trash <note>
   Moves a knowledge note to irori's trash; the person restores it there.
@@ -149,6 +163,21 @@ irori run <routine> [--vault <vault>]
   programs and never to you. Your own routine of that name comes first;
   --vault names a vault's. A routine's agent steps cannot start routines.
 
+irori stop <routine> [--vault <vault>]
+  Ends the routine's run in progress, as 停止 on the routines page does;
+  later steps do not run.
+
+irori install python
+  Downloads uv into irori's data, for the Python steps of routines, as the
+  routines page does. Only when the person asked for it, or agreed when a
+  routine needs it.
+
+irori skills [--update]
+  Adds the standard skills your folder lacks, and names those that differ from
+  this irori's version, edited by the person or written by an older irori.
+  --update writes this irori's version over them; ask the person first if they
+  may have edited one.
+
 irori call <vault agent or vault name> "<task>"
   Hands a task to the agent of a vault handed to this request, on any CLI:
   it runs inside the vault with the vault's own Schema. Waits until it
@@ -184,6 +213,18 @@ irori disconnect <vault> <name in contents>
   Takes a connected folder out of the vault's contents. The folder itself
   is not touched.
 
+irori connection <vault> <name in contents> [--name <new name>] [--read-only | --editable]
+  Renames a connected folder in the vault's contents, or chooses whether
+  agents may change it. A GitHub repository keeps the access it was connected
+  with.
+
+irori strays <vault> [--adopt <name> [--folder <folder>] | --remove <name>]
+  What the vault's contents folders hold that no connection names: a link
+  made by hand, or a folder or file put there. --adopt registers a link as a
+  connected folder (--folder names its folder when the link leads nowhere);
+  --remove deletes a link, or moves anything else to the system trash, only
+  when the person asked for it.
+
 irori work <vault> <folder>
 irori work <vault> --default
   Chooses the folder where the vault's agents keep scratch files,
@@ -191,11 +232,12 @@ irori work <vault> --default
   existing folder, not another vault's. --default goes back to work in the
   vault's contents, which Git ignores.
 
-irori set <vault> [--name <name>] [--category ...] [--knowledge-label <label>] [--contents-label <label>] [--layers <layers>] [--own knowledge|contents] [--color <color>] [--icon <icon>]
+irori set <vault> [--name <name>] [--category ...] [--knowledge-label <label>] [--contents-label <label>] [--layers <layers>] [--own knowledge|contents] [--color <color>] [--icon <icon> | --icon-image <file>]
   Changes the vault's name, its category, the names its Knowledge and
   Contents layers are shown under (one line, at most 40 characters), its
   color (${brainColors.join(', ')}) or its icon (${brainGlyphs.join(', ')},
-  or one or two characters such as an emoji).
+  or one or two characters such as an emoji; --icon-image takes a PNG, JPEG,
+  GIF or WebP file of at most 2 MiB).
   --layers chooses which layers the vault has, separated by commas: a
   knowledge base with connected material is schema,knowledge,contents (what
   a vault starts with), notes alone are schema,knowledge, and a workspace
@@ -223,13 +265,21 @@ irori layer <vault> contents <folder> [--also]
   folder; it stays where it is and Git keeps tracking it.
 
 irori workspace <workspace name> [<vault>...] [--leave]
+irori workspace <workspace name> --rename <new name>
+irori workspace <workspace name> --delete
+irori workspace <workspace name> <vault>... --group <group name> | --ungroup
   Makes the workspace if there is none of that name, and adds the vaults to
-  it, or with --leave takes them out of it.
+  it, or with --leave takes them out of it. --rename renames it; --delete
+  deletes it, leaving its vaults as they are, only when the person asked for
+  it. --group puts vaults of the workspace into a group of that name (made if
+  there is none), and --ungroup takes them out of theirs. Vaults on SSH hosts
+  are named as the others are.
 
 irori remove <vault> [--trash]
   Takes the vault off this computer and out of every workspace. Its folder
   stays and can be added again, unless --trash moves it to the system trash.
-  Only after the person said yes to removing that vault.
+  A vault on an SSH host is taken off the list only. Only after the person
+  said yes to removing that vault.
 
 New vaults go in ${JSON.stringify(defaultParent)} unless --parent names another folder.
 A relative --parent or folder is taken from your working folder.`;
@@ -254,6 +304,28 @@ export function noteMoved(
       : []),
     ...(moved.notice ? [`Note: ${moved.notice}`] : []),
   ].join('\n');
+}
+
+/** `irori move` into another vault. */
+export function noteMovedAcross(
+  from: string,
+  path: string,
+  to: string,
+  moved: string,
+  outcome: { links?: number; notice?: string },
+) {
+  return [
+    `Moved ${path} from the vault "${from}" to ${moved} in the vault "${to}".`,
+    outcome.links
+      ? `${outcome.links} links to or from it broke, as links never cross vaults.`
+      : 'No links to or from it broke.',
+    ...(outcome.notice ? [`Note: ${outcome.notice}`] : []),
+  ].join('\n');
+}
+
+/** `irori copy`. */
+export function entryCopied(from: string, path: string, to: string, copied: string) {
+  return `Copied ${path} of the vault "${from}" to ${copied} in the vault "${to}".`;
 }
 
 /** `irori trash`. */
@@ -431,20 +503,37 @@ export function vaultRegistered(
   ].join('\n');
 }
 
-/** `irori hosts`: the SSH hosts irori has, with their vaults. */
+/** `irori hosts`: the SSH hosts irori has, with their vaults, and those of the ssh configuration. */
 export function sshHostList(
   hosts: { name: string; destination: string; state: string; vaults: string[] }[],
+  configured: string[] = [],
 ) {
+  const offered = configured.length
+    ? [
+        `Hosts in the person's ssh configuration, not added: ${configured.join(', ')}. "irori hosts --add <name>" adds one when the person asks.`,
+      ]
+    : [];
   if (!hosts.length)
-    return 'irori has no SSH hosts. The person adds one in irori\'s settings, under SSH ホスト (SSH hosts); then "irori add --host" and "irori create --host" make vaults there.';
+    return [
+      'irori has no SSH hosts. The person adds one in irori\'s settings, under SSH ホスト (SSH hosts), or asks you to with "irori hosts --add"; then "irori add --host" and "irori create --host" make vaults there.',
+      ...offered,
+    ].join('\n');
   return [
     'SSH hosts:',
     ...hosts.map(
       (host) =>
         `- ${host.name}: ${host.destination}, ${host.state}${host.vaults.length ? `; vaults ${host.vaults.join(', ')}` : '; no vaults yet'}`,
     ),
+    ...offered,
     'Name a host to list the folders in its home folder: irori hosts <host> [<folder>].',
   ].join('\n');
+}
+
+/** `irori hosts --add`. */
+export function hostAdded(name: string, destination: string, already: boolean) {
+  return already
+    ? `irori has the SSH host "${name}" for ${destination} already.`
+    : `Added the SSH host "${name}" for ${destination}. irori connects when a command needs it; "irori hosts ${name}" lists its folders.`;
 }
 
 /** `irori hosts <host> [<folder>]`: the folders in a folder of an SSH host. */
@@ -575,11 +664,115 @@ export function workspaceSaved(
   ].join('\n');
 }
 
+/** `irori workspace --rename`. */
+export function workspaceRenamed(from: string, to: string) {
+  return `Renamed the workspace "${from}" to "${to}".`;
+}
+
+/** `irori workspace --delete`. */
+export function workspaceDeleted(name: string, vaults: string[]) {
+  return `Deleted the workspace "${name}".${vaults.length ? ` Its vaults (${vaults.join(', ')}) are as they were and stay on this computer.` : ''}`;
+}
+
+/** `irori workspace --group` or `--ungroup`: the workspace's groups now. */
+export function workspaceGrouped(name: string, groups: { name: string; vaults: string[] }[]) {
+  return groups.length
+    ? `The workspace "${name}" groups its vaults as: ${groups.map((group) => `${group.name} (${group.vaults.join(', ')})`).join('; ')}.`
+    : `The workspace "${name}" has no groups now.`;
+}
+
 /** `irori remove`. */
-export function vaultRemoved(vault: { name: string; root: string }, trash: boolean) {
+export function vaultRemoved(vault: { name: string; root: string }, trash: boolean, host?: string) {
+  if (host)
+    return `Took the vault "${vault.name}" off this computer's list and out of its workspaces. ${JSON.stringify(vault.root)} on the SSH host "${host}" is as it was; "irori add --host" brings it back.`;
   return trash
     ? `Removed the vault "${vault.name}" and moved ${JSON.stringify(vault.root)} to the system trash, where the person can restore it.`
     : `Removed the vault "${vault.name}" from this computer and its workspaces. ${JSON.stringify(vault.root)} is as it was; "irori add" brings it back.`;
+}
+
+/** `irori stop`. */
+export function routineStopped(name: string, stopped: boolean) {
+  return stopped
+    ? `Stopped the routine "${name}": its step in progress ended, and later steps do not run.`
+    : `The routine "${name}" is not running.`;
+}
+
+/** `irori install python`. */
+export function pythonInstalled() {
+  return "uv is ready in irori's data for the Python steps of routines.";
+}
+
+/** `irori skills`. */
+export function standardSkills(outcome: { added: string[]; updated: string[]; differ: string[] }) {
+  const lines = [
+    ...(outcome.added.length ? [`Added the standard skills ${outcome.added.join(', ')}.`] : []),
+    ...(outcome.updated.length
+      ? [`Wrote this irori's version of ${outcome.updated.join(', ')}.`]
+      : []),
+    ...(outcome.differ.length
+      ? [
+          `${outcome.differ.join(', ')} differ from this irori's version, edited by the person or written by an older irori. "irori skills --update" writes this irori's version over them.`,
+        ]
+      : []),
+  ];
+  return lines.length ? lines.join('\n') : 'Your standard skills are those of this irori.';
+}
+
+/** `irori connection`. */
+export function connectionChanged(
+  vault: string,
+  connection: { contentsRoot: string; name: string; readOnly: boolean },
+) {
+  return `The vault "${vault}" shows it as ${connection.contentsRoot}/${connection.name}, ${connection.readOnly ? 'read-only' : 'editable'}.`;
+}
+
+/** One stray in a vault's contents, as `irori strays` names it. */
+const strayLine = (stray: {
+  contentsRoot: string;
+  name: string;
+  kind: string;
+  target?: string;
+  missing?: boolean;
+}) =>
+  `${stray.contentsRoot}/${stray.name} (${stray.kind === 'link' ? `a link${stray.target ? ` to ${JSON.stringify(stray.target)}` : ''}${stray.missing ? ', leading nowhere' : ''}` : `a ${stray.kind}`})`;
+
+/** `irori strays`. */
+export function strayList(
+  vault: string,
+  strays: {
+    contentsRoot: string;
+    name: string;
+    kind: string;
+    target?: string;
+    missing?: boolean;
+  }[],
+) {
+  return strays.length
+    ? [
+        `In the contents of the vault "${vault}", no connection names:`,
+        ...strays.map((stray) => `- ${strayLine(stray)}`),
+        'A link becomes a connected folder with --adopt <name>; --remove <name> deletes a link or moves anything else to the system trash.',
+      ].join('\n')
+    : `The contents of the vault "${vault}" holds only its connections.`;
+}
+
+/** `irori strays --adopt`. */
+export function strayAdopted(
+  vault: string,
+  stray: { contentsRoot: string; name: string },
+  state: string,
+) {
+  return `${stray.contentsRoot}/${stray.name} is a connected folder of the vault "${vault}" now (${state}).`;
+}
+
+/** `irori strays --remove`. */
+export function strayRemoved(
+  vault: string,
+  stray: { contentsRoot: string; name: string; kind: string },
+) {
+  return stray.kind === 'link'
+    ? `Removed the link ${stray.contentsRoot}/${stray.name} from the vault "${vault}"; what it led to is as it was.`
+    : `Moved ${stray.contentsRoot}/${stray.name} of the vault "${vault}" to the system trash, where the person can restore it.`;
 }
 
 /** One routine in `irori routines`. */

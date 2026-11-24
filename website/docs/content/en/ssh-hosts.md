@@ -57,7 +57,7 @@ Choose a folder, or type a path starting with `/` in **Folder path on the host**
 
 The new vault joins the workspace on show.
 
-In [irori mode](irori-mode.md) you can also ask the irori agent: "make the folders under `~/projects` on gpu-box vaults" or "make a new vault called Lab on gpu-box". It finds the host and its folders with `irori hosts`, and registers a folder with `irori add --host`, makes a new vault (a Git repository with its first commit) with `irori create --host`, or clones a GitHub repository there with `irori clone --host`. Each waits for you to allow it, as on this computer. The vaults it makes join the workspace of the request.
+In [irori mode](irori-mode.md) you can also ask the irori agent: "make the folders under `~/projects` on gpu-box vaults" or "make a new vault called Lab on gpu-box". It finds the host and its folders with `irori hosts` (and adds a host with `irori hosts --add` when you ask), and registers a folder with `irori add --host`, makes a new vault (a Git repository with its first commit) with `irori create --host`, or clones a GitHub repository there with `irori clone --host`. Each waits for you to allow it, as on this computer. The vaults it makes join the workspace of the request.
 
 ## What you see
 

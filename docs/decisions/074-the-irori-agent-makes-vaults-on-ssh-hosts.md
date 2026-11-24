@@ -41,10 +41,19 @@ the irori agent to have a tool for preparing new vaults there.
    lists the folders in a folder there (the window dialog's listing), marking
    those that already hold a vault's declaration. `irori list` names the vaults
    on SSH hosts after this computer's.
-3. **The same guards as on this computer.** These forms are the irori agent's
+3. **A host is added, and its vaults named, as in the window.**
+   `irori hosts --add <destination> [--name] [--port]` adds an SSH host, as
+   the settings' **SSH ホスト** does; `irori hosts` also names the hosts of the
+   person's ssh configuration not added yet. `irori workspace` and
+   `irori remove` name a vault on an SSH host as one here: it joins, leaves or
+   is grouped in a workspace, and `remove` takes it off this device's list
+   (its folder stays there; `--trash` is refused). The forms that change a
+   vault's files or settings still reach vaults on this computer only, as the
+   window does, and say so for a vault on an SSH host.
+4. **The same guards as on this computer.** These forms are the irori agent's
    alone; a vault agent's command refuses them. `clone`, `create` and `add`
-   with `--host` wait for the person's 許可 as they do here; `hosts` only reads
-   folder names and asks nothing. Connecting to a host that needs a password
+   with `--host`, and `hosts --add`, wait for the person's 許可 as they do here;
+   `hosts` only reads host and folder names and asks nothing. Connecting to a host that needs a password
    asks the person in irori's window, as any connection does.
 
 ## Consequences
@@ -54,6 +63,5 @@ the irori agent to have a tool for preparing new vaults there.
   once nothing runs on it (ADR 061 decision 5).
 - Not in this step: putting a vault on an SSH host on GitHub from irori
   (`gh repo create` runs on this computer; the `new-vault` skill says to create
-  the repository first and clone it there); `irori workspace`, `set`, `remove`
-  and the other forms that name a vault still reach vaults on this computer
-  only.
+  the repository first and clone it there); `irori set`, `connect`, `index`
+  and the other forms that change a vault reach vaults on this computer only.

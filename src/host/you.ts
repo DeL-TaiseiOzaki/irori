@@ -222,6 +222,44 @@ export class YourAiService {
     await this.writeSkills(await this.root());
     return this.status();
   }
+  /**
+   * Which standard skills the irori agent's folder lacks, and which differ from
+   * the ones this irori writes (edited by the person, or written by an older irori).
+   */
+  async standardSkillState(): Promise<{ missing: string[]; changed: string[] }> {
+    if ((await this.status()).state !== 'ready')
+      throw Error(t('irori agent を用意してください。', 'Set up the irori agent first.'));
+    const root = await this.root();
+    const missing: string[] = [];
+    const changed: string[] = [];
+    for (const [name, text] of Object.entries(iroriAgentSkills)) {
+      const folder = path.join(root, standardSkill(name));
+      if (!(await fs.lstat(folder).catch(() => undefined))) missing.push(name);
+      else if (
+        (await fs.readFile(path.join(folder, 'SKILL.md'), 'utf8').catch(() => undefined)) !== text
+      )
+        changed.push(name);
+    }
+    return { missing, changed };
+  }
+  /**
+   * Writes this irori's version of the named standard skills over the ones in
+   * the folder, the SKILL.md alone; other files in a skill's folder stay.
+   */
+  async replaceStandardSkills(names: string[]) {
+    if ((await this.status()).state !== 'ready')
+      throw Error(t('irori agent を用意してください。', 'Set up the irori agent first.'));
+    const root = await this.root();
+    for (const name of names) {
+      if (!Object.hasOwn(iroriAgentSkills, name)) throw Error(`No standard skill "${name}".`);
+      const rel = `${standardSkill(name)}/SKILL.md`;
+      await this.folders(root, rel);
+      const file = path.join(root, rel);
+      const found = await fs.lstat(file).catch(() => undefined);
+      if (found && !found.isFile()) throw Error(`${rel} is not a file.`);
+      await fs.writeFile(file, iroriAgentSkills[name]);
+    }
+  }
   private async writeSkills(root: string) {
     for (const [name, text] of Object.entries(iroriAgentSkills)) {
       const rel = standardSkill(name);

@@ -416,6 +416,32 @@ test(
       /- box: box, connected; vaults Code, Lab, Team KB/,
     );
 
+    // A vault there is named in workspace and remove as one here is.
+    assert.match(
+      await setup.run(['workspace', 'Remote', 'Lab'], far.base, context),
+      /Made the workspace "Remote" holds Lab|"Remote" holds Lab/,
+    );
+    await assert.rejects(setup.run(['remove', 'Lab', '--trash'], far.base), /Leave out --trash/);
+    await assert.rejects(setup.run(['set', 'Lab', '--name', 'X'], far.base), /on an SSH host/);
+    assert.match(
+      await setup.run(['remove', 'Lab'], far.base, context),
+      /^Took the vault "Lab" off this computer's list[\s\S]*on the SSH host "box" is as it was/,
+    );
+    assert.equal(remote.has(lab.scopeId), false);
+    assert.ok(!(await workspaces.list()).some((item) => item.scopeIds.includes(lab.scopeId)));
+    assert.equal(git(lab.root, 'branch', '--show-current').trim(), 'main');
+
+    // Another host, added by its destination once.
+    assert.match(
+      await setup.run(['hosts', '--add', 'me@other', '--name', 'Other'], far.base),
+      /^Added the SSH host "Other" for me@other\./,
+    );
+    assert.match(await setup.run(['hosts', '--add', 'me@other'], far.base), /already/);
+    assert.deepEqual(
+      remote.hosts().map((item) => item.name),
+      ['box', 'Other'],
+    );
+
     // A vault agent cannot make vaults, here or there.
     await assert.rejects(
       setup.run(['create', 'Other', '--host', 'box'], far.base, { vault: code.scopeId }),

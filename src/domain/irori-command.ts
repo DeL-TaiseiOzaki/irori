@@ -24,8 +24,13 @@ export type IroriCommand =
   | { kind: 'help' }
   | { kind: 'list' }
   | { kind: 'routines' }
-  /** The SSH hosts irori has, or the folders in a folder of one (ADR 074). */
-  | { kind: 'hosts'; host?: string; folder?: string }
+  /** The SSH hosts irori has, the folders in a folder of one, or a host added (ADR 074). */
+  | {
+      kind: 'hosts';
+      host?: string;
+      folder?: string;
+      add?: { destination: string; name?: string; port?: number };
+    }
   | {
       kind: 'clone';
       url: string;
@@ -76,12 +81,35 @@ export type IroriCommand =
       /** The layer of the vault's own files beside its Knowledge folder (ADR 071). */
       own?: NamedLayer;
       look?: { color?: BrainLook['color']; icon?: BrainLook['icon'] };
+      /** An image file to show as the vault's icon. */
+      iconImage?: string;
     }
   | { kind: 'layer'; vault: string; layer: NamedLayer; folder: string; also: boolean }
   | { kind: 'work'; vault: string; folder?: string }
-  | { kind: 'workspace'; name: string; vaults: string[]; leave: boolean }
+  | {
+      kind: 'workspace';
+      name: string;
+      vaults: string[];
+      leave: boolean;
+      rename?: string;
+      delete?: boolean;
+      /** The group the named vaults go into, or `null` to take them out of theirs. */
+      group?: string | null;
+    }
   | { kind: 'remove'; vault: string; trash: boolean }
   | { kind: 'run'; routine: string; vault?: string }
+  | { kind: 'stop'; routine: string; vault?: string }
+  | { kind: 'copy'; source: string; destination: string }
+  | {
+      kind: 'connection';
+      vault: string;
+      name: string;
+      rename?: string;
+      access?: 'read-only' | 'read-write';
+    }
+  | { kind: 'strays'; vault: string; adopt?: string; folder?: string; remove?: string }
+  | { kind: 'skills'; update: boolean }
+  | { kind: 'install'; what: 'python' }
   | { kind: 'move'; note: string; destination: string }
   | { kind: 'trash'; note: string }
   | { kind: 'comment'; file: string; body: string; quote?: string; line?: number }
@@ -93,18 +121,34 @@ export type IroriCommand =
 export const iroriArgumentLimit = { count: 20, length: 4096 };
 
 const options: Record<Exclude<IroriCommand['kind'], 'help' | 'list' | 'routines'>, string[]> = {
-  hosts: [],
+  hosts: ['add', 'name', 'port'],
   clone: ['folder', 'parent', 'name', 'category', 'layers', 'host'],
   create: ['parent', 'name', 'category', 'layers', 'host'],
   add: ['name', 'category', 'layers', 'host'],
   connect: ['name', 'read-only', 'into', 'existing', 'branch', 'editable'],
   disconnect: [],
-  set: ['name', 'category', 'knowledge-label', 'contents-label', 'layers', 'own', 'color', 'icon'],
+  set: [
+    'name',
+    'category',
+    'knowledge-label',
+    'contents-label',
+    'layers',
+    'own',
+    'color',
+    'icon',
+    'icon-image',
+  ],
   layer: ['also'],
   work: ['default'],
-  workspace: ['leave'],
+  workspace: ['leave', 'rename', 'delete', 'group', 'ungroup'],
   remove: ['trash'],
   run: ['vault'],
+  stop: ['vault'],
+  copy: [],
+  connection: ['name', 'read-only', 'editable'],
+  strays: ['adopt', 'folder', 'remove'],
+  skills: ['update'],
+  install: [],
   move: [],
   trash: [],
   comment: ['quote', 'line'],
@@ -112,7 +156,17 @@ const options: Record<Exclude<IroriCommand['kind'], 'help' | 'list' | 'routines'
   index: [],
   check: [],
 };
-const flags = new Set(['read-only', 'also', 'leave', 'trash', 'default', 'editable']);
+const flags = new Set([
+  'read-only',
+  'also',
+  'leave',
+  'trash',
+  'default',
+  'editable',
+  'delete',
+  'ungroup',
+  'update',
+]);
 /** The words each form takes, and how a wrong count is explained; a workspace takes one or more. */
 const positional: Record<keyof typeof options, [count: number, words: string]> = {
   hosts: [2, 'at most an SSH host and a folder on it'],
@@ -127,6 +181,12 @@ const positional: Record<keyof typeof options, [count: number, words: string]> =
   workspace: [1, 'a workspace name and then vaults'],
   remove: [1, 'one vault'],
   run: [1, 'one routine'],
+  stop: [1, 'one routine'],
+  copy: [2, 'a file or folder and the folder it is copied into'],
+  connection: [2, 'a vault and the name of a connected folder'],
+  strays: [1, 'one vault'],
+  skills: [0, 'no words'],
+  install: [1, 'what to install: python'],
   move: [2, 'a note, file or folder and where it goes'],
   trash: [1, 'one note'],
   comment: [2, 'a file and the comment'],
@@ -189,7 +249,7 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
     kind === 'workspace'
       ? !words.length
       : kind === 'index' || kind === 'check' || kind === 'hosts'
-        ? words.length > count
+        ? words.length > (kind === 'hosts' && values.add ? 0 : count)
         : kind === 'work'
           ? words.length !== (values.default === true ? 1 : 2)
           : words.length !== count
@@ -229,12 +289,26 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
     ...(text('host') && { host: text('host')!.trim() }),
   };
   switch (kind) {
-    case 'hosts':
+    case 'hosts': {
+      const port = text('port');
+      if (!text('add')) {
+        if (text('name') || port) throw Error('--name and --port go with --add.');
+        return {
+          kind,
+          ...(words[0] && { host: words[0] }),
+          ...(words[1] && { folder: words[1] }),
+        };
+      }
+      if (port !== undefined && !/^[1-9]\d{0,4}$/.test(port)) throw Error('--port is a number.');
       return {
         kind,
-        ...(words[0] && { host: words[0] }),
-        ...(words[1] && { folder: words[1] }),
+        add: {
+          destination: text('add')!.trim(),
+          ...(common.name && { name: common.name }),
+          ...(port && { port: Number(port) }),
+        },
       };
+    }
     case 'clone': {
       return {
         kind,
@@ -330,16 +404,19 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
           );
         look.icon = parsed.data.icon;
       }
+      const iconImage = text('icon-image');
+      if (iconImage && look.icon) throw Error('Give --icon or --icon-image, not both.');
       if (
         !common.name &&
         !common.category &&
         !Object.keys(labels).length &&
         !layers &&
         !own &&
-        !Object.keys(look).length
+        !Object.keys(look).length &&
+        !iconImage
       )
         throw Error(
-          '"irori set" needs --name, --category, --knowledge-label, --contents-label, --layers, --own, --color or --icon.',
+          '"irori set" needs --name, --category, --knowledge-label, --contents-label, --layers, --own, --color, --icon or --icon-image.',
         );
       return {
         kind,
@@ -349,6 +426,7 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
         ...(layers && { layers }),
         ...(own && { own }),
         ...(Object.keys(look).length ? { look } : {}),
+        ...(iconImage && { iconImage }),
       };
     }
     case 'layer': {
@@ -364,17 +442,72 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
     }
     case 'work':
       return { kind, vault: words[0], ...(words[1] !== undefined && { folder: words[1] }) };
-    case 'workspace':
+    case 'workspace': {
+      const chosen = ['leave', 'rename', 'delete', 'group', 'ungroup'].filter(
+        (key) => key in values,
+      );
+      if (chosen.length > 1) throw Error(`Give one of --${chosen.join(', --')}, not several.`);
+      const vaults = words.slice(1);
+      if ((values.rename || values.delete) && vaults.length)
+        throw Error(`--${values.rename ? 'rename' : 'delete'} names no vaults.`);
+      if ((values.group || values.ungroup) && !vaults.length)
+        throw Error(`--${values.group ? 'group' : 'ungroup'} needs the vaults it moves.`);
+      const rename = text('rename')?.trim();
+      const group = text('group')?.trim();
+      if (group !== undefined && (group.length > 60 || /[\r\n]/.test(group)))
+        throw Error('--group is one line of at most 60 characters.');
       return {
         kind,
         name: words[0].trim(),
-        vaults: words.slice(1),
+        vaults,
         leave: values.leave === true,
+        ...(rename && { rename }),
+        ...(values.delete === true && { delete: true }),
+        ...(group ? { group } : values.ungroup === true ? { group: null } : {}),
       };
+    }
     case 'remove':
       return { kind, vault: words[0], trash: values.trash === true };
     case 'run':
+    case 'stop':
       return { kind, routine: words[0], ...(text('vault') && { vault: text('vault') }) };
+    case 'copy':
+      return { kind, source: words[0], destination: words[1] };
+    case 'connection': {
+      if (values['read-only'] && values.editable)
+        throw Error('Give --read-only or --editable, not both.');
+      const access = values['read-only']
+        ? ('read-only' as const)
+        : values.editable
+          ? ('read-write' as const)
+          : undefined;
+      if (!common.name && !access)
+        throw Error('"irori connection" needs --name, --read-only or --editable.');
+      return {
+        kind,
+        vault: words[0],
+        name: words[1],
+        ...(common.name && { rename: common.name }),
+        ...(access && { access }),
+      };
+    }
+    case 'strays': {
+      if (text('adopt') && text('remove')) throw Error('Give --adopt or --remove, not both.');
+      if (text('folder') && !text('adopt')) throw Error('--folder goes with --adopt.');
+      return {
+        kind,
+        vault: words[0],
+        ...(text('adopt') && { adopt: text('adopt') }),
+        ...(text('folder') && { folder: text('folder') }),
+        ...(text('remove') && { remove: text('remove') }),
+      };
+    }
+    case 'skills':
+      return { kind, update: values.update === true };
+    case 'install':
+      if (words[0].trim().toLowerCase() !== 'python')
+        throw Error('"irori install" installs python: uv, for the Python steps of routines.');
+      return { kind, what: 'python' };
     case 'move':
       return { kind, note: words[0], destination: words[1] };
     case 'trash':
