@@ -3,7 +3,10 @@
 **A new vault chooses its layers, 0.2.96**
 ([ADR 072](decisions/072-a-new-vault-chooses-its-layers.md)): the forms that
 make a vault offer its layers and ask for no category; `irori clone`, `create`
-and `add` take `--layers`. In review as a pull request; not merged or published.
+and `add` take `--layers`. Merged in
+[#376](https://github.com/DeL-TaiseiOzaki/irori/pull/376) and published as
+`v0.2.96-preview.1`; UI smokes ran on Linux only. The SSH host's form was not
+tried against a real host.
 
 **A vault's own files can be its Contents, 0.2.95**
 ([ADR 071](decisions/071-a-vaults-own-files-in-contents.md)): a Schema +

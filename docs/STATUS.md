@@ -1,13 +1,17 @@
 # Implementation status — notes, native agents and connection onboarding
 
 A new vault chooses its layers, 2026-11-24 (**0.2.96**,
-[ADR 072](decisions/072-a-new-vault-chooses-its-layers.md); not yet merged or
-published): the forms that make a vault (`RegisterSpace`, `RemoteFolderDialog`)
+[ADR 072](decisions/072-a-new-vault-chooses-its-layers.md),
+[#376](https://github.com/DeL-TaiseiOzaki/irori/pull/376), published as
+`v0.2.96-preview.1`): the forms that make a vault (`RegisterSpace`, `RemoteFolderDialog`)
 show the layer choice of the settings (`LayerChoice`) and no longer ask for a
 category, which the owner called an empty form; a new vault carries none.
 `register`, `registerRemote`, `createSpace` and the vault host's
 `registerVault` take an optional category and the layers, applied only to a
 declaration irori writes. `irori clone`, `create` and `add` take `--layers`.
+- Published from `7182709` (publish run `45348355308`). Anonymous downloads
+  matched `SHA256SUMS.txt`: Windows 179,433,472 bytes, Mac 145,710,511 bytes,
+  `irori-0.2.96-full.nupkg` 178,603,299 bytes.
 - Verified on Linux: `npm run build`, `npm run format:check`, `npm test` except
   the `ssh -G` test that fails on this shared host without the change.
 - Not covered: the SSH host's form against a real host; macOS and Windows.
