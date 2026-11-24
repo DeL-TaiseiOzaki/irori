@@ -1,6 +1,6 @@
 # irori continuation handoff
 
-**A vault chooses its layers, 0.2.93**
+**A vault chooses its layers, 0.2.94**
 ([ADR 070](decisions/070-a-vault-chooses-its-layers.md)): Knowledge and
 Contents are each kept or left out per vault (`layers` in `.irori/scope.json`,
 the settings' 層, `irori set --layers`). In review as

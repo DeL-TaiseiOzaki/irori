@@ -1,6 +1,6 @@
 # 070 — A vault chooses which layers it has
 
-Date: 2026-11-23. Status: owner request; implemented for 0.2.93.
+Date: 2026-11-23. Status: owner request; implemented for 0.2.94.
 Extends [ADR 024](024-layer-names.md) (a vault names its Knowledge and Contents
 layers) and [ADR 035](035-knowledge-at-the-vault-root.md) (classification).
 Changes what [ADR 039](039-what-a-vault-agent-is-told.md) decision 1 tells a
@@ -34,7 +34,7 @@ say what each is for:
 3. **Nothing on disk moves, and the declaration stays whole.** `knowledge`,
    `contents` and `labels` stay as declared while a layer is left out, so
    choosing the layer again brings it back as it was, and an irori before
-   0.2.93, which does not read `layers`, still reads a valid declaration (and
+   0.2.94, which does not read `layers`, still reads a valid declaration (and
    shows all three layers).
 4. **Without Knowledge, the vault's own files are Schema.** Classification
    needs a layer for every path. A declared contents folder is Contents; the

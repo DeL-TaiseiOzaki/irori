@@ -1,6 +1,6 @@
 # Implementation status — notes, native agents and connection onboarding
 
-A vault chooses its layers, 2026-11-23 (**0.2.93**,
+A vault chooses its layers, 2026-11-23 (**0.2.94**,
 [ADR 070](decisions/070-a-vault-chooses-its-layers.md); not yet merged or
 published): the owner asked for a vault of Schema and Contents alone, a
 workspace for code beside a knowledge-base vault, and then for any vault to
