@@ -507,3 +507,50 @@ test('removeStray falls back to permanent deletion only when trash fails and the
   await cloud.removeStray(space.scopeId, 'contents', 'Stuck');
   await assert.rejects(lstat(stray), { code: 'ENOENT' });
 });
+
+test('As irori starts, every connection with a folder here is linked again (ADR 073)', async (t) => {
+  const { files, space, cloud, folder, base } = await local(t);
+  const other = path.join(base, 'Sync 同期', 'Later');
+  await mkdir(other, { recursive: true });
+  const kept = await cloud.addLocal({
+    scopeId: space.scopeId,
+    path: folder,
+    contentsRoot: 'contents',
+    name: 'Research',
+  });
+  const away = await cloud.addLocal({
+    scopeId: space.scopeId,
+    path: other,
+    contentsRoot: 'contents',
+    name: 'Later',
+  });
+  const unchosen = await cloud.addLocal({
+    scopeId: space.scopeId,
+    path: path.join(base, 'Sync 同期'),
+    contentsRoot: 'contents',
+    name: 'Unchosen',
+  });
+  await cloud.connect(space.scopeId, kept.mountId);
+  // Quitting takes the links away.
+  await cloud.close();
+  const entry = path.join(space.root, 'contents', 'Research');
+  await assert.rejects(lstat(entry), { code: 'ENOENT' });
+  // The next start: one folder is there, one is not yet, and one was never chosen here.
+  await rename(other, `${other}-unmounted`);
+  await rm(path.join(files.dataDir, 'local-bindings', `${space.scopeId}-${unchosen.mountId}.json`));
+  const { cloud: started } = waiting(files);
+  assert.equal(await started.connectAll(space.scopeId), true);
+  assert.equal(await readlink(entry), folder);
+  const states = Object.fromEntries(
+    (await started.connections(space.scopeId)).map((item) => [item.mountId, item.state]),
+  );
+  assert.deepEqual(states, {
+    [kept.mountId]: 'mounted',
+    [away.mountId]: 'waiting',
+    [unchosen.mountId]: 'unconfigured',
+  });
+  assert.equal((await files.read(space.scopeId, 'contents/Research/note.md')).text, '# Synced\n');
+  // Linking them again changes nothing that is already linked or waiting.
+  assert.equal(await started.connectAll(space.scopeId), false);
+  await started.close();
+});

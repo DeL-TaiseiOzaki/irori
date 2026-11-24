@@ -30,6 +30,8 @@ stopped every run, routine and terminal, and closing it shut irori down.
    them runs, its terminals, the runs of vaults only it has open and the irori
    agent's conversations of workspaces only it has open stop, and those vaults'
    cloud folders are disconnected. Routines go on, as they do when a tab closes.
+   *(Amended 2026-11-24, 0.2.98, [ADR 073](073-connections-belong-to-the-vault.md):
+   the folders now stay connected.)*
 5. **The last window, Quit and an update's restart** shut irori down as before:
    every window's draft is saved, and the person agrees once to stop what runs.
    Windows close one at a time, so two closing together cannot both count as not
