@@ -5,14 +5,20 @@ can work at the same time and to hand independent tasks to them in parallel
 (irori already allowed it). Not merged or published. Next: check with a real
 CLI agent that a request spanning two vaults runs both hand-offs at once.
 
+**A vault's own files can be its Contents, 0.2.95**
+([ADR 071](decisions/071-a-vaults-own-files-in-contents.md)): a Schema +
+Contents vault shows its own files in Contents, editable and in Git; a vault
+with both layers may choose the same beside a named knowledge folder
+(`rootLayer`, `irori set --own`). In review as a pull request; not merged or
+published. Next: try a repository of code as a vault with a real CLI agent.
+Not covered: search in these files.
+
 **A vault chooses its layers, 0.2.94**
 ([ADR 070](decisions/070-a-vault-chooses-its-layers.md)): Knowledge and
 Contents are each kept or left out per vault (`layers` in `.irori/scope.json`,
-the settings' 層, `irori set --layers`). In review as
-[#373](https://github.com/DeL-TaiseiOzaki/irori/pull/373), CI green; not merged
-or published. Next: try a Schema + Contents vault with a connected repository
-and a real CLI agent. Open request, not started: the vault's root as its contents folder, so
-that code at a vault's top level is Contents rather than Schema.
+the settings' 層, `irori set --layers`). Merged in
+[#373](https://github.com/DeL-TaiseiOzaki/irori/pull/373) and published as
+`v0.2.94-preview.1`; its UI smoke ran on Linux only.
 
 **The latest 3 runs in a routine's history, 0.2.93**: an opened routine lists
 its latest 3 runs; 20 are still kept on the device. Merged in #372 and

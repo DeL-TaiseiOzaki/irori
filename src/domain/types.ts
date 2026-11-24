@@ -32,6 +32,11 @@ export interface ScopeDeclaration {
    * declared it has both. Read it with `hasLayer`, never by the field.
    */
   layers?: import('./layers').NamedLayer[];
+  /**
+   * `contents` puts the vault's own files in Contents although it has Knowledge,
+   * which is then its named folder alone (ADR 071). Read it with `ownLayer`.
+   */
+  rootLayer?: 'contents';
   /** The brain's tile as everyone who opens the KB sees it. */
   appearance?: import('./brains').BrainLook;
 }
@@ -44,6 +49,8 @@ export interface SpaceChange {
   labels?: Partial<Record<import('./layers').NamedLayer, string | null>> | null;
   /** The Knowledge and Contents layers the vault has; `null` or both returns to all three. */
   layers?: import('./layers').NamedLayer[] | null;
+  /** The layer of the vault's own files beside a Knowledge folder; `null` returns them to Knowledge. */
+  rootLayer?: 'contents' | null;
 }
 /** What a layer folder rename did, and what it could not carry over. */
 export interface LayerFolderRename {
@@ -281,6 +288,9 @@ export interface CloudRoot {
   /** As a vault declares them: a vault without Contents takes no connection (ADR 070). */
   layers?: import('./layers').NamedLayer[];
   labels?: Partial<Record<import('./layers').NamedLayer, string>>;
+  /** What sorts the vault's own files into Contents (ADR 071). */
+  knowledge?: string;
+  rootLayer?: 'contents';
 }
 /**
  * A folder on this device, such as one a Drive, Dropbox, Box, iCloud or OneDrive

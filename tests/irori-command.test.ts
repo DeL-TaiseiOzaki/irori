@@ -615,29 +615,57 @@ test('set --layers chooses the layers a vault has, and list says which it left o
   // A workspace for code: Schema and Contents, no notes.
   assert.match(
     await setup.run(['set', 'Dev', '--layers', 'schema,contents'], base),
-    /^The vault is now "Dev", category .*, with the layers Schema, Contents\./,
+    /^The vault is now "Dev", category .*, with the layers Schema, Contents, its own files in Contents\./,
   );
   assert.deepEqual(files.get(id).layers, ['contents']);
   const listed = await setup.run(['list'], base);
-  assert.match(listed, /- Dev: .*no Knowledge layer; contents "contents"/);
+  assert.match(listed, /- Dev: .*no Knowledge layer; own files in Contents; contents "contents"/);
   assert.doesNotMatch(listed, /- Dev: .*knowledge "/);
   await assert.rejects(
     setup.run(['layer', 'Dev', 'knowledge', 'wiki'], base),
     /has no Knowledge layer|Knowledge 層がありません/,
   );
-  // Nothing moved, and the files outside Contents show with Schema.
+  // Nothing moved, and the vault's own files are Contents now (ADR 071).
   assert.equal(await readFile(path.join(vault, 'scripts', 'build.sh'), 'utf8'), 'echo build\n');
   assert.equal(
     (await files.entries(id, '')).find((entry) => entry.path === 'scripts')?.layer,
-    'schema',
+    'contents',
   );
 
   // All three again: the declaration keeps no field for it.
   assert.match(
     await setup.run(['set', 'Dev', '--layers', 'schema,knowledge,contents'], base),
-    /with the layers Schema, Knowledge, Contents\./,
+    /with the layers Schema, Knowledge, Contents, its own files in Knowledge\./,
   );
   assert.equal(files.get(id).layers, undefined);
+  // Both layers, with the vault's own files in Contents beside a named Knowledge folder.
+  assert.match(
+    await setup.run(['set', 'Dev', '--own', 'contents'], base),
+    /its own files in Contents\./,
+  );
+  assert.equal(files.get(id).rootLayer, 'contents');
+  await mkdir(path.join(vault, 'Knowledge_Base'));
+  assert.equal(
+    (await files.entries(id, '')).find((entry) => entry.path === 'scripts')?.layer,
+    'contents',
+  );
+  assert.equal(
+    (await files.entries(id, '')).find((entry) => entry.path === 'Knowledge_Base')?.layer,
+    'Knowledge_Base',
+  );
+  await assert.rejects(
+    setup.run(['layer', 'Dev', 'knowledge', '.'], base),
+    /cannot be the Knowledge folder while|フォルダにできません/,
+  );
+  assert.match(
+    await setup.run(['set', 'Dev', '--own', 'knowledge'], base),
+    /own files in Knowledge/,
+  );
+  assert.equal(files.get(id).rootLayer, undefined);
+  assert.throws(
+    () => parseIroriCommand(['set', 'Dev', '--own', 'schema']),
+    /--own is knowledge or contents/,
+  );
   assert.match(await setup.run(['list'], base), /- Dev: .*knowledge "Knowledge_Base"; contents/);
 });
 

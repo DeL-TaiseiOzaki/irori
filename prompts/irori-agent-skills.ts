@@ -94,7 +94,12 @@ fits what they told you. "You" below is the irori agent.
   \`schema,knowledge\` notes alone, \`schema,contents\` a workspace for code
   or other work with no notes. A layer left out is not shown and is not told
   to the vault's agent; nothing on disk moves, and naming it again brings it
-  back. Without Knowledge, files outside contents show with Schema.
+  back.
+- A vault's own files, outside Schema and its contents folders, are Knowledge
+  when it has that layer and Contents otherwise, so a repository of code
+  becomes a \`schema,contents\` vault as it is: its files are changed in
+  place and stay in Git. With both layers, \`irori set <h> --own contents\`
+  puts them in Contents and leaves Knowledge its named folder alone.
 
 ## Workspaces
 A workspace is a named set of vaults on this computer; the person opens one

@@ -275,6 +275,7 @@ export const hostArguments = {
         appearance: brainLook.nullable().optional(),
         labels: layerLabelChanges.nullable().optional(),
         layers: layerSelection.nullable().optional(),
+        rootLayer: z.literal('contents').nullable().optional(),
       })
       .strict(),
   ]),

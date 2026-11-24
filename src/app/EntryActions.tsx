@@ -7,6 +7,7 @@ import { Dialog } from './Dialog';
 import { Icon, type IconName } from './Icon';
 import { t } from '../domain/i18n';
 import { parentPath } from '../domain/paths';
+import { inContentsFolder } from '../domain/scopes';
 import { useAction } from './useAction';
 import type { Brought } from './dropped';
 
@@ -319,7 +320,10 @@ export function EntryDialog({
   const [directory, setDirectory] = useState(parentPath(entry.path));
   const { busy, error, run } = useAction();
   const layer: Layer = entry.layer;
-  const connection = connectionOf(space.contents, entry.path);
+  // One of the vault's own files in Contents moves anywhere among them (ADR 071); the host checks.
+  const connection = inContentsFolder(space, entry.path)
+    ? connectionOf(space.contents, entry.path)
+    : undefined;
   const title = actionLabel(action);
   const destination = directory.trim().replace(/^\/+|\/+$/g, '');
   const problem =
@@ -329,6 +333,7 @@ export function EntryDialog({
         : (entryNameError(name) ?? '')
       : action === 'move' &&
           layer === 'contents' &&
+          connection !== undefined &&
           destination !== connection &&
           !destination.startsWith(`${connection}/`)
         ? t(

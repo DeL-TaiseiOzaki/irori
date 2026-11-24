@@ -17,6 +17,7 @@ import {
   layerLabel,
   type NamedLayer,
 } from '../src/domain/layers';
+import { ownLayer } from '../src/domain/scopes';
 import type { ScopeDeclaration } from '../src/domain/types';
 import { connectedFolders, type ConnectedFolder } from './connected-folders';
 import { workFolder } from './work-folder';
@@ -24,7 +25,7 @@ import { vaultCommandPreamble } from './irori-command';
 
 export type VaultLayout = Pick<
   ScopeDeclaration,
-  'name' | 'contents' | 'knowledge' | 'labels' | 'layers'
+  'name' | 'contents' | 'knowledge' | 'labels' | 'layers' | 'rootLayer'
 > & {
   /** The vault has an AGENTS.md at its top. */
   instructions: boolean;
@@ -47,12 +48,15 @@ const heading = (vault: VaultLayout, layer: NamedLayer) => {
 /**
  * The vault agent's introduction. `commands`: the run has the `irori` command.
  * A vault with all three layers hears the words it always did; one that left
- * Knowledge or Contents out (ADR 070) hears which it has and nothing of the other.
+ * Knowledge or Contents out (ADR 070) hears which it has and nothing of the other,
+ * and one whose own files are Contents (ADR 071) hears that they are.
  */
 export function vaultIntro(vault: VaultLayout, commands: boolean) {
   const knowledge = knowledgeFolder(vault);
   const notes = hasLayer(vault, 'Knowledge_Base');
   const contents = hasLayer(vault, 'contents');
+  // The vault's own files are Contents: all of them without Knowledge, or those outside its folder.
+  const ownFiles = ownLayer(vault) === 'contents';
   const opening = `irori: you are the agent of the ${JSON.stringify(vault.name)} vault, open in irori, the desktop app where the person keeps this ${
     notes ? 'knowledge base, edits its notes' : 'vault'
   } and talks with you.`;
@@ -69,24 +73,32 @@ export function vaultIntro(vault: VaultLayout, commands: boolean) {
     } Schema is also CLAUDE.md, the top README.md, the hidden folders at the top, such as .agents/skills and .irori${
       notes
         ? ", and an AGENTS.md inside a folder of Knowledge: that folder's own instructions."
-        : `. irori shows every other file of the vault${contents ? ' outside Contents' : ''} with Schema too: the vault's own working files. It keeps no notes.`
+        : contents
+          ? '. This vault keeps no notes.'
+          : ". irori shows every other file of the vault with Schema too: the vault's own working files. It keeps no notes."
     }`,
     ...(notes
       ? [
-          `- ${heading(vault, 'Knowledge_Base')}: ${
-            knowledge ? `${folder(knowledge)} and every other file` : "the vault's root: every file"
-          } outside Schema${contents ? ' and Contents' : ''}. The notes and pages of what this vault knows.`,
+          ownFiles
+            ? `- ${heading(vault, 'Knowledge_Base')}: ${folder(knowledge)} alone. The notes and pages of what this vault knows.`
+            : `- ${heading(vault, 'Knowledge_Base')}: ${
+                knowledge
+                  ? `${folder(knowledge)} and every other file`
+                  : "the vault's root: every file"
+              } outside Schema${contents ? ' and Contents' : ''}. The notes and pages of what this vault knows.`,
         ]
       : []),
     ...(contents
       ? [
-          `- ${heading(vault, 'contents')}: ${
-            vault.contents.length ? vault.contents.map(folder).join(', ') : 'no folder yet'
-          }. ${
-            notes
-              ? 'Files the knowledge is about, whose original lives elsewhere: source material, deliverables, incoming items.'
-              : 'Folders and repositories connected from elsewhere, whose original lives there: code, source material, deliverables.'
-          }`,
+          ownFiles
+            ? `- ${heading(vault, 'contents')}: the vault's own files, which are every file outside Schema${
+                notes ? ' and the Knowledge folder' : ''
+              }: its code and other working files, changed in place and kept in its Git history. Also ${
+                vault.contents.length ? vault.contents.map(folder).join(', ') : 'no folder yet'
+              }, where folders and repositories are connected from elsewhere; their original lives there.`
+            : `- ${heading(vault, 'contents')}: ${
+                vault.contents.length ? vault.contents.map(folder).join(', ') : 'no folder yet'
+              }. Files the knowledge is about, whose original lives elsewhere: source material, deliverables, incoming items.`,
           ...(vault.linked?.length ? [connectedFolders(vault.linked, vault.readOnly)] : []),
         ]
       : []),

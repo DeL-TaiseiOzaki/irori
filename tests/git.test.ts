@@ -190,6 +190,30 @@ test('Git protects contents, nested scopes, aliases and pre-staged foreign files
   await assert.rejects(service.diff(space.scopeId, '../device/spaces.json', false));
 });
 
+test('A vault’s own files in Contents are committed; its contents folder still is not', async (t) => {
+  const { service, space, root, files } = await fixture(t);
+  // A workspace for code: Schema and Contents, its own files Contents (ADR 071).
+  await files.update(space.scopeId, { layers: ['contents'] });
+  await mkdir(path.join(root, 'src'));
+  await writeFile(path.join(root, 'src/app.ts'), 'export const app = 1;\n');
+  await mkdir(path.join(root, 'contents'));
+  await writeFile(path.join(root, 'contents/private.md'), 'Cloud bytes');
+  git(root, 'add', '-f', 'contents/private.md');
+  let status = await service.status(space.scopeId);
+  assert.equal(status.changes.find((c) => c.path === 'src/app.ts')?.blocked, undefined);
+  assert.ok(status.changes.find((c) => c.path === 'contents/private.md')?.blocked);
+  const diff = await service.diff(space.scopeId, 'contents/private.md', true);
+  await service.stage(space.scopeId, 'contents/private.md', false, diff.version);
+  await stage(service, space.scopeId, 'src/app.ts');
+  status = await service.status(space.scopeId);
+  status = await service.commit(space.scopeId, 'Add the app', status.version);
+  assert.ok(!status.changes.some((c) => c.path === 'src/app.ts'));
+  assert.match(
+    git(root, 'show', '--stat', '--format=%s', 'HEAD'),
+    /Add the app[\s\S]*src\/app\.ts/,
+  );
+});
+
 test('fetch, fast-forward receive and exact-branch push use real local remotes', async (t) => {
   const { service, space, root, remote, peer } = await remoteFixture(t);
   await writeFile(path.join(peer, 'other.md'), 'Peer update\n');
