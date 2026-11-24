@@ -1,13 +1,21 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Vaults work at once, 2026-11-24 (**0.2.97**; not yet merged or published): the
+Vaults work at once, 2026-11-24 (**0.2.97**,
+[#377](https://github.com/DeL-TaiseiOzaki/irori/pull/377), published as
+`v0.2.97-preview.1`): the
 owner asked whether irori mode can ask several vaults in parallel. `handOff`
 refuses only a second hand-off to a vault already working, so different vaults
 could already run at once, but `brainsCommandPreamble` said only "one task at a
 time to a vault". It now adds that different vaults can work at once and that
 calls for independent tasks run in parallel.
+The irori mode page of the website says the same.
 - Verified by `tests/vault-command.test.ts` (two hand-offs that each wait for
-  the other's start, through the Pi protocol fixture) and `tests/prompts.test.ts`.
+  the other's start, through the Pi protocol fixture) and `tests/prompts.test.ts`;
+  pull request run `45348826221` passed `verify` and packaging.
+- Published from `bce547f` (publish run `45350321941`): Windows 179,432,448
+  bytes, Mac 145,709,188 bytes, `irori-0.2.97-full.nupkg` 178,603,262 bytes,
+  with `SHA256SUMS.txt`. The live irori mode page, in Japanese and English,
+  has the new sentence.
 - Not covered: a real CLI agent choosing to run the calls in parallel.
 
 A new vault chooses its layers, 2026-11-24 (**0.2.96**,

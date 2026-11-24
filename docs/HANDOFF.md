@@ -2,7 +2,9 @@
 
 **Vaults work at once, 0.2.97**: the irori agent is told that different vaults
 can work at the same time and to hand independent tasks to them in parallel
-(irori already allowed it). Not merged or published. Next: check with a real
+(irori already allowed it). Merged in
+[#377](https://github.com/DeL-TaiseiOzaki/irori/pull/377) and published as
+`v0.2.97-preview.1`. Next: check with a real
 CLI agent that a request spanning two vaults runs both hand-offs at once.
 
 **A new vault chooses its layers, 0.2.96**
