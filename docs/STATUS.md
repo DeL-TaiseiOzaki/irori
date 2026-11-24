@@ -1,5 +1,15 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Vaults work at once, 2026-11-24 (**0.2.97**; not yet merged or published): the
+owner asked whether irori mode can ask several vaults in parallel. `handOff`
+refuses only a second hand-off to a vault already working, so different vaults
+could already run at once, but `brainsCommandPreamble` said only "one task at a
+time to a vault". It now adds that different vaults can work at once and that
+calls for independent tasks run in parallel.
+- Verified by `tests/vault-command.test.ts` (two hand-offs that each wait for
+  the other's start, through the Pi protocol fixture) and `tests/prompts.test.ts`.
+- Not covered: a real CLI agent choosing to run the calls in parallel.
+
 A new vault chooses its layers, 2026-11-24 (**0.2.96**,
 [ADR 072](decisions/072-a-new-vault-chooses-its-layers.md); not yet merged or
 published): the forms that make a vault (`RegisterSpace`, `RemoteFolderDialog`)

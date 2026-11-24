@@ -100,7 +100,7 @@ export function brainsCommandPreamble(brains: Handed[], comments: number[] = [])
     ),
     "Hand work in a vault to that vault's agent with `irori call` in your shell: irori call <vault agent or vault name> \"<task>\" (or the task on standard input). Not your CLI's own sub-agents: only the vault agent works with that vault's Schema. Do not change a vault's files yourself.",
     'It runs the vault agent inside that vault, waits until it finishes, however long that takes, and prints its report. A non-zero exit status means the hand-off did not complete; the reason is on standard error.',
-    'Hand one task at a time to a vault, and wait for its report before handing it another.',
+    'Hand one task at a time to a vault, and wait for its report before handing it another. Different vaults can work at once: run the calls for independent tasks in parallel.',
     ...remoteNote(brains),
     ...linkedNote(brains),
     ...workNote(brains),

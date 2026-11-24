@@ -163,6 +163,9 @@ test('The irori agent hands vaults with irori call on every CLI, and hears each 
   assert.match(handed, /vault agent "vault-lab", its agent: "Papers and reading notes\."/);
   assert.match(handed, /irori call <vault agent or vault name> "<task>"/);
   assert.match(handed, /Not your CLI's own sub-agents/);
+  // One task at a time per vault, and different vaults at once.
+  assert.match(handed, /one task at a time to a vault/);
+  assert.match(handed, /Different vaults can work at once/);
   assert.doesNotMatch(handed, /sub-agent "|spawn_agent|task tool/);
   // The command's own help and refusal say the same: no CLI is left out (ADR 050).
   const help = prompts.iroriCommandHelp('/kb');

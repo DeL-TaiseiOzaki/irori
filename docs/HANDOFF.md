@@ -1,5 +1,10 @@
 # irori continuation handoff
 
+**Vaults work at once, 0.2.97**: the irori agent is told that different vaults
+can work at the same time and to hand independent tasks to them in parallel
+(irori already allowed it). Not merged or published. Next: check with a real
+CLI agent that a request spanning two vaults runs both hand-offs at once.
+
 **A new vault chooses its layers, 0.2.96**
 ([ADR 072](decisions/072-a-new-vault-chooses-its-layers.md)): the forms that
 make a vault offer its layers and ask for no category; `irori clone`, `create`

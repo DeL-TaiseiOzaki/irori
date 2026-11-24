@@ -13,7 +13,7 @@ Change vault names, icons, and colors in [vault settings](workspaces.md#section-
 
 The irori agent is the entry point for work across vaults. For example: “Compare my research notes with the team's plan and prepare a memo for our next meeting.”
 
-It splits the request, hands work to the relevant vault agents, and brings the results together. Review questions and permission requests from handed work in the interface. Work handed to a [vault on an SSH host](ssh-hosts.md) runs on that host.
+It splits the request, hands work to the relevant vault agents, and brings the results together. Different vaults work at the same time; each vault takes one task at a time. Review questions and permission requests from handed work in the interface. Work handed to a [vault on an SSH host](ssh-hosts.md) runs on that host.
 
 ## Manage instructions and conversations
 

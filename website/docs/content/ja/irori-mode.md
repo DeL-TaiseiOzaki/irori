@@ -13,7 +13,7 @@ vault の名前・アイコン・色は[vault の設定](workspaces.md#section-3
 
 irori agent は、複数の vault を使う仕事の窓口です。例えば「個人の調査ノートとチームの計画を比べて、次の打ち合わせ用のメモを作ってください」と頼めます。
 
-irori agent は依頼を分け、必要な vault の vault agent に渡し、結果をまとめます。渡された仕事の許可や質問も画面で確認します。[SSH ホストの vault](ssh-hosts.md)に任せた仕事は、そのホストで動きます。
+irori agent は依頼を分け、必要な vault の vault agent に渡し、結果をまとめます。別々の vault への仕事は同時に進み、1つの vault では1件ずつ進みます。渡された仕事の許可や質問も画面で確認します。[SSH ホストの vault](ssh-hosts.md)に任せた仕事は、そのホストで動きます。
 
 ## 指示と会話を管理する
 

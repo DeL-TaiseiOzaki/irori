@@ -249,6 +249,34 @@ test(
 );
 
 test(
+  'the irori agent hands tasks to two vaults at once, each waiting for the other to start (protocol fixture)',
+  posixOnly,
+  async (t) => {
+    const { brains, root, events, run, log } = await handOffs(t);
+    const [product, research] = brains;
+    // Each vault agent, in its own vault, marks beside the vaults that it began,
+    // then waits up to 10 s for the other's mark: only hand-offs running at the
+    // same time both see it.
+    const task = (mine: string, other: string) =>
+      `'run: touch ../${mine}-began; i=0; while [ ! -f ../${other}-began ] && [ $i -lt 100 ]; do sleep 0.1; i=$((i+1)); done; [ -f ../${other}-began ] && echo ${mine}-saw-${other}'`;
+    const { runId, done } = await run(
+      `Hand over.\nrun: irori call Product ${task('product', 'research')} & irori call Research ${task('research', 'product')} & wait`,
+      [product, research],
+    );
+    await done;
+    assert.equal(events.filter((event) => event.runId === runId).at(-1)?.outcome, 'completed');
+    const command = (await log(root)).find((call) => call.type === 'command');
+    assert.match(command.stdout, /product-saw-research/, JSON.stringify(command));
+    assert.match(command.stdout, /research-saw-product/, JSON.stringify(command));
+    for (const brain of [product, research])
+      assert.equal(
+        events.find((event) => event.scopeId === brain.scopeId && event.type === 'done')?.outcome,
+        'completed',
+      );
+  },
+);
+
+test(
   'a vault not handed to the request is refused, and stopping the irori agent stops its hand-off (protocol fixture)',
   posixOnly,
   async (t) => {
