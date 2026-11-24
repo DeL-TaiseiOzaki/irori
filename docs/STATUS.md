@@ -51,10 +51,20 @@ choice. Nothing on disk moves.
   vault shows under Schema); creating or moving files in the Schema file view;
   a real CLI agent reading the changed introduction.
 
-The latest 3 runs in a routine's history, 2026-11-24 (**0.2.93**): the owner
+The latest 3 runs in a routine's history, 2026-11-24 (**0.2.93**,
+[#372](https://github.com/DeL-TaiseiOzaki/irori/pull/372), published as `v0.2.93-preview.1`): the owner
 asked for only the latest 3 runs in an opened routine's 成功/失敗 history.
 `RoutinesView` lists `history.slice(0, 3)`; the host still keeps the last 20
 records (ADR 016), so no record is deleted.
+- Verified locally by `tsc --noEmit`, `vite build` and `build-host`; the UI
+  smoke could not run on the authoring host (no display). Pull request run
+  `45335572687` passed `verify` (full `npm test` and `test:ui`, including
+  `routines-ui-smoke.ts` running Collect four times and seeing 3 runs listed)
+  and Linux, macOS and Windows packaging.
+- Published from `f570736` (publish run `45336799913`). The release lists
+  Windows 179,425,792 bytes, Mac 145,737,051 bytes and `irori-0.2.93-full.nupkg`
+  178,595,228 bytes with `SHA256SUMS.txt`; the live page links
+  v0.2.93-preview.1. Downloads were not checked against the checksums.
 
 The session board at the right, 2026-11-22 (**0.2.92**,
 [#370](https://github.com/DeL-TaiseiOzaki/irori/pull/370), published as `v0.2.92-preview.1`;
