@@ -4,14 +4,17 @@
 ([ADR 075](decisions/075-the-irori-command-has-what-the-window-has.md)):
 `copy`, `stop`, `connection`, `strays`, `skills`, `install python`, `move`
 across vaults, workspace rename/delete/groups, `set --icon-image`,
-`hosts --add`. Next: in the packaged app, have the irori agent run
+`hosts --add`. Merged in
+[#382](https://github.com/DeL-TaiseiOzaki/irori/pull/382) and published as
+`v0.2.99-preview.1`. Next: in the packaged app, have the irori agent run
 `irori skills --update` (so its new-vault skill learns `--host`) and a move
 across vaults.
 
 **The irori agent makes vaults on SSH hosts, 0.2.99**
 ([ADR 074](decisions/074-the-irori-agent-makes-vaults-on-ssh-hosts.md)):
 `irori add`, `create` and `clone` take `--host`, and `irori hosts` lists the
-hosts and a folder's folders there. Next: with a real CLI agent and a real SSH
+hosts and a folder's folders there. Published with the entry above in
+`v0.2.99-preview.1`. Next: with a real CLI agent and a real SSH
 host, ask the irori agent to make several folders there vaults and to create a
 new one, and check they join the workspace and are handed from the next
 request.
