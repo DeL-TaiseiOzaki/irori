@@ -15,6 +15,7 @@ import type {
   Delegate,
   Question,
   QuestionOption,
+  ScopeDeclaration,
   StartRun,
 } from '../domain/types';
 import type { EffortLevel, SDKUserMessage, Settings } from '@anthropic-ai/claude-agent-sdk';
@@ -151,7 +152,7 @@ import {
   type AgentDefinition,
 } from './agent-definitions';
 import { categoryName } from '../domain/brains';
-import { knowledgeFolder, shownFolder } from '../domain/layers';
+import { hasLayer, knowledgeFolder, shownFolder } from '../domain/layers';
 import {
   brainOfPath,
   onThisDevice,
@@ -397,6 +398,11 @@ const textWindow = 32;
 /** How long Claude Code lets the irori agent's shell commands run: a hand-off takes as long as it takes. */
 const handOffShellTimeout = String(24 * 60 * 60 * 1000);
 const digest = (words: string) => createHash('sha256').update(words).digest('hex');
+/** The layer folders the irori agent hears for a handed vault: those of the layers it has (ADR 070). */
+const handedLayers = (vault: Pick<ScopeDeclaration, 'contents' | 'knowledge' | 'layers'>) => ({
+  ...(hasLayer(vault, 'Knowledge_Base') && { knowledge: shownFolder(knowledgeFolder(vault)) }),
+  ...(hasLayer(vault, 'contents') && { contents: vault.contents }),
+});
 /** The configuration a run took, in one line: what irori passes by its name, files by path. */
 const configNames = (found: FoundConfig[]) =>
   found.flatMap((item) => (item.label ? [item.label] : item.files)).join(', ');
@@ -1367,8 +1373,11 @@ export class AgentService {
           ...vault,
           instructions,
           // Searches that walk the vault skip the links its connected folders appear through.
-          linked: this.files.cloud?.linkedFolders?.(scopeId),
-          readOnly: this.files.cloud?.linkedPaths?.(scopeId, false),
+          // A vault without Contents shows no connected folder (ADR 070).
+          ...(hasLayer(vault, 'contents') && {
+            linked: this.files.cloud?.linkedFolders?.(scopeId),
+            readOnly: this.files.cloud?.linkedPaths?.(scopeId, false),
+          }),
           work:
             work &&
             (inside ? `${path.relative(vault.root, work).split(path.sep).join('/')}/` : work),
@@ -2204,7 +2213,7 @@ export class AgentService {
                 agent: names.get(scopeId)!,
                 root: far.root,
                 host: far.host.name,
-                layers: { knowledge: shownFolder(knowledgeFolder(far)), contents: far.contents },
+                layers: handedLayers(far),
               };
             }
             const brain = this.files.get(scopeId);
@@ -2220,12 +2229,12 @@ export class AgentService {
               category: brain.category && categoryName(brain.category),
               agent: names.get(brain.scopeId)!,
               root: brain.root,
-              layers: {
-                knowledge: shownFolder(knowledgeFolder(brain)),
-                contents: brain.contents,
-              },
-              linked: this.files.cloud?.linkedFolders?.(brain.scopeId),
-              readOnly: this.files.cloud?.linkedPaths?.(brain.scopeId, false),
+              layers: handedLayers(brain),
+              // A vault without Contents shows no connected folder (ADR 070).
+              ...(hasLayer(brain, 'contents') && {
+                linked: this.files.cloud?.linkedFolders?.(brain.scopeId),
+                readOnly: this.files.cloud?.linkedPaths?.(brain.scopeId, false),
+              }),
               work: await this.work(brain.scopeId),
             };
           }),

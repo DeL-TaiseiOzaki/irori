@@ -173,11 +173,19 @@ irori work <vault> --default
   existing folder, not another vault's. --default goes back to work in the
   vault's contents, which Git ignores.
 
-irori set <vault> [--name <name>] [--category ...] [--knowledge-label <label>] [--contents-label <label>] [--color <color>] [--icon <icon>]
+irori set <vault> [--name <name>] [--category ...] [--knowledge-label <label>] [--contents-label <label>] [--layers <layers>] [--color <color>] [--icon <icon>]
   Changes the vault's name, its category, the names its Knowledge and
   Contents layers are shown under (one line, at most 40 characters), its
   color (${brainColors.join(', ')}) or its icon (${brainGlyphs.join(', ')},
   or one or two characters such as an emoji).
+  --layers chooses which layers the vault has, separated by commas: a
+  knowledge base with connected material is schema,knowledge,contents (what
+  a vault starts with), notes alone are schema,knowledge, and a workspace
+  for code is schema,contents. Schema is always one of them. Nothing on disk
+  moves. A layer left out is not shown, takes no new notes or connections,
+  and is not told to the vault's agent; without Knowledge, the vault's files
+  outside Contents show with Schema. Disconnect the vault's folders before
+  leaving Contents out. Naming the layer again brings it back as it was.
 
 irori layer <vault> knowledge <folder>
 irori layer <vault> contents <folder> [--also]
@@ -311,8 +319,11 @@ export interface ListedVault {
   repository?: string;
   inWorkspace: boolean;
   category?: string;
+  /** Its knowledge and contents folders; a layer the vault left out has none (ADR 070). */
   knowledge?: string;
   contents?: string[];
+  /** The layers the vault left out, by irori's names. */
+  without?: string[];
   connections?: {
     name: string;
     contentsRoot: string;
@@ -359,6 +370,7 @@ export function vaultList(
 const line = (workspace: string | undefined) => (item: ListedVault) => {
   const layers = [
     item.category && `category ${item.category}`,
+    item.without?.length && `no ${item.without.join(' or ')} layer`,
     item.knowledge && `knowledge ${JSON.stringify(item.knowledge)}`,
     item.contents?.length && `contents ${item.contents.map((c) => JSON.stringify(c)).join(', ')}`,
     item.connections?.length &&
@@ -425,6 +437,8 @@ export function vaultChanged(vault: {
   name: string;
   category?: string;
   labels?: { knowledge: string; contents: string };
+  /** The layers it has now, Schema first, when the command chose them. */
+  layers?: string[];
   look?: { color?: string; icon?: string };
 }) {
   const look = vault.look
@@ -433,7 +447,7 @@ export function vaultChanged(vault: {
         vault.look.icon && `icon ${vault.look.icon}`,
       ].filter(Boolean)
     : [];
-  return `The vault is now "${vault.name}"${vault.category ? `, category ${vault.category}` : ''}${vault.labels ? `, with its layers shown as ${JSON.stringify(vault.labels.knowledge)} and ${JSON.stringify(vault.labels.contents)}` : ''}${look.length ? `, ${look.join(', ')}` : ''}.`;
+  return `The vault is now "${vault.name}"${vault.category ? `, category ${vault.category}` : ''}${vault.labels ? `, with its layers shown as ${JSON.stringify(vault.labels.knowledge)} and ${JSON.stringify(vault.labels.contents)}` : ''}${vault.layers ? `, with the layers ${vault.layers.join(', ')}` : ''}${look.length ? `, ${look.join(', ')}` : ''}.`;
 }
 
 /** `irori work`: where the vault's agents work now. */

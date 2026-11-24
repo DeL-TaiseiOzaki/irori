@@ -35,10 +35,14 @@ import type {
   WorkspaceProfile,
 } from '../domain/types';
 import {
+  defaultLayerLabel,
+  hasLayer,
   knowledgeFolder,
   layerFolder,
   layerLabel,
+  namedLayers,
   shownFolder,
+  vaultLayers,
   type NamedLayer,
 } from '../domain/layers';
 import { categoryName } from '../domain/brains';
@@ -291,8 +295,13 @@ export class AgentSetup {
         repository: (await inspectRepository(space.root)).repository,
         inWorkspace: !!workspace?.scopeIds.includes(space.scopeId),
         category: categoryName(space.category),
-        knowledge: shownFolder(knowledgeFolder(space)),
-        contents: space.contents,
+        ...(hasLayer(space, 'Knowledge_Base') && {
+          knowledge: shownFolder(knowledgeFolder(space)),
+        }),
+        ...(hasLayer(space, 'contents') && { contents: space.contents }),
+        without: namedLayers
+          .filter((layer) => !hasLayer(space, layer))
+          .map((layer) => defaultLayerLabel(layer)),
         connections: (await this.host.cloud.connections(space.scopeId).catch(() => [])).map(
           (item) => ({
             name: item.name,
@@ -658,10 +667,13 @@ export class AgentSetup {
     // A vault's name, category, look and layer names: its run keeps what it was told,
     // so they change during it as in the vault's settings (ADR 020 D5).
     const space = this.vault(command.vault, cwd, context.vault, context.handedScopes);
+    // Its layers sort its files anew, so they wait for another's run as its folders do.
+    if (command.layers) this.idle(space, 'Choose its layers', context.vault);
     const change: SpaceChange = {
       ...(command.name && { name: command.name }),
       ...(command.category && { category: command.category }),
       ...(command.labels && { labels: command.labels }),
+      ...(command.layers && { layers: command.layers }),
       // An icon or color keeps the other one.
       ...(command.look && { appearance: { ...space.appearance, ...command.look } }),
     };
@@ -689,6 +701,9 @@ export class AgentSetup {
           knowledge: layerLabel(next, 'Knowledge_Base'),
           contents: layerLabel(next, 'contents'),
         },
+      }),
+      ...(command.layers && {
+        layers: ['Schema', ...vaultLayers(next).map((layer) => defaultLayerLabel(layer))],
       }),
     });
   }

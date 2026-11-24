@@ -9,7 +9,7 @@ import {
 import { commentBodyLimit, commentQuoteLimit } from './comments';
 import type { Category } from './types';
 import { githubCloneURL, isBranchName } from './git';
-import type { NamedLayer } from './layers';
+import { namedLayers, type NamedLayer } from './layers';
 
 /**
  * What the irori agent asks of irori through the `irori` command on its run's
@@ -50,6 +50,8 @@ export type IroriCommand =
       name?: string;
       category?: Category;
       labels?: Partial<Record<NamedLayer, string>>;
+      /** The Knowledge and Contents layers the vault has from now on (ADR 070). */
+      layers?: NamedLayer[];
       look?: { color?: BrainLook['color']; icon?: BrainLook['icon'] };
     }
   | { kind: 'layer'; vault: string; layer: NamedLayer; folder: string; also: boolean }
@@ -73,7 +75,7 @@ const options: Record<Exclude<IroriCommand['kind'], 'help' | 'list' | 'routines'
   add: ['name', 'category'],
   connect: ['name', 'read-only', 'into', 'existing', 'branch', 'editable'],
   disconnect: [],
-  set: ['name', 'category', 'knowledge-label', 'contents-label', 'color', 'icon'],
+  set: ['name', 'category', 'knowledge-label', 'contents-label', 'layers', 'color', 'icon'],
   layer: ['also'],
   work: ['default'],
   workspace: ['leave'],
@@ -244,6 +246,24 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
           throw Error(`--${key} is one line of at most 40 characters.`);
         labels[layer] = label;
       }
+      // Schema is always there; naming it is how a vault of Schema alone is asked for.
+      let layers: NamedLayer[] | undefined;
+      if (text('layers') !== undefined) {
+        const named: Record<string, NamedLayer | undefined> = {
+          schema: undefined,
+          knowledge: 'Knowledge_Base',
+          contents: 'contents',
+        };
+        const words = text('layers')!
+          .split(/[\s,]+/)
+          .filter(Boolean)
+          .map((word) => word.toLowerCase());
+        if (!words.length || words.some((word) => !Object.hasOwn(named, word)))
+          throw Error(
+            '--layers lists the layers the vault has, separated by commas: schema, knowledge, contents. Schema is always one of them.',
+          );
+        layers = namedLayers.filter((layer) => words.some((word) => named[word] === layer));
+      }
       const look: NonNullable<Extract<IroriCommand, { kind: 'set' }>['look']> = {};
       const color = text('color')?.trim();
       if (color !== undefined) {
@@ -267,16 +287,18 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
         !common.name &&
         !common.category &&
         !Object.keys(labels).length &&
+        !layers &&
         !Object.keys(look).length
       )
         throw Error(
-          '"irori set" needs --name, --category, --knowledge-label, --contents-label, --color or --icon.',
+          '"irori set" needs --name, --category, --knowledge-label, --contents-label, --layers, --color or --icon.',
         );
       return {
         kind,
         vault: words[0],
         ...common,
         ...(Object.keys(labels).length ? { labels } : {}),
+        ...(layers && { layers }),
         ...(Object.keys(look).length ? { look } : {}),
       };
     }

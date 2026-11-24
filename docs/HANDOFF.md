@@ -1,5 +1,14 @@
 # irori continuation handoff
 
+**A vault chooses its layers, 0.2.94**
+([ADR 070](decisions/070-a-vault-chooses-its-layers.md)): Knowledge and
+Contents are each kept or left out per vault (`layers` in `.irori/scope.json`,
+the settings' 層, `irori set --layers`). In review as
+[#373](https://github.com/DeL-TaiseiOzaki/irori/pull/373), CI green; not merged
+or published. Next: try a Schema + Contents vault with a connected repository
+and a real CLI agent. Open request, not started: the vault's root as its contents folder, so
+that code at a vault's top level is Contents rather than Schema.
+
 **The latest 3 runs in a routine's history, 0.2.93**: an opened routine lists
 its latest 3 runs; 20 are still kept on the device. Not tried on macOS or Windows.
 

@@ -1,5 +1,5 @@
 import { classify, isPropertyPage } from '../domain/scopes';
-import { layerFolder, movedPath } from '../domain/layers';
+import { hasLayer, layerFolder, movedPath, noLayer } from '../domain/layers';
 import { defaultNoteDirectoryOf } from '../domain/notes';
 import { useDraft, flushDrafts } from './useDraft';
 import { stripIndexAt, WorkspaceTabs } from './WorkspaceTabs';
@@ -1271,6 +1271,12 @@ function App() {
   const reconciliation = useRef(0);
   const dirty = !!doc && buffer !== doc.text;
   const report = useCallback((e: unknown) => setError(errorText(e)), []);
+  /** Says so and is true when the vault left the layer out (ADR 070): what needs it does not start. */
+  const lacksLayer = (space: Space, layer: import('../domain/types').Layer) => {
+    if (hasLayer(space, layer)) return false;
+    report(noLayer(space, layer));
+    return true;
+  };
   // The irori agent's folder is the workspace's (ADR 044): the host reads the one
   // on show for its screens, its Schema settings and its terminal.
   useEffect(() => {
@@ -1308,7 +1314,7 @@ function App() {
   }, [hostsListed]);
 
   function openDaily() {
-    if (!active) return;
+    if (!active || lacksLayer(active, 'Knowledge_Base')) return;
     const scopeId = active.scopeId;
     void save()
       .then(async (saved) => {
@@ -2512,9 +2518,11 @@ function App() {
     newNoteHere: () => {
       if (active) newNoteIn(active);
     },
-    showGraph: () => setView('graph'),
+    showGraph: () => {
+      if (!active || !lacksLayer(active, 'Knowledge_Base')) setView('graph');
+    },
     connectHere: () => {
-      if (active) showConnections(active);
+      if (active && !lacksLayer(active, 'contents')) showConnections(active);
     },
     openTrash: () => {
       void save().then((saved) => {
@@ -3247,6 +3255,7 @@ function App() {
     }
   }
   function newNoteIn(space: Space) {
+    if (lacksLayer(space, 'Knowledge_Base')) return;
     void selectSpace(space).then((selected) => {
       if (selected) {
         setNoteDirectory(
@@ -4208,7 +4217,9 @@ function App() {
                               )}
                               <div className="welcome-actions">
                                 <ArrowFillButton
-                                  disabled={!active || connecting}
+                                  disabled={
+                                    !active || connecting || !hasLayer(active, 'Knowledge_Base')
+                                  }
                                   onClick={() => {
                                     setNoteDirectory(defaultNoteDirectory);
                                     setNewNote(true);
@@ -4456,6 +4467,8 @@ function App() {
             setSpaces((all) => all.map((item) => (item.scopeId === next.scopeId ? next : item)));
             setActive(next);
             setBrainSettings(false);
+            // Its layers may have changed, and with them where each file shows (ADR 070).
+            bump(next.scopeId);
             const notices = renamed.flatMap((item) => [
               ...(item.notice ? [item.notice] : []),
               ...(item.skipped.length

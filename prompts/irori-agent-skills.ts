@@ -88,6 +88,13 @@ fits what they told you. "You" below is the irori agent.
   folder that exists as it is; otherwise it renames the current one and
   rewrites links into it. Folder \`.\` is the vault's root.
 - Shown names of Knowledge and Contents: \`irori set --knowledge-label/--contents-label\`.
+- Which layers a vault has: \`irori set <h> --layers schema,contents\`. Every
+  vault has Schema; Knowledge and Contents are each kept or left out. All
+  three is a knowledge base with its materials (what a vault starts with),
+  \`schema,knowledge\` notes alone, \`schema,contents\` a workspace for code
+  or other work with no notes. A layer left out is not shown and is not told
+  to the vault's agent; nothing on disk moves, and naming it again brings it
+  back. Without Knowledge, files outside contents show with Schema.
 
 ## Workspaces
 A workspace is a named set of vaults on this computer; the person opens one
