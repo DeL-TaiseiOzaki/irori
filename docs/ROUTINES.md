@@ -283,7 +283,7 @@ status shows changed between the start and the end (**変更 n 件**). A run is
 running, **成功**, **対象なし**, **失敗**, **停止** or **不明**. A run that irori's
 exit or a crash left running becomes **不明** when irori next opens, and is
 never repeated. The last 20 runs of each routine are kept; the row's history
-shows them.
+shows the latest 3.
 
 Files in irori's data directory:
 

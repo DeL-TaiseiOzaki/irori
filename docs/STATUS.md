@@ -20,6 +20,11 @@ choice. Nothing on disk moves.
   vault shows under Schema); creating or moving files in the Schema file view;
   a real CLI agent reading the changed introduction.
 
+The latest 3 runs in a routine's history, 2026-11-24 (**0.2.93**): the owner
+asked for only the latest 3 runs in an opened routine's 成功/失敗 history.
+`RoutinesView` lists `history.slice(0, 3)`; the host still keeps the last 20
+records (ADR 016), so no record is deleted.
+
 The session board at the right, 2026-11-22 (**0.2.92**,
 [#370](https://github.com/DeL-TaiseiOzaki/irori/pull/370), published as `v0.2.92-preview.1`;
 ADR 069 amended): the
