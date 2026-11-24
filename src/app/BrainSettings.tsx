@@ -21,8 +21,10 @@ import {
   layerFolder,
   layerFolderProblem,
   layerLabel,
+  namedLayers,
   rootKnowledgeFolder,
   shownFolder,
+  vaultLayers,
   type NamedLayer,
 } from '../domain/layers';
 import { t } from '../domain/i18n';
@@ -232,12 +234,11 @@ function RemoveLocal({
   );
 }
 
-const namedLayers: NamedLayer[] = ['Knowledge_Base', 'contents'];
 const layerIcons = { Knowledge_Base: 'book', contents: 'cloud' } as const;
 
 /**
- * A brain's name, category, icon and colour, and the names of its Knowledge and
- * Contents layers and their folders. They are kept in the KB's
+ * A brain's name, category, icon and colour, which of the Knowledge and Contents
+ * layers it has (ADR 070), and the names of those layers and their folders. They are kept in the KB's
  * `.irori/scope.json`, so everyone who opens the brain sees the same tile.
  */
 export function BrainSettings({
@@ -289,6 +290,9 @@ export function BrainSettings({
     Knowledge_Base: knowledgeFolder(space) || defaultKnowledgeFolder,
     contents: baseName(layerFolder(space, 'contents')),
   }));
+  // The layers the vault has (ADR 070); one left out keeps its name and folder as they are.
+  const [chosen, setChosen] = useState<NamedLayer[]>(() => vaultLayers(space));
+  const has = (layer: NamedLayer) => chosen.includes(layer);
   // The vault's root as the knowledge folder (ADR 035).
   const [knowledgeAtRoot, setKnowledgeAtRoot] = useState(!knowledgeFolder(space));
   const chosenFolder = (layer: NamedLayer) =>
@@ -296,7 +300,9 @@ export function BrainSettings({
   const folderProblems = Object.fromEntries(
     namedLayers.map((layer) => [
       layer,
-      (chosenFolder(layer) !== rootKnowledgeFolder && layerFolderProblem(chosenFolder(layer))) ||
+      (has(layer) &&
+        chosenFolder(layer) !== rootKnowledgeFolder &&
+        layerFolderProblem(chosenFolder(layer))) ||
         '',
     ]),
   ) as Record<NamedLayer, string>;
@@ -364,11 +370,13 @@ export function BrainSettings({
           Knowledge_Base: labels.Knowledge_Base || null,
           contents: labels.contents || null,
         },
+        // Sent only when chosen anew: a run in the vault keeps the layers it was told.
+        ...(chosen.join() !== vaultLayers(space).join() && { layers: chosen }),
       });
       const renamed: (LayerFolderRename & { layer: NamedLayer })[] = [];
       for (const layer of namedLayers) {
         const folder = chosenFolder(layer);
-        if (folder === shownFolder(baseName(layerFolder(next, layer)))) continue;
+        if (!has(layer) || folder === shownFolder(baseName(layerFolder(next, layer)))) continue;
         if (beforeRename && !(await beforeRename())) break;
         const result = await host.renameLayerFolder(space.scopeId, layer, folder);
         next = result.space;
@@ -480,11 +488,43 @@ export function BrainSettings({
             {running && (
               <p className="brain-sheet-note" role="status">
                 {t(
-                  'エージェントの実行中は、フォルダの変更と vault の削除はできません。名前・見た目・表示名は変えられます。',
-                  'While an agent runs, the folders cannot change and the vault cannot be removed. Its name, look and shown names can.',
+                  'エージェントの実行中は、層の選択、フォルダの変更と vault の削除はできません。名前・見た目・表示名は変えられます。',
+                  'While an agent runs, the layers and their folders cannot change and the vault cannot be removed. Its name, look and shown names can.',
                 )}
               </p>
             )}
+            <fieldset className="brain-sheet-layer-choice">
+              <legend>{t('この vault が持つ層', 'The layers this vault has')}</legend>
+              <label>
+                <input type="checkbox" checked disabled readOnly />
+                <Icon name="schema" size={15} className="layer-icon schema" />
+                {defaultLayerLabel('schema')}
+              </label>
+              {namedLayers.map((layer) => (
+                <label key={layer}>
+                  <input
+                    type="checkbox"
+                    checked={has(layer)}
+                    disabled={running}
+                    onChange={(event) =>
+                      setChosen(
+                        namedLayers.filter((item) =>
+                          item === layer ? event.target.checked : has(item),
+                        ),
+                      )
+                    }
+                  />
+                  <Icon name={layerIcons[layer]} size={15} className={`layer-icon ${layer}`} />
+                  {defaultLayerLabel(layer)}
+                </label>
+              ))}
+            </fieldset>
+            <p className="brain-sheet-note">
+              {t(
+                '外した層は表示されず、ノートや接続を受け付けません。ファイルは動かず、選び直すと元に戻ります。Knowledge を外すと、Contents 以外のファイルは Schema に並びます。',
+                'A layer left out is not shown and takes no notes or connections. No file moves, and choosing it again brings it back. Without Knowledge, the files outside Contents show with Schema.',
+              )}
+            </p>
             <div className="brain-sheet-layer-grid">
               <span />
               <span className="brain-sheet-layer-head">{t('表示名', 'Shown as')}</span>
@@ -500,6 +540,7 @@ export function BrainSettings({
                   <input
                     value={labels[layer]}
                     maxLength={40}
+                    disabled={!has(layer)}
                     placeholder={defaultLayerLabel(layer)}
                     aria-label={t(
                       `${defaultLayerLabel(layer)} の表示名`,
@@ -516,7 +557,9 @@ export function BrainSettings({
                         ? rootKnowledgeFolder
                         : folders[layer]
                     }
-                    disabled={running || (layer === 'Knowledge_Base' && knowledgeAtRoot)}
+                    disabled={
+                      running || !has(layer) || (layer === 'Knowledge_Base' && knowledgeAtRoot)
+                    }
                     maxLength={64}
                     aria-label={t(
                       `${defaultLayerLabel(layer)} のフォルダ`,
@@ -532,7 +575,7 @@ export function BrainSettings({
                       <input
                         type="checkbox"
                         checked={knowledgeAtRoot}
-                        disabled={running}
+                        disabled={running || !has(layer)}
                         onChange={(event) => setKnowledgeAtRoot(event.target.checked)}
                       />{' '}
                       {t('vault のルート', "The vault's root")}

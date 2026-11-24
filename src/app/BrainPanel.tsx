@@ -10,7 +10,7 @@ import {
   type DragEvent,
   type ReactNode,
 } from 'react';
-import { knowledgeFolder, layerLabel } from '../domain/layers';
+import { hasLayer, knowledgeFolder, layerLabel, vaultLayers } from '../domain/layers';
 import { Menu } from '@base-ui/react/menu';
 import { ContextMenu } from '@base-ui/react/context-menu';
 import {
@@ -625,16 +625,47 @@ function SectionAction({
   );
 }
 
-const sections: { layer: Layer; defaultSize: string }[] = [
-  { layer: 'schema', defaultSize: '26%' },
-  { layer: 'Knowledge_Base', defaultSize: '46%' },
-  { layer: 'contents', defaultSize: '28%' },
+// Each section's share of the panel's height among those shown.
+const sections: { layer: Layer; share: number }[] = [
+  { layer: 'schema', share: 26 },
+  { layer: 'Knowledge_Base', share: 46 },
+  { layer: 'contents', share: 28 },
 ];
 // Without the vault agent the Schema layer is not shown (ADR 021).
-const editorSections: { layer: Layer; defaultSize: string }[] = [
-  { layer: 'Knowledge_Base', defaultSize: '62%' },
-  { layer: 'contents', defaultSize: '38%' },
+const editorSections: { layer: Layer; share: number }[] = [
+  { layer: 'Knowledge_Base', share: 62 },
+  { layer: 'contents', share: 38 },
 ];
+/**
+ * The sections of the layers a vault has (ADR 070), sharing the whole height.
+ * The list is the same one for the same choice, so the panel's layout holds.
+ */
+const shownSections = new Map<string, { layer: Layer; defaultSize: string }[]>();
+function sectionsOf(space: Space, schema: boolean) {
+  const from = (schema ? sections : editorSections).filter(({ layer }) => hasLayer(space, layer));
+  const key = from.map(({ layer }) => layer).join();
+  let shown = shownSections.get(key);
+  if (!shown) {
+    const whole = from.reduce((sum, { share }) => sum + share, 0);
+    shown = from.map(({ layer, share }) => ({
+      layer,
+      defaultSize: `${Math.round((share / whole) * 100)}%`,
+    }));
+    shownSections.set(key, shown);
+  }
+  return shown;
+}
+/** What a panel says where a vault shows no layer: it left out those shown here. */
+function NoLayers() {
+  return (
+    <small className="tree-empty">
+      {t(
+        'この vault にはここに表示する層がありません。vault の設定の「層」で選べます。',
+        'This vault has no layer to show here. Its settings choose its layers.',
+      )}
+    </small>
+  );
+}
 // A folded section keeps its heading line.
 const headingHeight = 36;
 
@@ -662,9 +693,11 @@ export function VaultSections({
   const contentRoots = roots?.entries.filter(
     (entry) => entry.layer === 'contents' && space.contents.includes(entry.path),
   );
-  const layers = ['Knowledge_Base', 'contents'] as const;
+  // Only the layers the vault has (ADR 070).
+  const layers = vaultLayers(space);
   return (
     <div className="side-sections">
+      {!layers.length && <NoLayers />}
       {layers.map((layer) => (
         <section
           key={layer}
@@ -910,13 +943,18 @@ export const BrainPanel = memo(function BrainPanel({
   const remote = !!space.host;
   const editLocked = locked || remote;
   const [folded, setFolded] = useState<Layer[]>([]);
-  const [schemaFiles, setSchemaFiles] = useState(false);
+  // Without Knowledge, Schema holds the vault's own files (ADR 070): it opens on them.
+  const ownFiles = !hasLayer(space, 'Knowledge_Base');
+  const [schemaFiles, setSchemaFiles] = useState(ownFiles);
+  useEffect(() => {
+    if (ownFiles) setSchemaFiles(true);
+  }, [space.scopeId, ownFiles]);
   const refs = {
     schema: usePanelRef(),
     Knowledge_Base: usePanelRef(),
     contents: usePanelRef(),
   } satisfies Record<Layer, unknown>;
-  const shown = schema === undefined ? editorSections : sections;
+  const shown = sectionsOf(space, schema !== undefined);
   const panelIds = useMemo(() => shown.map((section) => section.layer), [shown]);
   // The section holding the file on the stage opens for it; its tree finds the row.
   const target = selected?.scopeId === space.scopeId ? selected.path : undefined;
@@ -1158,73 +1196,81 @@ export const BrainPanel = memo(function BrainPanel({
       {mode === 'changes' && <div className="brain-changes">{children}</div>}
       {/* The files stay mounted behind the changes, so open folders stay open. */}
       <div className="brain-files" hidden={mode === 'changes'}>
-        <PaneGroup
-          className="brain-sections"
-          orientation="vertical"
-          defaultLayout={layout.defaultLayout}
-          onLayoutChanged={layout.onLayoutChanged}
-        >
-          {shown.map(({ layer, defaultSize }, index) => {
-            const open = !folded.includes(layer);
-            return [
-              index > 0 && (
-                <PaneSeparator
-                  key={`${layer}-handle`}
-                  className="section-handle"
-                  aria-label={t(
-                    `${layerLabel(space, shown[index - 1].layer)} と ${layerLabel(space, layer)} の境界`,
-                    `Border between ${layerLabel(space, shown[index - 1].layer)} and ${layerLabel(space, layer)}`,
-                  )}
-                />
-              ),
-              <Pane
-                key={layer}
-                id={layer}
-                className="brain-section-pane"
-                panelRef={refs[layer]}
-                defaultSize={defaultSize}
-                minSize={72}
-                collapsible
-                collapsedSize={headingHeight}
-                onResize={(size) => {
-                  const collapsed = size.inPixels <= headingHeight + 1;
-                  setFolded((value) =>
-                    collapsed === value.includes(layer)
-                      ? value
-                      : collapsed
-                        ? [...value, layer]
-                        : value.filter((item) => item !== layer),
-                  );
-                }}
-              >
-                <section className={`brain-section ${layer}`} aria-label={layerLabel(space, layer)}>
-                  <div className="section-heading">
-                    <button
-                      className="section-toggle"
-                      aria-expanded={open}
-                      onClick={() => {
-                        const handle = refs[layer].current;
-                        if (open) handle?.collapse();
-                        else handle?.expand();
-                      }}
-                    >
-                      <Icon name={open ? 'chevronDown' : 'chevron'} size={12} />
-                      <Icon
-                        name={layerIcons[layer]}
-                        size={15}
-                        strokeWidth={1.9}
-                        className="layer-icon"
-                      />
-                      <span>{layerLabel(space, layer)}</span>
-                    </button>
-                    {actions[layer]}
-                  </div>
-                  {open && <div className="section-body">{body(layer)}</div>}
-                </section>
-              </Pane>,
-            ];
-          })}
-        </PaneGroup>
+        {!shown.length && <NoLayers />}
+        {!!shown.length && (
+          <PaneGroup
+            // Another choice of layers is another set of panes.
+            key={panelIds.join()}
+            className="brain-sections"
+            orientation="vertical"
+            defaultLayout={layout.defaultLayout}
+            onLayoutChanged={layout.onLayoutChanged}
+          >
+            {shown.map(({ layer, defaultSize }, index) => {
+              const open = !folded.includes(layer);
+              return [
+                index > 0 && (
+                  <PaneSeparator
+                    key={`${layer}-handle`}
+                    className="section-handle"
+                    aria-label={t(
+                      `${layerLabel(space, shown[index - 1].layer)} と ${layerLabel(space, layer)} の境界`,
+                      `Border between ${layerLabel(space, shown[index - 1].layer)} and ${layerLabel(space, layer)}`,
+                    )}
+                  />
+                ),
+                <Pane
+                  key={layer}
+                  id={layer}
+                  className="brain-section-pane"
+                  panelRef={refs[layer]}
+                  defaultSize={defaultSize}
+                  minSize={72}
+                  collapsible
+                  collapsedSize={headingHeight}
+                  onResize={(size) => {
+                    const collapsed = size.inPixels <= headingHeight + 1;
+                    setFolded((value) =>
+                      collapsed === value.includes(layer)
+                        ? value
+                        : collapsed
+                          ? [...value, layer]
+                          : value.filter((item) => item !== layer),
+                    );
+                  }}
+                >
+                  <section
+                    className={`brain-section ${layer}`}
+                    aria-label={layerLabel(space, layer)}
+                  >
+                    <div className="section-heading">
+                      <button
+                        className="section-toggle"
+                        aria-expanded={open}
+                        onClick={() => {
+                          const handle = refs[layer].current;
+                          if (open) handle?.collapse();
+                          else handle?.expand();
+                        }}
+                      >
+                        <Icon name={open ? 'chevronDown' : 'chevron'} size={12} />
+                        <Icon
+                          name={layerIcons[layer]}
+                          size={15}
+                          strokeWidth={1.9}
+                          className="layer-icon"
+                        />
+                        <span>{layerLabel(space, layer)}</span>
+                      </button>
+                      {actions[layer]}
+                    </div>
+                    {open && <div className="section-body">{body(layer)}</div>}
+                  </section>
+                </Pane>,
+              ];
+            })}
+          </PaneGroup>
+        )}
       </div>
     </section>
   );

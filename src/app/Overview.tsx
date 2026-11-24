@@ -15,7 +15,7 @@ import {
   usePanelRef,
 } from 'react-resizable-panels';
 import type { overviewViews } from '../domain/workspace-tabs';
-import { knowledgeFolder } from '../domain/layers';
+import { hasLayer, knowledgeFolder } from '../domain/layers';
 import type { AgentAccess, AgentId, Entry, Space, WorkspaceProfile } from '../domain/types';
 import { agentNames } from '../domain/types';
 import { agentAccessLabel, conversationAccess } from '../domain/agent-access';
@@ -436,9 +436,9 @@ function BrainColumn({
   const roots = useResource(() => host.entries(space.scopeId, ''), [space.scopeId], {
     refresh: revision,
   });
-  const knowledgeRoot = roots.data?.some(
-    (entry) => entry.path === knowledgeFolder(space) && entry.directory,
-  );
+  const knowledgeRoot =
+    hasLayer(space, 'Knowledge_Base') &&
+    roots.data?.some((entry) => entry.path === knowledgeFolder(space) && entry.directory);
   const knowledgeRead = useResource(
     () => host.entries(space.scopeId, knowledgeFolder(space)),
     [space.scopeId, knowledgeFolder(space)],
@@ -459,6 +459,7 @@ function BrainColumn({
     6,
   );
   const open = (entry: Entry) => actions.onEnter(space, { entry });
+  const contents = hasLayer(space, 'contents');
   return (
     <section className={`brain-column ${openRequest(ai) ? 'waiting' : ''}`} aria-label={space.name}>
       <header className="column-head">
@@ -512,6 +513,9 @@ function BrainColumn({
         </div>
       )}
       <div className="column-cell">
+        {!hasLayer(space, 'Knowledge_Base') && (
+          <small className="column-note">{noLayerNote()}</small>
+        )}
         {knowledge.shown.map((entry) =>
           entry.directory ? (
             <div key={entry.path} className="column-row">
@@ -532,7 +536,8 @@ function BrainColumn({
         )}
       </div>
       <div className="column-cell">
-        {(connections.data ?? []).map((connection) => (
+        {!contents && <small className="column-note">{noLayerNote()}</small>}
+        {((contents && connections.data) || []).map((connection) => (
           <div key={connection.mountId} className="column-row">
             <Icon name="cloud" size={14} className="layer-icon contents" />
             <span className="column-row-name">{connection.name}</span>
@@ -543,7 +548,7 @@ function BrainColumn({
             )}
           </div>
         ))}
-        {connections.data && !connections.data.length && !space.host && (
+        {contents && connections.data && !connections.data.length && !space.host && (
           <button className="column-connect" onClick={() => onConnect(space)}>
             <Icon name="cloudConnect" size={14} />
             {t('フォルダを接続', 'Connect a folder')}
@@ -553,6 +558,9 @@ function BrainColumn({
     </section>
   );
 }
+
+/** What a column shows in the row of a layer its vault left out (ADR 070). */
+const noLayerNote = () => t('この層はありません', 'No such layer');
 
 function OverviewColumns({
   spaces,

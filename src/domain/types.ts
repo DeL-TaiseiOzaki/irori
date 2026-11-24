@@ -27,6 +27,11 @@ export interface ScopeDeclaration {
   knowledge?: string;
   /** The names the Knowledge and Contents layers are shown under (ADR 024). */
   labels?: Partial<Record<import('./layers').NamedLayer, string>>;
+  /**
+   * The Knowledge and Contents layers the vault has (ADR 070); with none
+   * declared it has both. Read it with `hasLayer`, never by the field.
+   */
+  layers?: import('./layers').NamedLayer[];
   /** The brain's tile as everyone who opens the KB sees it. */
   appearance?: import('./brains').BrainLook;
 }
@@ -37,6 +42,8 @@ export interface SpaceChange {
   appearance?: import('./brains').BrainLook | null;
   /** Each layer's shown name; an empty or `null` one returns to irori's. */
   labels?: Partial<Record<import('./layers').NamedLayer, string | null>> | null;
+  /** The Knowledge and Contents layers the vault has; `null` or both returns to all three. */
+  layers?: import('./layers').NamedLayer[] | null;
 }
 /** What a layer folder rename did, and what it could not carry over. */
 export interface LayerFolderRename {
@@ -271,6 +278,9 @@ export interface CloudRoot {
   name: string;
   root: string;
   contents: string[];
+  /** As a vault declares them: a vault without Contents takes no connection (ADR 070). */
+  layers?: import('./layers').NamedLayer[];
+  labels?: Partial<Record<import('./layers').NamedLayer, string>>;
 }
 /**
  * A folder on this device, such as one a Drive, Dropbox, Box, iCloud or OneDrive

@@ -1,5 +1,25 @@
 # Implementation status — notes, native agents and connection onboarding
 
+A vault chooses its layers, 2026-11-23 (**0.2.94**,
+[ADR 070](decisions/070-a-vault-chooses-its-layers.md); not yet merged or
+published): the owner asked for a vault of Schema and Contents alone, a
+workspace for code beside a knowledge-base vault, and then for any vault to
+choose its layers. `layers` in `.irori/scope.json` names the Knowledge and
+Contents layers a vault has (`hasLayer` in `src/domain/layers.ts`); none
+declared means both. Without Knowledge, `classify` puts the vault's own files
+in Schema; a declared contents folder stays Contents while that layer is out.
+The settings' 層, `irori set --layers`, `irori list`, the vault panel, the vault
+beside, the home, the overview and the vault agent's introduction follow the
+choice. Nothing on disk moves.
+- Verified on Linux: `npm run build`, `npm run format:check`, and `npm test`
+  except the `ssh -G` test that fails on this shared host without the change.
+  `scripts/vault-layers-ui-smoke.ts` is new and was not run here (no display);
+  it passed with the other UI smokes in pull request CI run `45163225150`
+  ([#373](https://github.com/DeL-TaiseiOzaki/irori/pull/373)).
+- Not covered: the vault's root as a contents folder (code at the top level of a
+  vault shows under Schema); creating or moving files in the Schema file view;
+  a real CLI agent reading the changed introduction.
+
 The latest 3 runs in a routine's history, 2026-11-24 (**0.2.93**,
 [#372](https://github.com/DeL-TaiseiOzaki/irori/pull/372), published as `v0.2.93-preview.1`): the owner
 asked for only the latest 3 runs in an opened routine's 成功/失敗 history.
