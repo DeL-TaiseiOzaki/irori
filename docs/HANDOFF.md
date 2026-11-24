@@ -1,5 +1,10 @@
 # irori continuation handoff
 
+**Vaults work at once, 0.2.97**: the irori agent is told that different vaults
+can work at the same time and to hand independent tasks to them in parallel
+(irori already allowed it). Not merged or published. Next: check with a real
+CLI agent that a request spanning two vaults runs both hand-offs at once.
+
 **A vault chooses its layers, 0.2.94**
 ([ADR 070](decisions/070-a-vault-chooses-its-layers.md)): Knowledge and
 Contents are each kept or left out per vault (`layers` in `.irori/scope.json`,
