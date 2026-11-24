@@ -29,6 +29,9 @@ showed the start screen.
    cancelled; the person agrees first when any of them runs. Its vaults' cloud
    folders are disconnected unless another tab has the vault. Closing the tab
    on show brings the next tab, or the start screen after the last one.
+   *(Amended 2026-11-24, 0.2.98, [ADR 073](073-connections-belong-to-the-vault.md):
+   a vault's folders stay connected when its tabs close; irori links them as it
+   starts.)*
 5. **A terminal belongs to the tab on show.** The renderer's terminal ends with
    its panel, so leaving the tab on show (Home, another tab, closing it) asks
    first while a terminal is open and then closes it.

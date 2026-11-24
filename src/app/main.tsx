@@ -1987,13 +1987,8 @@ function App() {
     try {
       // The vault's stage comes back as it was left, if its note is still there.
       if (shown) await reopenStage(shown);
-      // Vaults an edit took out of this workspace let go of their folders, unless
-      // another tab has them; the workspace's own are connected.
-      if (before)
-        await release(
-          before.scopeIds.filter((id) => !profile.scopeIds.includes(id)),
-          workspaceTabs.filter((tab) => tab.id !== profile.id),
-        );
+      // The workspace's connections are linked if they are not yet. Those of vaults an
+      // edit took out of it stay: a connection belongs to its vault (ADR 073).
       for (const id of available.map((space) => space.scopeId))
         for (const connection of await host.cloudConnections(id).catch((error) => {
           report(error);
@@ -2010,21 +2005,6 @@ function App() {
     } finally {
       setConnecting(false);
       bump();
-    }
-  }
-  /** Disconnects the folders of vaults that no open tab, `others` or another window's, has. */
-  async function release(scopeIds: string[], others: OpenTab[]) {
-    const kept = new Set(
-      [...others, ...(await host.otherWindows())].flatMap((tab) => tab.scopeIds),
-    );
-    for (const id of scopeIds) {
-      if (kept.has(id) || !spaces.some((space) => space.scopeId === id)) continue;
-      for (const connection of await host.cloudConnections(id).catch((error) => {
-        report(error);
-        return [];
-      }))
-        if (['mounted', 'waiting', 'error'].includes(connection.state))
-          await host.disconnectCloud(id, connection.mountId).catch(report);
     }
   }
   /** The open tabs take their workspaces' newest profiles; a workspace no longer saved stays as it was. */
@@ -3238,12 +3218,7 @@ function App() {
         ...step.scopes.map((scopeId) => host.cancel(scopeId)),
         ...step.conversations.map((id) => host.cancel(you!.id, id)),
       ]);
-      const { tabs } = closeTabs(workspaceTabs, keys, shownTab);
       setWorkspaceTabs((all) => all.filter((tab) => !keys.includes(tab.key)));
-      await release(
-        leaving.flatMap((tab) => tab.scopeIds),
-        tabs,
-      );
       if (shown && next) await openWorkspace(next, next.key);
       else if (shown) setStartup(true);
       for (const key of keys) delete tabViews.current[key];

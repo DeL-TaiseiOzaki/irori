@@ -1,5 +1,11 @@
 # irori continuation handoff
 
+**Connections stay connected, 0.2.98**
+([ADR 073](decisions/073-connections-belong-to-the-vault.md)): irori links every
+vault's connections as it starts, and closing a tab or window no longer
+disconnects them. Next: check in a packaged app that a GitHub repository stays
+接続済み across a restart and after closing its tab.
+
 **Vaults work at once, 0.2.97**: the irori agent is told that different vaults
 can work at the same time and to hand independent tasks to them in parallel
 (irori already allowed it). Merged in

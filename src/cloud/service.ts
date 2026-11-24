@@ -1060,6 +1060,30 @@ export class CloudService {
     return this.mutate(() => this.mount(scopeId, mountId));
   }
   /**
+   * Links every connection of a vault that has a folder or clone on this device and
+   * is neither linked nor waiting, as irori starts (ADR 073): a connection belongs to
+   * the vault on this device, not to a tab. A folder not there yet waits as one a
+   * person connects would; one that cannot be linked shows its error and the others
+   * go on. A connection with no folder chosen here, or one being cloned, is left.
+   * Returns whether any was linked.
+   */
+  async connectAll(scopeId: string): Promise<boolean> {
+    let linked = false;
+    for (const record of await this.localDeclarations(scopeId)) {
+      const key = this.key(scopeId, record.mountId);
+      if (this.stopping) break;
+      if (this.mounted.has(key) || this.waiting.has(key) || this.fetching.has(key)) continue;
+      if (this.mayLink?.(scopeId) === false) break;
+      if (!(await this.localBinding(scopeId, record.mountId).catch(() => undefined))) continue;
+      await this.mutate(async () => {
+        if (this.mounted.has(key) || this.waiting.has(key)) return;
+        await this.link(record);
+      }).catch(() => {});
+      if (this.mounted.has(key)) linked = true;
+    }
+    return linked;
+  }
+  /**
    * Whether a connection's folder is linked now, or was and its link no longer checks
    * out: the folder runs of its vault may have been given.
    */

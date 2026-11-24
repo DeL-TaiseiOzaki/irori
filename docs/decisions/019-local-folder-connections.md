@@ -28,6 +28,9 @@ Box, iCloud Drive and OneDrive all keep a folder on the device in sync.
    symbolic link to the folder (a junction on Windows), so the person's tools and
    CLI agents find it where Drive folders appear. Disconnecting, quitting or
    switching workspaces removes the link; the folder is never touched.
+   *(Amended 2026-11-24, 0.2.98, [ADR 073](073-connections-belong-to-the-vault.md):
+   switching or closing workspaces no longer removes it, and irori links every
+   vault's connections again as it starts.)*
 3. **The path stays on the device.** `.irori/local-folders.json` in the hibachi
    holds the connection's name, place in contents, access and the folder's own
    name, never its path, which carries the person's account and often an email.

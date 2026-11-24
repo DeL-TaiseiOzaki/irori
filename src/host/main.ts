@@ -1751,15 +1751,7 @@ app
               owner === window ? [terminals.close(id)] : [],
             ),
           ]);
-          // Its vaults' cloud folders are let go unless another window has the vault.
-          for (const scopeId of only.scopeIds) {
-            if (!files.list().some((space) => space.scopeId === scopeId)) continue;
-            for (const connection of await cloud.connections(scopeId).catch(() => []))
-              if (['mounted', 'waiting', 'error'].includes(connection.state))
-                await changeCloud(scopeId, () =>
-                  cloud.disconnect(scopeId, connection.mountId),
-                ).catch((error) => console.warn('Cloud folder stayed connected', String(error)));
-          }
+          // Its vaults' connected folders stay connected: they belong to the vault (ADR 073).
         },
       };
     }
@@ -2018,6 +2010,17 @@ app
     };
     setMenu();
     languageChanged = setMenu;
+    // Every vault's connections are linked again as irori starts, not when a tab opens
+    // its workspace (ADR 073); the window shows each as it is linked.
+    void (async () => {
+      for (const space of files.list()) {
+        const linked = await cloud.connectAll(space.scopeId).catch((error) => {
+          console.warn('Connections were not linked', space.scopeId, String(error));
+          return false;
+        });
+        if (linked) emit({ type: 'files', scopeId: space.scopeId });
+      }
+    })();
     await createWindow().loaded;
     // An installed irori looks for a newer published version by itself; a development run and
     // the package smoke (IRORI_AUTOMATIC_UPDATE_CHECKS=0) only check when asked.

@@ -266,3 +266,29 @@ test('A link left where a repository shows: one leading nowhere gives way, one t
   await assert.rejects(again.connect(space.scopeId, mountId), /同じ名前|same name/);
   assert.equal(await readFile(path.join(entry, 'mine.md'), 'utf8'), '# Mine\n');
 });
+
+test('A registered clone is linked again when irori starts, without opening its workspace (ADR 073)', async (t) => {
+  const { files, space, cloud, base } = await repositoryFixture(t);
+  const clone = path.join(base, 'Mine');
+  await run('git', ['clone', '--quiet', url, clone]);
+  const { mountId } = await cloud.addRepository({
+    scopeId: space.scopeId,
+    url,
+    folder: clone,
+    existing: true,
+    contentsRoot: 'contents',
+    name: 'mine',
+  });
+  await cloud.connect(space.scopeId, mountId);
+  await cloud.close();
+  const entry = path.join(space.root, 'contents', 'mine');
+  await assert.rejects(lstat(entry), { code: 'ENOENT' });
+  const started = new CloudService(files);
+  started.repositories = cloud.repositories;
+  files.cloud = started;
+  assert.equal(await started.connectAll(space.scopeId), true);
+  assert.equal(await readlink(entry), clone);
+  assert.equal((await started.connections(space.scopeId))[0].state, 'mounted');
+  assert.equal((await files.read(space.scopeId, 'contents/mine/README.md')).text, '# Project\n');
+  await started.close();
+});

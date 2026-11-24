@@ -1,5 +1,18 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Connections stay connected, 2026-11-24 (**0.2.98**,
+[ADR 073](decisions/073-connections-belong-to-the-vault.md)): the owner saw
+GitHub repositories turn 未接続 with no detail. irori disconnected a vault's
+folders when it quit, when a tab or window closed and when a vault left a
+workspace, and linked them only when a tab opened the workspace. The host now
+links every vault's connections as it starts (`CloudService.connectAll`), and
+closing a tab or window or editing a workspace disconnects nothing.
+- Verified by `tests/local-folders.test.ts` and
+  `tests/repository-connections.test.ts` (a restarted service links a folder and
+  a clone again, waits for a missing folder, leaves an unchosen one).
+- Not covered: by hand in a packaged app; vaults on an SSH host are still linked
+  only when their workspace opens.
+
 Vaults work at once, 2026-11-24 (**0.2.97**,
 [#377](https://github.com/DeL-TaiseiOzaki/irori/pull/377), published as
 `v0.2.97-preview.1`): the
