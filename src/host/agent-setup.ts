@@ -23,6 +23,8 @@ import {
   workspaceSaved,
   routineRunRefused,
   routineStarted,
+  sshHostList,
+  hostFolders,
   type ListedVault,
 } from '../../prompts';
 import { parseIroriCommand } from '../domain/irori-command';
@@ -59,6 +61,7 @@ import { inspectRepository, type WorkspaceService } from './workspaces';
 import { githubRepository, repositoryFolder } from '../domain/git';
 import { renameLayerFolder } from './layer-folders';
 import type { WorkFolders } from './work-folders';
+import type { RemoteHosts } from './remote-hosts';
 
 /** What the `irori` command reaches in the host. */
 export interface AgentSetupHost {
@@ -82,6 +85,8 @@ export interface AgentSetupHost {
   work?: Pick<WorkFolders, 'folder' | 'choose'>;
   /** Where new vaults go when the command names no parent folder. */
   defaultParent: () => Promise<string>;
+  /** The person's SSH hosts and their vaults, where `--host` makes a vault (ADR 061, ADR 074). */
+  remote?: Pick<RemoteHosts, 'hosts' | 'list' | 'register' | 'create' | 'folders'>;
   /** Registers through the host's own guards and starts watching the vault. */
   register?: (
     root: string,
@@ -161,7 +166,7 @@ export interface SetupContext {
 type Joined = 'joined' | 'member' | 'no workspace';
 
 /** Forms only the irori agent has: they register, group or remove vaults, or start routines. */
-const irori = new Set(['clone', 'create', 'add', 'workspace', 'remove', 'run']);
+const irori = new Set(['clone', 'create', 'add', 'hosts', 'workspace', 'remove', 'run']);
 /**
  * Forms the person confirms each time: they add a folder agents may write in,
  * clone, create, register or remove a vault, or start a routine with its secrets. Any process
@@ -205,7 +210,7 @@ export class AgentSetup {
       );
     const relativePathArg =
       command.kind === 'add'
-        ? !path.isAbsolute(command.folder) && !/^~(?:[\\/]|$)/.test(command.folder)
+        ? !command.host && !path.isAbsolute(command.folder) && !/^~(?:[\\/]|$)/.test(command.folder)
         : command.kind === 'connect'
           ? !command.repository &&
             !path.isAbsolute(command.folder) &&
@@ -214,7 +219,7 @@ export class AgentSetup {
             ? !!command.folder &&
               !path.isAbsolute(command.folder) &&
               !/^~(?:[\\/]|$)/.test(command.folder)
-            : command.kind === 'clone' || command.kind === 'create'
+            : (command.kind === 'clone' || command.kind === 'create') && !command.host
               ? !!command.parent &&
                 !path.isAbsolute(command.parent) &&
                 !/^~(?:[\\/]|$)/.test(command.parent)
@@ -236,6 +241,8 @@ export class AgentSetup {
         return iroriCommandHelp(await this.host.defaultParent(), !!context.vault);
       case 'list':
         return this.list(context);
+      case 'hosts':
+        return this.hosts(command);
       case 'routines': {
         if (!this.host.routines) throw Error('Routines are not available here.');
         const workspace = context.vault ? undefined : await this.workspace(context);
@@ -249,10 +256,13 @@ export class AgentSetup {
         );
       }
       case 'clone':
-        return this.clone(command, cwd, context);
       case 'create':
-        return this.create(command, cwd, context);
+        if (command.host) return this.onHost(command, command.host, context);
+        return command.kind === 'clone'
+          ? this.clone(command, cwd, context)
+          : this.create(command, cwd, context);
       case 'add':
+        if (command.host) return this.onHost(command, command.host, context);
         return this.add(this.folder(cwd, command.folder), command, context);
       case 'connect':
         return this.connect(command, cwd, context);
@@ -319,8 +329,27 @@ export class AgentSetup {
         ),
         ...(this.host.work && { work: (await this.host.work.folder(space.scopeId)).path }),
       });
+    // The vaults on SSH hosts, which only the irori agent sees.
+    const far = context.vault ? [] : (this.host.remote?.list() ?? []);
+    for (const space of far)
+      vaults.push({
+        name: space.name,
+        root: space.root,
+        host: space.host.name,
+        inWorkspace: !!workspace?.scopeIds.includes(space.scopeId),
+        ...(space.category && { category: categoryName(space.category) }),
+        ...(hasLayer(space, 'Knowledge_Base') && {
+          knowledge: shownFolder(knowledgeFolder(space)),
+        }),
+        ...(hasLayer(space, 'contents') && { contents: space.contents }),
+        without: namedLayers
+          .filter((layer) => !hasLayer(space, layer))
+          .map((layer) => defaultLayerLabel(layer)),
+      });
     const names = (scopeIds: string[]) =>
-      scopeIds.map((id) => spaces.find((space) => space.scopeId === id)?.name ?? 'unavailable');
+      scopeIds.map(
+        (id) => [...spaces, ...far].find((space) => space.scopeId === id)?.name ?? 'unavailable',
+      );
     return vaultList(
       vaults,
       await this.host.defaultParent(),
@@ -452,6 +481,109 @@ export class AgentSetup {
     return vaultRegistered(
       { name: space.name, root: space.root, repository: inspection.repository },
       { already: false, joined: await this.join(space.scopeId, context) },
+    );
+  }
+  private get remote() {
+    if (!this.host.remote) throw Error('SSH hosts are not available here.');
+    return this.host.remote;
+  }
+  /** The SSH host a command names, by its name or its destination. */
+  private sshHost(name: string) {
+    const hosts = this.remote.hosts();
+    const wanted = name.trim().toLowerCase();
+    const found = hosts.filter(
+      (item) => item.name.toLowerCase() === wanted || item.destination.toLowerCase() === wanted,
+    );
+    if (found.length === 1) return found[0];
+    if (found.length)
+      throw Error(
+        `More than one SSH host is named "${name}": ${found.map((item) => item.destination).join(', ')}. Name it by its destination.`,
+      );
+    throw Error(
+      hosts.length
+        ? `No SSH host is named "${name}". irori has ${hosts.map((item) => JSON.stringify(item.name)).join(', ')}; "irori hosts" lists them. Another host is added by the person in irori's settings, under SSH ホスト (SSH hosts).`
+        : `irori has no SSH hosts. The person adds "${name}" in irori's settings, under SSH ホスト (SSH hosts), first.`,
+    );
+  }
+  /** A folder on a host: absolute, or taken from the host's home folder. */
+  private async hostFolder(hostId: string, value?: string) {
+    if (value?.startsWith('/')) return value;
+    const home = (await this.remote.folders(hostId)).path;
+    if (!value || value === '~') return home;
+    return path.posix.join(home, value.startsWith('~/') ? value.slice(2) : value);
+  }
+  /** `irori hosts`: the SSH hosts, or the folders in a folder of one. */
+  private async hosts(command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'hosts' }>) {
+    if (!command.host) {
+      const vaults = this.host.remote?.list() ?? [];
+      return sshHostList(
+        (this.host.remote?.hosts() ?? []).map((item) => ({
+          name: item.name,
+          destination: item.port ? `${item.destination}:${item.port}` : item.destination,
+          state: item.state,
+          vaults: vaults.filter((vault) => vault.host.id === item.id).map((vault) => vault.name),
+        })),
+      );
+    }
+    const host = this.sshHost(command.host);
+    return hostFolders(
+      host.name,
+      await this.remote.folders(host.id, await this.hostFolder(host.id, command.folder)),
+    );
+  }
+  /**
+   * `irori clone`, `create` and `add` with `--host` (ADR 074): the vault is made
+   * or registered on that SSH host, as the window's 「SSH ホストのフォルダを vault にする」
+   * does, and joins the request's workspace.
+   */
+  private async onHost(
+    command: Extract<
+      ReturnType<typeof parseIroriCommand>,
+      { kind: 'clone' } | { kind: 'create' } | { kind: 'add' }
+    >,
+    name: string,
+    context: SetupContext,
+  ) {
+    const host = this.sshHost(name);
+    const before = new Set(this.remote.list().map((vault) => vault.scopeId));
+    let vault: Space;
+    let notice: string | undefined;
+    let repository: string | undefined;
+    if (command.kind === 'add') {
+      const root = await this.hostFolder(host.id, command.folder);
+      vault = await this.remote.register(
+        host.id,
+        root,
+        command.name ?? (path.posix.basename(root) || root),
+        command.category,
+        command.layers,
+      );
+    } else {
+      if (command.kind === 'clone') {
+        repository = githubRepository(command.url);
+        if (!repository || !githubCloneURL(command.url))
+          throw Error(
+            `"${command.url}" is not a GitHub repository. Give its URL or owner/name, for example octo/notes.`,
+          );
+      }
+      const folder =
+        command.kind === 'clone' ? (command.folder ?? repository!.split('/')[1]) : command.folder;
+      ({ vault, notice } = await this.remote.create(host.id, {
+        ...(command.parent && { parent: await this.hostFolder(host.id, command.parent) }),
+        folder,
+        name: command.name ?? (command.kind === 'clone' ? repository!.split('/')[1] : folder),
+        ...(command.category && { category: command.category }),
+        ...(command.layers && { layers: command.layers }),
+        ...(command.kind === 'clone' && { url: command.url }),
+      }));
+    }
+    return vaultRegistered(
+      { name: vault.name, root: vault.root, host: host.name, repository },
+      {
+        already: before.has(vault.scopeId),
+        joined: await this.join(vault.scopeId, context),
+        notice,
+      },
     );
   }
   /**

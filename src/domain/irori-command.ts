@@ -24,6 +24,8 @@ export type IroriCommand =
   | { kind: 'help' }
   | { kind: 'list' }
   | { kind: 'routines' }
+  /** The SSH hosts irori has, or the folders in a folder of one (ADR 074). */
+  | { kind: 'hosts'; host?: string; folder?: string }
   | {
       kind: 'clone';
       url: string;
@@ -32,6 +34,8 @@ export type IroriCommand =
       name?: string;
       category?: Category;
       layers?: NamedLayer[];
+      /** The SSH host the vault goes on, by its name or destination (ADR 074). */
+      host?: string;
     }
   | {
       kind: 'create';
@@ -41,8 +45,16 @@ export type IroriCommand =
       category?: Category;
       /** The layers a vault irori declares for the first time has (ADR 072). */
       layers?: NamedLayer[];
+      host?: string;
     }
-  | { kind: 'add'; folder: string; name?: string; category?: Category; layers?: NamedLayer[] }
+  | {
+      kind: 'add';
+      folder: string;
+      name?: string;
+      category?: Category;
+      layers?: NamedLayer[];
+      host?: string;
+    }
   | {
       kind: 'connect';
       vault: string;
@@ -81,9 +93,10 @@ export type IroriCommand =
 export const iroriArgumentLimit = { count: 20, length: 4096 };
 
 const options: Record<Exclude<IroriCommand['kind'], 'help' | 'list' | 'routines'>, string[]> = {
-  clone: ['folder', 'parent', 'name', 'category', 'layers'],
-  create: ['parent', 'name', 'category', 'layers'],
-  add: ['name', 'category', 'layers'],
+  hosts: [],
+  clone: ['folder', 'parent', 'name', 'category', 'layers', 'host'],
+  create: ['parent', 'name', 'category', 'layers', 'host'],
+  add: ['name', 'category', 'layers', 'host'],
   connect: ['name', 'read-only', 'into', 'existing', 'branch', 'editable'],
   disconnect: [],
   set: ['name', 'category', 'knowledge-label', 'contents-label', 'layers', 'own', 'color', 'icon'],
@@ -102,6 +115,7 @@ const options: Record<Exclude<IroriCommand['kind'], 'help' | 'list' | 'routines'
 const flags = new Set(['read-only', 'also', 'leave', 'trash', 'default', 'editable']);
 /** The words each form takes, and how a wrong count is explained; a workspace takes one or more. */
 const positional: Record<keyof typeof options, [count: number, words: string]> = {
+  hosts: [2, 'at most an SSH host and a folder on it'],
   clone: [1, 'one repository'],
   create: [1, 'one folder'],
   add: [1, 'one folder'],
@@ -174,7 +188,7 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
   if (
     kind === 'workspace'
       ? !words.length
-      : kind === 'index' || kind === 'check'
+      : kind === 'index' || kind === 'check' || kind === 'hosts'
         ? words.length > count
         : kind === 'work'
           ? words.length !== (values.default === true ? 1 : 2)
@@ -209,8 +223,18 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
     layers = namedLayers.filter((layer) => chosen.some((word) => named[word] === layer));
   }
   // A vault irori declares for the first time takes its layers with it (ADR 072).
-  const starting = { ...common, ...(layers && { layers }) };
+  const starting = {
+    ...common,
+    ...(layers && { layers }),
+    ...(text('host') && { host: text('host')!.trim() }),
+  };
   switch (kind) {
+    case 'hosts':
+      return {
+        kind,
+        ...(words[0] && { host: words[0] }),
+        ...(words[1] && { folder: words[1] }),
+      };
     case 'clone': {
       return {
         kind,

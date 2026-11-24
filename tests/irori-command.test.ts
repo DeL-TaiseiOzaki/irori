@@ -604,6 +604,34 @@ test('layer knowledge . moves the knowledge folder to the vault’s root and bac
   assert.equal(await readFile(path.join(vault, 'Knowledge_Base', 'wiki', 'a.md'), 'utf8'), '# A\n');
 });
 
+test('create, add and clone take --host, and hosts lists the SSH hosts or a folder of one', () => {
+  assert.deepEqual(parseIroriCommand(['add', '~/lab', '--host', 'gpu']), {
+    kind: 'add',
+    folder: '~/lab',
+    host: 'gpu',
+  });
+  assert.deepEqual(parseIroriCommand(['create', 'Lab', '--host=gpu', '--parent', '/data']), {
+    kind: 'create',
+    folder: 'Lab',
+    parent: '/data',
+    host: 'gpu',
+  });
+  assert.deepEqual(parseIroriCommand(['clone', 'octo/kb', '--host', 'gpu']), {
+    kind: 'clone',
+    url: 'https://github.com/octo/kb.git',
+    host: 'gpu',
+  });
+  assert.deepEqual(parseIroriCommand(['hosts']), { kind: 'hosts' });
+  assert.deepEqual(parseIroriCommand(['hosts', 'gpu', '/data']), {
+    kind: 'hosts',
+    host: 'gpu',
+    folder: '/data',
+  });
+  assert.throws(() => parseIroriCommand(['hosts', 'gpu', 'a', 'b']), /at most an SSH host/);
+  assert.throws(() => parseIroriCommand(['add', 'x', '--host']), /--host needs a value/);
+  assert.throws(() => parseIroriCommand(['set', 'x', '--host', 'gpu']), /has no --host/);
+});
+
 test('create, add and clone take --layers for a vault irori declares, and ask for no category', async (t) => {
   const { base, files, setup } = await device(t);
   assert.deepEqual(parseIroriCommand(['create', 'Dev', '--layers', 'schema,contents']), {

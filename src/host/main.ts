@@ -577,6 +577,7 @@ app
       cloud,
       work,
       defaultParent,
+      remote,
       register: registerWatched,
       // As the settings and explorer do, but the irori agent's own hold on a vault does not count.
       update: (scopeId, change) => {

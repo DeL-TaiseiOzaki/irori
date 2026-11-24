@@ -19,7 +19,7 @@ import type { Ontology, OntologyFinding } from '../src/domain/ontology';
  * it; later requests in that session get `iroriCommandPointer` (ADR 039).
  */
 export const iroriCommandPreamble = [
-  "irori: the `irori` command is on your PATH. With it you do what the person does in irori to set up vaults, workspaces and routines: `irori list` shows the vaults, their layers, connected folders and the workspaces, `irori routines` the routines as irori reads them, and `irori help` gives every form. Your folder's .agents/skills holds the procedures for that work, and irori-guide says what irori can do. A vault you register is handed to you from the next request.",
+  "irori: the `irori` command is on your PATH. With it you do what the person does in irori to set up vaults, workspaces and routines: `irori list` shows the vaults, their layers, connected folders, the workspaces and the SSH hosts, `irori routines` the routines as irori reads them, and `irori help` gives every form. `irori create`, `clone` and `add` make a vault on this computer, or with `--host` on one of the person's SSH hosts. Your folder's .agents/skills holds the procedures for that work, and irori-guide says what irori can do. A vault you register is handed to you from the next request.",
   "Inside a vault, `irori move` and `irori trash` keep links, comments and records in step where `mv` and `rm` break them; hand such work to the vault's agent, whose own `irori` command does the same.",
   "A routine's secrets go only to its programs, inside irori; you never see them. Never ask the person for a secret's value: they enter it on the routines page.",
 ].join('\n');
@@ -52,8 +52,8 @@ note to irori's trash.${
       ? `
 
 You are a vault agent: every form reaches your own vault alone, named by
-its name or "." from its folder. clone, create, add, workspace, remove, run,
-call, ls, read, search and send are the irori agent's; the person asks it in
+its name or "." from its folder. clone, create, add, hosts, workspace, remove,
+run, call, ls, read, search and send are the irori agent's; the person asks it in
 irori mode. A secret's
 value, a routine's first review, accounts, updates and agent permissions
 stay with the person.
@@ -73,7 +73,8 @@ links, not [[wiki links]].`
 irori list
   The vaults on this computer: name, folder, GitHub repository, category,
   knowledge and contents folders, connected folders, the folder their agents
-  work in, and whether they are in this workspace. Then the workspaces, and where new vaults go.
+  work in, and whether they are in this workspace. Then the vaults on SSH
+  hosts, the workspaces, and where new vaults go.
 
 irori clone <GitHub URL or owner/name> [--folder <name>] [--parent <folder>] [--name <vault name>] [--category <category>] [--layers <layers>]
   Clones the repository into a new folder and registers it as a vault in
@@ -92,6 +93,20 @@ irori create <folder name> [--parent <folder>] [--name <vault name>] [--category
 irori add <folder> [--name <vault name>] [--category ...] [--layers <layers>]
   Registers a folder already on this computer, a Git checkout or a plain
   folder, and adds it to this workspace. One already registered just joins.
+
+clone, create and add take --host <SSH host> to make the vault on one of the
+person's SSH hosts instead, named as in "irori hosts". The folders are then
+the host's: absolute, or taken from its home folder (~), where new vaults go
+unless --parent names another. The vault lives and its agent runs there; once
+it is handed to you, it is read as the other vaults on SSH hosts are. A clone
+there uses the host's own Git sign-in.
+
+irori hosts [<SSH host> [<folder>]]
+  The SSH hosts the person added in irori's settings (SSH ホスト), with their
+  vaults. With a host, the folders in a folder of it (its home folder unless
+  one is named), those that are vaults marked: how to find a folder to add.
+  irori connects to the host when it has not; a host that asks for a password
+  asks the person in irori's window.
 
 irori move <path> <new path or folder>
   Moves or renames a note, file or folder in a vault's knowledge, as the
@@ -324,6 +339,8 @@ export function indexUpdated(
 export interface ListedVault {
   name: string;
   root: string;
+  /** The SSH host it lives on; `root` is then its folder there (ADR 061). */
+  host?: string;
   repository?: string;
   inWorkspace: boolean;
   category?: string;
@@ -356,10 +373,12 @@ export function vaultList(
   own = false,
 ) {
   if (own) return ['Your vault:', ...vaults.map(line(undefined))].join('\n');
-  const lines = vaults.map(line(workspace));
+  const here = vaults.filter((item) => !item.host);
+  const far = vaults.filter((item) => item.host);
   return [
-    vaults.length ? 'Vaults on this computer:' : 'No vaults on this computer yet.',
-    ...lines,
+    here.length ? 'Vaults on this computer:' : 'No vaults on this computer yet.',
+    ...here.map(line(workspace)),
+    ...(far.length ? ['Vaults on SSH hosts:', ...far.map(line(workspace))] : []),
     ...(workspaces.length
       ? [
           'Workspaces:',
@@ -393,22 +412,58 @@ const line = (workspace: string | undefined) => (item: ListedVault) => {
         .join(', ')}`,
     item.work && `work folder ${JSON.stringify(item.work)}`,
   ].filter(Boolean);
-  return `- ${item.name}: folder ${JSON.stringify(item.root)}${item.repository ? `, GitHub ${item.repository}` : ''}${workspace ? (item.inWorkspace ? ', in this workspace' : ', not in this workspace') : ''}${layers.length ? `; ${layers.join('; ')}` : ''}`;
+  return `- ${item.name}: folder ${JSON.stringify(item.root)}${item.host ? ` on the SSH host ${JSON.stringify(item.host)}` : ''}${item.repository ? `, GitHub ${item.repository}` : ''}${workspace ? (item.inWorkspace ? ', in this workspace' : ', not in this workspace') : ''}${layers.length ? `; ${layers.join('; ')}` : ''}`;
 };
 
 /** What became of one vault a command registered or found registered. */
 export function vaultRegistered(
-  vault: { name: string; root: string; repository?: string },
+  vault: { name: string; root: string; repository?: string; host?: string },
   outcome: { already: boolean; joined: 'joined' | 'member' | 'no workspace'; notice?: string },
 ) {
   return [
-    `${outcome.already ? 'Already a vault' : 'Registered the vault'} "${vault.name}" at ${JSON.stringify(vault.root)}${vault.repository ? ` (GitHub ${vault.repository})` : ''}.`,
+    `${outcome.already ? 'Already a vault' : 'Registered the vault'} "${vault.name}" at ${JSON.stringify(vault.root)}${vault.host ? ` on the SSH host ${JSON.stringify(vault.host)}` : ''}${vault.repository ? ` (GitHub ${vault.repository})` : ''}.`,
     outcome.joined === 'joined'
       ? 'Added it to this workspace; it is handed to you from the next request.'
       : outcome.joined === 'member'
         ? 'It is already in this workspace.'
         : 'No workspace sent this request, so it joined none; the person can add it on the start screen.',
     ...(outcome.notice ? [`Note: ${outcome.notice}`] : []),
+  ].join('\n');
+}
+
+/** `irori hosts`: the SSH hosts irori has, with their vaults. */
+export function sshHostList(
+  hosts: { name: string; destination: string; state: string; vaults: string[] }[],
+) {
+  if (!hosts.length)
+    return 'irori has no SSH hosts. The person adds one in irori\'s settings, under SSH ホスト (SSH hosts); then "irori add --host" and "irori create --host" make vaults there.';
+  return [
+    'SSH hosts:',
+    ...hosts.map(
+      (host) =>
+        `- ${host.name}: ${host.destination}, ${host.state}${host.vaults.length ? `; vaults ${host.vaults.join(', ')}` : '; no vaults yet'}`,
+    ),
+    'Name a host to list the folders in its home folder: irori hosts <host> [<folder>].',
+  ].join('\n');
+}
+
+/** `irori hosts <host> [<folder>]`: the folders in a folder of an SSH host. */
+export function hostFolders(
+  host: string,
+  listing: {
+    path: string;
+    parent?: string;
+    folders: { name: string; vault?: boolean }[];
+    more?: boolean;
+  },
+) {
+  return [
+    `Folders in ${JSON.stringify(listing.path)} on the SSH host ${JSON.stringify(host)}${listing.parent ? ` (the folder above is ${JSON.stringify(listing.parent)})` : ''}:`,
+    ...(listing.folders.length
+      ? listing.folders.map((folder) => `- ${folder.name}${folder.vault ? ' (a vault)' : ''}`)
+      : ['(none)']),
+    ...(listing.more ? ['...and more, not listed.'] : []),
+    'Hidden folders are not listed. Make one a vault with irori add <folder> --host <host>.',
   ].join('\n');
 }
 

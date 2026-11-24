@@ -7,6 +7,7 @@ import { categoryText } from '../domain/brains';
 import { layerSelection } from '../domain/layers';
 import { languages } from '../domain/i18n';
 import { remotePath, sentFileName, type RemoteHostAbout } from '../domain/remote-hosts';
+import { githubCloneURL } from '../domain/git';
 import type { VaultRead } from '../host/vault-reads';
 import type { HandOffResult } from '../agents/remote-vaults';
 
@@ -114,12 +115,32 @@ export const handedTask = z.object({
   task: z.string().min(1).max(32000),
 });
 
+/**
+ * A new vault the irori agent makes on the host (ADR 074): a new folder that
+ * is made a Git repository, or a clone of a GitHub repository, in `parent`
+ * (the host's home when none is named), registered with its first commit.
+ */
+export const newVault = z.object({
+  parent: remotePath.nullish(),
+  folder: name,
+  name,
+  category: categoryText.nullish(),
+  layers: layerSelection.nullish(),
+  url: z
+    .string()
+    .max(4096)
+    .refine((url) => !!githubCloneURL(url))
+    .nullish(),
+});
+export type NewVault = z.input<typeof newVault>;
+
 /** What a vault host answers beside the HostAPI's reads. */
 export const hostOperations = {
   spaces: z.tuple([]),
   folders: z.tuple([remotePath.optional()]),
   // JSON carries a missing category or choice of layers as null.
   registerVault: z.tuple([remotePath, name, categoryText.nullish(), layerSelection.nullish()]),
+  newVault: z.tuple([newVault]),
   unregisterVault: z.tuple([id]),
   brief: z.tuple([id, z.enum(agentIds)]),
   sendFile: z.tuple([

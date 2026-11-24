@@ -1,5 +1,13 @@
 # irori continuation handoff
 
+**The irori agent makes vaults on SSH hosts, 0.2.99**
+([ADR 074](decisions/074-the-irori-agent-makes-vaults-on-ssh-hosts.md)):
+`irori add`, `create` and `clone` take `--host`, and `irori hosts` lists the
+hosts and a folder's folders there. Next: with a real CLI agent and a real SSH
+host, ask the irori agent to make several folders there vaults and to create a
+new one, and check they join the workspace and are handed from the next
+request.
+
 **Connections stay connected, 0.2.98**
 ([ADR 073](decisions/073-connections-belong-to-the-vault.md)): irori links every
 vault's connections as it starts, and closing a tab or window no longer
