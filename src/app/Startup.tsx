@@ -2,9 +2,9 @@ import { Dialog } from './Dialog';
 import { MagnetTabs } from './obsidian/MagnetTabs';
 import { ArrowFillButton } from './obsidian/ArrowFillButton';
 import { useEffect, useState } from 'react';
-import type { AgentAccess, Category, Space, WorkspaceProfile } from '../domain/types';
+import type { AgentAccess, Space, WorkspaceProfile } from '../domain/types';
 import type { OpenTab } from '../domain/workspace-tabs';
-import { categoryChoices, categoryName, categoryValue } from '../domain/brains';
+import { namedLayers, type NamedLayer } from '../domain/layers';
 import { appIcon, appVersion } from './branding';
 import { BrainTile } from './BrainTile';
 import { Icon } from './Icon';
@@ -16,7 +16,8 @@ import { t } from '../domain/i18n';
 import { ErrorMessage, errorText } from './ErrorMessage';
 import { PublishFields, initialPublish, publishReady } from './GitHubPublish';
 import { RestoreEnvironment } from './AccountSync';
-import { CategoryField, RemoveVault } from './BrainSettings';
+import { RemoveVault } from './BrainSettings';
+import { LayerChoice } from './LayerChoice';
 import { RemoteFolderDialog, RemoteHostChoice } from './RemoteHosts';
 import type { RemoteHost } from '../domain/remote-hosts';
 import './startup.css';
@@ -27,19 +28,15 @@ export function RegisterSpace({
   onRegistered,
   onCancel,
   mode = 'folder',
-  categories,
 }: {
   onRegistered: (space: Space) => void;
   onCancel: () => void;
   mode?: RegisterMode;
-  /** The categories to offer; the presets when not given. */
-  categories?: readonly Category[];
 }) {
   const [folder, setFolder] = useState(''),
-    [name, setName] = useState(''),
-    [typed, setTyped] = useState('');
-  // An empty field keeps the first preset, as registration always has.
-  const category = categoryValue(typed) ?? 'personal';
+    [name, setName] = useState('');
+  // The layers the new vault has (ADR 072); a category is given later, in its settings, if at all.
+  const [layers, setLayers] = useState<NamedLayer[]>(() => [...namedLayers]);
   const [way, setWay] = useState(mode),
     [url, setUrl] = useState(''),
     [parent, setParent] = useState(''),
@@ -65,7 +62,7 @@ export function RegisterSpace({
       parent,
       folder: cloneName,
       name: name.trim() || cloneName,
-      category,
+      layers,
     });
     if (!publishing && !result.notice) return onRegistered(result.space);
     // From here the vault exists; what follows can only add a notice to it.
@@ -97,7 +94,7 @@ export function RegisterSpace({
         setFolder(result.path);
         setCloneNotice(result.notice ?? '');
         if (!name) setName(cloneName);
-      } else onRegistered(await host.register(folder, name, category));
+      } else onRegistered(await host.register(folder, name, undefined, layers));
     });
   }
   const ways = (
@@ -121,7 +118,6 @@ export function RegisterSpace({
     return (
       <RemoteFolderDialog
         remote={remote}
-        categories={categories}
         onCancel={() => setRemote(undefined)}
         onRegistered={onRegistered}
       />
@@ -333,19 +329,7 @@ export function RegisterSpace({
                 onChange={(e) => setName(e.target.value)}
               />
             </label>
-            <details>
-              <summary>{t('分類', 'Category')}</summary>
-              <label>
-                <CategoryField
-                  label={t('スペースの種類', 'Space type')}
-                  value={typed}
-                  choices={categories}
-                  placeholder={categoryName('personal')}
-                  disabled={busy || !!created}
-                  onChange={setTyped}
-                />
-              </label>
-            </details>
+            <LayerChoice value={layers} disabled={busy || !!created} onChange={setLayers} />
             {creating ? (
               <>
                 <label className="checkbox-row">
@@ -728,7 +712,6 @@ export function Startup({
       {adding && (
         <RegisterSpace
           mode={adding}
-          categories={categoryChoices(spaces)}
           onCancel={() => setAdding(undefined)}
           onRegistered={(space) => {
             setSelected((value) => [...value, space.scopeId]);

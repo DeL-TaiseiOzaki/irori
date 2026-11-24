@@ -18,6 +18,8 @@ There are four ways to add one.
 
 A new vault starts as a Git repository. You can also choose to [publish it to GitHub](git.md#section-4).
 
+Each of these forms has **The layers this vault has**. Leave both Knowledge and Contents on for a knowledge base, or turn Knowledge off for a repository of code, whose files then show in Contents. A folder that is already a vault keeps the layers it declares. You can change the choice later in the vault's settings; see [choosing a vault's layers](layers.md).
+
 ## Create a workspace
 
 A workspace is a selection of vaults to use together. Select them on the startup screen, name the workspace, and choose **Create workspace**.

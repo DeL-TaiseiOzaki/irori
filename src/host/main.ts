@@ -33,6 +33,7 @@ import { relink } from './relink';
 import { carryMove, renameLayerFolder } from './layer-folders';
 import { appendUpload, discardUpload } from './entries';
 import { classify, ownContents } from '../domain/scopes';
+import type { NamedLayer } from '../domain/layers';
 import { DraftService } from './drafts';
 import { writeExclusive } from './local-json';
 import { UpdateService } from './updates';
@@ -517,9 +518,14 @@ app
       error: (error) => console.warn('Watchers could not be refreshed', String(error)),
     });
     const defaultParent = async () => path.dirname((await you.load()).root);
-    const registerWatched = (root: string, name: string, category: Category) =>
+    const registerWatched = (
+      root: string,
+      name: string,
+      category?: Category,
+      layers?: NamedLayer[],
+    ) =>
       changeFiles(async () => {
-        const space = await files.register(root, name, category);
+        const space = await files.register(root, name, category, layers);
         // A vault is registered in one place only: one on an SSH host stays there (ADR 061).
         if (remote.has(space.scopeId)) {
           await files.unregister(space.scopeId);
@@ -1212,8 +1218,8 @@ app
       removeRemoteHost: (id) => remote.removeHost(id),
       connectRemoteHost: (id) => remote.connect(id),
       remoteFolders: (hostId, folder) => remote.folders(hostId, folder),
-      registerRemote: (hostId, root, name, category) =>
-        remote.register(hostId, root, name, category),
+      registerRemote: (hostId, root, name, category, layers) =>
+        remote.register(hostId, root, name, category, layers),
       setWorkFolder: async (scopeId, folder) => {
         const chosen = await work.choose(scopeId, folder);
         emit({ type: 'files', scopeId });
@@ -1230,7 +1236,7 @@ app
         });
         return choice.canceled ? null : choice.filePaths[0];
       },
-      register: async (root, name, category) => {
+      register: async (root, name, category, layers) => {
         whenSettled(
           t(
             '実行中の処理を止めてから登録してください。',
@@ -1239,7 +1245,7 @@ app
         );
         const inspection = await inspectRepository(root);
         if (inspection.kind === 'unavailable') throw Error(inspection.detail);
-        return registerWatched(root, name, category);
+        return registerWatched(root, name, category, layers);
       },
       createSpace: async (input) => {
         whenSettled(
@@ -1251,7 +1257,9 @@ app
         const root = await git.create(input);
         let space: Space;
         try {
-          space = await changeFiles(() => files.register(root, input.name, input.category));
+          space = await changeFiles(() =>
+            files.register(root, input.name, input.category, input.layers),
+          );
         } catch (error) {
           await git.abandon(root);
           throw error;

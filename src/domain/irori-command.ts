@@ -31,9 +31,18 @@ export type IroriCommand =
       parent?: string;
       name?: string;
       category?: Category;
+      layers?: NamedLayer[];
     }
-  | { kind: 'create'; folder: string; parent?: string; name?: string; category?: Category }
-  | { kind: 'add'; folder: string; name?: string; category?: Category }
+  | {
+      kind: 'create';
+      folder: string;
+      parent?: string;
+      name?: string;
+      category?: Category;
+      /** The layers a vault irori declares for the first time has (ADR 072). */
+      layers?: NamedLayer[];
+    }
+  | { kind: 'add'; folder: string; name?: string; category?: Category; layers?: NamedLayer[] }
   | {
       kind: 'connect';
       vault: string;
@@ -72,9 +81,9 @@ export type IroriCommand =
 export const iroriArgumentLimit = { count: 20, length: 4096 };
 
 const options: Record<Exclude<IroriCommand['kind'], 'help' | 'list' | 'routines'>, string[]> = {
-  clone: ['folder', 'parent', 'name', 'category'],
-  create: ['parent', 'name', 'category'],
-  add: ['name', 'category'],
+  clone: ['folder', 'parent', 'name', 'category', 'layers'],
+  create: ['parent', 'name', 'category', 'layers'],
+  add: ['name', 'category', 'layers'],
   connect: ['name', 'read-only', 'into', 'existing', 'branch', 'editable'],
   disconnect: [],
   set: ['name', 'category', 'knowledge-label', 'contents-label', 'layers', 'own', 'color', 'icon'],
@@ -181,6 +190,26 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
     ...(text('name') && { name: text('name')!.trim() }),
     ...(category && { category }),
   };
+  // Schema is always there; naming it is how a vault of Schema alone is asked for.
+  let layers: NamedLayer[] | undefined;
+  if (text('layers') !== undefined) {
+    const named: Record<string, NamedLayer | undefined> = {
+      schema: undefined,
+      knowledge: 'Knowledge_Base',
+      contents: 'contents',
+    };
+    const chosen = text('layers')!
+      .split(/[\s,]+/)
+      .filter(Boolean)
+      .map((word) => word.toLowerCase());
+    if (!chosen.length || chosen.some((word) => !Object.hasOwn(named, word)))
+      throw Error(
+        '--layers lists the layers the vault has, separated by commas: schema, knowledge, contents. Schema is always one of them.',
+      );
+    layers = namedLayers.filter((layer) => chosen.some((word) => named[word] === layer));
+  }
+  // A vault irori declares for the first time takes its layers with it (ADR 072).
+  const starting = { ...common, ...(layers && { layers }) };
   switch (kind) {
     case 'clone': {
       return {
@@ -188,7 +217,7 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
         url: githubRepositoryURL(words[0]),
         ...(text('folder') && { folder: text('folder') }),
         ...(text('parent') && { parent: text('parent') }),
-        ...common,
+        ...starting,
       };
     }
     case 'create':
@@ -196,10 +225,10 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
         kind,
         folder: words[0],
         ...(text('parent') && { parent: text('parent') }),
-        ...common,
+        ...starting,
       };
     case 'add':
-      return { kind, folder: words[0], ...common };
+      return { kind, folder: words[0], ...starting };
     case 'connect': {
       const name = text('name') && { name: text('name')!.trim() };
       if (!githubCloneURL(words[1])) {
@@ -247,24 +276,6 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
         if (label.length > 40 || /[\r\n]/.test(label))
           throw Error(`--${key} is one line of at most 40 characters.`);
         labels[layer] = label;
-      }
-      // Schema is always there; naming it is how a vault of Schema alone is asked for.
-      let layers: NamedLayer[] | undefined;
-      if (text('layers') !== undefined) {
-        const named: Record<string, NamedLayer | undefined> = {
-          schema: undefined,
-          knowledge: 'Knowledge_Base',
-          contents: 'contents',
-        };
-        const words = text('layers')!
-          .split(/[\s,]+/)
-          .filter(Boolean)
-          .map((word) => word.toLowerCase());
-        if (!words.length || words.some((word) => !Object.hasOwn(named, word)))
-          throw Error(
-            '--layers lists the layers the vault has, separated by commas: schema, knowledge, contents. Schema is always one of them.',
-          );
-        layers = namedLayers.filter((layer) => words.some((word) => named[word] === layer));
       }
       let own: NamedLayer | undefined;
       if (text('own') !== undefined) {

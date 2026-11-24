@@ -111,6 +111,47 @@ test('The layers are kept in scope.json and come back as they were', async (t) =
   assert.equal('layers' in (await meta()), false);
 });
 
+test('A vault is registered with the layers chosen for it, and with a category only when given', async (t) => {
+  const { base, files } = await fixture(t);
+  const make = async (name: string) => {
+    const root = path.join(base, name);
+    await mkdir(root);
+    return root;
+  };
+  const read = async (root: string) =>
+    JSON.parse(await readFile(path.join(root, '.irori/scope.json'), 'utf8'));
+
+  const code = await make('Code');
+  const workspace = await files.register(code, 'Code', undefined, ['contents']);
+  assert.deepEqual(workspace.layers, ['contents']);
+  assert.equal(workspace.category, undefined);
+  assert.deepEqual((await read(code)).layers, ['contents']);
+  assert.equal('category' in (await read(code)), false);
+
+  // Both layers is what a vault has anyway: no field, as before.
+  const whole = await files.register(await make('Whole'), 'Whole', 'team', [
+    'Knowledge_Base',
+    'contents',
+  ]);
+  assert.equal(whole.layers, undefined);
+  assert.equal(whole.category, 'team');
+
+  // A folder that declares itself already is taken as it is.
+  await files.unregister(workspace.scopeId);
+  const again = await files.register(code, 'Other name', 'personal', ['Knowledge_Base']);
+  assert.deepEqual([again.name, again.category, again.layers], ['Code', undefined, ['contents']]);
+
+  assert.deepEqual(hostArguments.register.parse([code, 'Code', undefined, ['contents']])[3], [
+    'contents',
+  ]);
+  assert.equal(hostArguments.register.parse([code, 'Code']).length, 2);
+  assert.deepEqual(
+    hostArguments.createSpace.parse([{ parent: base, folder: 'New', name: 'New', layers: [] }])[0]
+      .layers,
+    [],
+  );
+});
+
 test('A vault without Knowledge takes no note, and a layer left out keeps its folder', async (t) => {
   const { files, id } = await fixture(t);
   await files.createNote(id, 'Before');

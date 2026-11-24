@@ -604,6 +604,46 @@ test('layer knowledge . moves the knowledge folder to the vault’s root and bac
   assert.equal(await readFile(path.join(vault, 'Knowledge_Base', 'wiki', 'a.md'), 'utf8'), '# A\n');
 });
 
+test('create, add and clone take --layers for a vault irori declares, and ask for no category', async (t) => {
+  const { base, files, setup } = await device(t);
+  assert.deepEqual(parseIroriCommand(['create', 'Dev', '--layers', 'schema,contents']), {
+    kind: 'create',
+    folder: 'Dev',
+    layers: ['contents'],
+  });
+  assert.deepEqual(parseIroriCommand(['add', '.', '--layers', 'knowledge']), {
+    kind: 'add',
+    folder: '.',
+    layers: ['Knowledge_Base'],
+  });
+  assert.throws(
+    () => parseIroriCommand(['clone', 'octo/app', '--layers', 'code']),
+    /--layers lists/,
+  );
+
+  // A repository of code becomes a workspace vault in one step.
+  const code = path.join(base, 'Code');
+  await mkdir(path.join(code, 'src'), { recursive: true });
+  await setup.run(['add', code, '--layers', 'schema,contents'], base);
+  const added = files.list().find((space) => space.root.endsWith('Code'))!;
+  assert.deepEqual(added.layers, ['contents']);
+  // No category unless one is given: the list names none.
+  assert.equal(added.category, undefined);
+  const listed = await setup.run(['list'], base);
+  assert.match(listed, /- Code: .*no Knowledge layer; own files in Contents/);
+  assert.doesNotMatch(listed, /- Code: .*category/);
+
+  // A folder that already holds a vault's declaration keeps its own layers.
+  await setup.run(['remove', 'Code'], base);
+  await setup.run(['add', code, '--name', 'Again', '--layers', 'schema,knowledge'], base);
+  assert.deepEqual(files.list().find((space) => space.root.endsWith('Code'))!.layers, ['contents']);
+
+  await setup.run(['create', 'Notes', '--parent', base, '--category', '研究室'], base);
+  const notes = files.list().find((space) => space.name === 'Notes')!;
+  assert.equal(notes.layers, undefined);
+  assert.equal(notes.category, '研究室');
+});
+
 test('set --layers chooses the layers a vault has, and list says which it left out', async (t) => {
   const { base, files, setup } = await device(t);
   const vault = path.join(base, 'Dev');
@@ -615,7 +655,7 @@ test('set --layers chooses the layers a vault has, and list says which it left o
   // A workspace for code: Schema and Contents, no notes.
   assert.match(
     await setup.run(['set', 'Dev', '--layers', 'schema,contents'], base),
-    /^The vault is now "Dev", category .*, with the layers Schema, Contents, its own files in Contents\./,
+    /^The vault is now "Dev", with the layers Schema, Contents, its own files in Contents\./,
   );
   assert.deepEqual(files.get(id).layers, ['contents']);
   const listed = await setup.run(['list'], base);

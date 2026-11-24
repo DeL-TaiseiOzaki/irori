@@ -86,7 +86,9 @@ export interface CreateSpace {
   /** The new folder's name. */
   folder: string;
   name: string;
-  category: import('./types').Category;
+  category?: import('./types').Category;
+  /** The Knowledge and Contents layers the new vault has; both when not given (ADR 072). */
+  layers?: import('./layers').NamedLayer[];
 }
 export interface CreatedSpace {
   space: import('./types').Space;

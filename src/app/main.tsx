@@ -205,7 +205,6 @@ import { StatusBar } from './StatusBar';
 import { TerminalDrawer } from './TerminalDrawer';
 import { errorText } from './ErrorMessage';
 import { hostEvents } from './host-events';
-import { categoryChoices } from '../domain/brains';
 const host = window.irori;
 /**
  * A backlink points at a link on the line, a search hit at matching text and a
@@ -4637,7 +4636,6 @@ function App() {
       )}
       {add && (
         <RegisterSpace
-          categories={categoryChoices(spaces)}
           onCancel={() => setAdd(false)}
           onRegistered={(space) => {
             setAdd(false);

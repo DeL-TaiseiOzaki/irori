@@ -75,18 +75,21 @@ irori list
   knowledge and contents folders, connected folders, the folder their agents
   work in, and whether they are in this workspace. Then the workspaces, and where new vaults go.
 
-irori clone <GitHub URL or owner/name> [--folder <name>] [--parent <folder>] [--name <vault name>] [--category <category>]
+irori clone <GitHub URL or owner/name> [--folder <name>] [--parent <folder>] [--name <vault name>] [--category <category>] [--layers <layers>]
   Clones the repository into a new folder and registers it as a vault in
   this workspace. A repository already registered here joins the workspace
   instead. The folder is the repository's name unless --folder says otherwise.
-  --category is personal, team, organization or a name of your own, one line
-  of at most 40 characters.
+  --category is optional: personal, team, organization or a name of your
+  own, one line of at most 40 characters. A vault has none unless given one.
+  --layers says which layers the vault has, as for "irori set": a repository
+  of code is schema,contents. It counts for a vault irori declares for the
+  first time; a folder that already holds a vault's declaration keeps its own.
 
-irori create <folder name> [--parent <folder>] [--name <vault name>] [--category ...]
+irori create <folder name> [--parent <folder>] [--name <vault name>] [--category ...] [--layers <layers>]
   Makes a new vault: an empty folder, a Git repository on main, and a first
   commit of what irori writes there. It has no GitHub repository yet.
 
-irori add <folder> [--name <vault name>] [--category ...]
+irori add <folder> [--name <vault name>] [--category ...] [--layers <layers>]
   Registers a folder already on this computer, a Git checkout or a plain
   folder, and adds it to this workspace. One already registered just joins.
 

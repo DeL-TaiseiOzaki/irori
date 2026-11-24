@@ -734,7 +734,16 @@ export interface HostAPI {
   setWorkFolder(scopeId: string, folder: string | null): Promise<WorkFolder>;
   /** Shows the vault's work folder in the system file manager, making the default one first. */
   openWorkFolder(scopeId: string): Promise<void>;
-  register(root: string, name: string, category: Category): Promise<Space>;
+  /**
+   * Registers a folder as a vault; `category` and `layers` go into a
+   * declaration irori writes, never over one the folder has (ADR 072).
+   */
+  register(
+    root: string,
+    name: string,
+    category?: Category,
+    layers?: import('./layers').NamedLayer[],
+  ): Promise<Space>;
   /** The SSH hosts this device knows, with whether each is connected (ADR 061). */
   remoteHosts(): Promise<import('./remote-hosts').RemoteHost[]>;
   /**
@@ -762,7 +771,13 @@ export interface HostAPI {
    * Registers a folder of an SSH host as a vault. One whose id is already
    * registered on this device or on another host is refused.
    */
-  registerRemote(hostId: string, root: string, name: string, category: Category): Promise<Space>;
+  registerRemote(
+    hostId: string,
+    root: string,
+    name: string,
+    category?: Category,
+    layers?: import('./layers').NamedLayer[],
+  ): Promise<Space>;
   /** Makes a new folder a Git repository and registers it as a vault. */
   createSpace(input: import('./git').CreateSpace): Promise<import('./git').CreatedSpace>;
   /**

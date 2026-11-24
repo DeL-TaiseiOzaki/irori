@@ -148,8 +148,11 @@ try {
   await page.getByRole('button', { name: 'KBフォルダを開く' }).click();
   await page.getByLabel('KBフォルダ', { exact: true }).fill(kb);
   await page.getByLabel('スペース名', { exact: true }).fill('プロダクト');
-  await page.getByText('分類', { exact: true }).click();
-  await page.getByLabel('スペースの種類').fill('チーム');
+  // A new vault has all three layers unless chosen otherwise, and no category is asked (ADR 072).
+  const layerChoice = page.getByRole('group', { name: 'この vault が持つ層' });
+  await expect(layerChoice.getByRole('checkbox', { name: 'Knowledge' })).toBeChecked();
+  await expect(layerChoice.getByRole('checkbox', { name: 'Contents' })).toBeChecked();
+  await expect(page.getByText('分類', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '登録して開く' }).click();
   await page.getByRole('button', { name: '選択したスペースを開く' }).click();
   // The workspace opens on the first brain's home.

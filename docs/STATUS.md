@@ -1,8 +1,21 @@
 # Implementation status — notes, native agents and connection onboarding
 
+A new vault chooses its layers, 2026-11-24 (**0.2.96**,
+[ADR 072](decisions/072-a-new-vault-chooses-its-layers.md); not yet merged or
+published): the forms that make a vault (`RegisterSpace`, `RemoteFolderDialog`)
+show the layer choice of the settings (`LayerChoice`) and no longer ask for a
+category, which the owner called an empty form; a new vault carries none.
+`register`, `registerRemote`, `createSpace` and the vault host's
+`registerVault` take an optional category and the layers, applied only to a
+declaration irori writes. `irori clone`, `create` and `add` take `--layers`.
+- Verified on Linux: `npm run build`, `npm run format:check`, `npm test` except
+  the `ssh -G` test that fails on this shared host without the change.
+- Not covered: the SSH host's form against a real host; macOS and Windows.
+
 A vault's own files can be its Contents, 2026-11-24 (**0.2.95**,
-[ADR 071](decisions/071-a-vaults-own-files-in-contents.md); not yet merged or
-published): asked which layer the files at the top of a Schema + Contents vault
+[ADR 071](decisions/071-a-vaults-own-files-in-contents.md),
+[#375](https://github.com/DeL-TaiseiOzaki/irori/pull/375), published as
+`v0.2.95-preview.1`): asked which layer the files at the top of a Schema + Contents vault
 belong to, the owner chose Contents, so that a repository of code is a vault as
 it is. `ownLayer` in `src/domain/scopes.ts` gives the layer of a vault's own
 files (Knowledge, else Contents, else Schema); `rootLayer: "contents"` in
@@ -12,8 +25,14 @@ place (`own` in `src/cloud/service.ts`), so the explorer's operations and saves
 work as in an editable connection; Git tracks these files (`boundary` blocks only
 a contents folder). The settings' 層, `irori set --own` and the vault agent's
 introduction follow.
+- Published from `25528cf` (publish run `45346674563`). Anonymous downloads
+  matched `SHA256SUMS.txt`: Windows 179,433,472 bytes, Mac 145,709,667 bytes,
+  `irori-0.2.95-full.nupkg` 178,602,928 bytes.
 - Verified on Linux: `npm run build`, `npm run format:check`, `npm test` except
-  the `ssh -G` test that fails on this shared host without the change.
+  the `ssh -G` test that fails on this shared host without the change; the UI
+  smokes in pull request CI. The pull request's `verify` job once ran into its
+  20-minute limit in `test:website`, after every application check had passed,
+  and passed when run again.
 - Not covered: search in these files; a real CLI agent; macOS and Windows.
 
 A vault chooses its layers, 2026-11-23 (**0.2.94**,
