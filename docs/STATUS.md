@@ -1,8 +1,24 @@
 # Implementation status — notes, native agents and connection onboarding
 
+A vault's own files can be its Contents, 2026-11-24 (**0.2.95**,
+[ADR 071](decisions/071-a-vaults-own-files-in-contents.md); not yet merged or
+published): asked which layer the files at the top of a Schema + Contents vault
+belong to, the owner chose Contents, so that a repository of code is a vault as
+it is. `ownLayer` in `src/domain/scopes.ts` gives the layer of a vault's own
+files (Knowledge, else Contents, else Schema); `rootLayer: "contents"` in
+`.irori/scope.json` chooses Contents in a vault with both layers, beside a named
+knowledge folder. The cloud service serves the vault's root as one more editable
+place (`own` in `src/cloud/service.ts`), so the explorer's operations and saves
+work as in an editable connection; Git tracks these files (`boundary` blocks only
+a contents folder). The settings' 層, `irori set --own` and the vault agent's
+introduction follow.
+- Verified on Linux: `npm run build`, `npm run format:check`, `npm test` except
+  the `ssh -G` test that fails on this shared host without the change.
+- Not covered: search in these files; a real CLI agent; macOS and Windows.
+
 A vault chooses its layers, 2026-11-23 (**0.2.94**,
-[ADR 070](decisions/070-a-vault-chooses-its-layers.md); not yet merged or
-published): the owner asked for a vault of Schema and Contents alone, a
+[ADR 070](decisions/070-a-vault-chooses-its-layers.md),
+[#373](https://github.com/DeL-TaiseiOzaki/irori/pull/373), merged 2026-11-24): the owner asked for a vault of Schema and Contents alone, a
 workspace for code beside a knowledge-base vault, and then for any vault to
 choose its layers. `layers` in `.irori/scope.json` names the Knowledge and
 Contents layers a vault has (`hasLayer` in `src/domain/layers.ts`); none
@@ -11,6 +27,9 @@ in Schema; a declared contents folder stays Contents while that layer is out.
 The settings' 層, `irori set --layers`, `irori list`, the vault panel, the vault
 beside, the home, the overview and the vault agent's introduction follow the
 choice. Nothing on disk moves.
+- Published as `v0.2.94-preview.1` from `9830e28` (publish run `45338254918`).
+  Anonymous downloads matched `SHA256SUMS.txt`: Windows 179,431,424 bytes, Mac
+  145,721,092 bytes, `irori-0.2.94-full.nupkg` 178,600,225 bytes.
 - Verified on Linux: `npm run build`, `npm run format:check`, and `npm test`
   except the `ssh -G` test that fails on this shared host without the change.
   `scripts/vault-layers-ui-smoke.ts` is new and was not run here (no display);
