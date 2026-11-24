@@ -31,6 +31,7 @@ import { t } from '../domain/i18n';
 import { baseName } from '../domain/paths';
 import { BrainTile, glyphs } from './BrainTile';
 import { Dialog } from './Dialog';
+import { LayerChoice } from './LayerChoice';
 import { Icon } from './Icon';
 import { ErrorMessage, errorText } from './ErrorMessage';
 import { useAction } from './useAction';
@@ -505,32 +506,7 @@ export function BrainSettings({
                 )}
               </p>
             )}
-            <fieldset className="brain-sheet-layer-choice">
-              <legend>{t('この vault が持つ層', 'The layers this vault has')}</legend>
-              <label>
-                <input type="checkbox" checked disabled readOnly />
-                <Icon name="schema" size={15} className="layer-icon schema" />
-                {defaultLayerLabel('schema')}
-              </label>
-              {namedLayers.map((layer) => (
-                <label key={layer}>
-                  <input
-                    type="checkbox"
-                    checked={has(layer)}
-                    disabled={running}
-                    onChange={(event) =>
-                      setChosen(
-                        namedLayers.filter((item) =>
-                          item === layer ? event.target.checked : has(item),
-                        ),
-                      )
-                    }
-                  />
-                  <Icon name={layerIcons[layer]} size={15} className={`layer-icon ${layer}`} />
-                  {defaultLayerLabel(layer)}
-                </label>
-              ))}
-            </fieldset>
+            <LayerChoice value={chosen} disabled={running} onChange={setChosen} />
             <p className="brain-sheet-note">
               {t(
                 '外した層は表示されず、ノートや接続を受け付けません。ファイルは動かず、選び直すと元に戻ります。vault 直下のファイル（Schema と Contents のフォルダ以外）は、Knowledge があれば Knowledge、なければ Contents に並びます。',

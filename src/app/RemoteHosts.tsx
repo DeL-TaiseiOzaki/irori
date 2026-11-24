@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import type { Category, Space } from '../domain/types';
+import type { Space } from '../domain/types';
 import type {
   RemoteFolders,
   RemoteHost,
@@ -8,13 +8,13 @@ import type {
   SshConfigHost,
 } from '../domain/remote-hosts';
 import { remotePath, sshDestination } from '../domain/remote-hosts';
-import { categoryChoices, categoryName, categoryValue } from '../domain/brains';
+import { namedLayers, type NamedLayer } from '../domain/layers';
 import { baseName } from '../domain/paths';
 import { t } from '../domain/i18n';
 import { Dialog } from './Dialog';
 import { Icon } from './Icon';
 import { ErrorMessage, errorText } from './ErrorMessage';
-import { CategoryField } from './BrainSettings';
+import { LayerChoice } from './LayerChoice';
 import { hostEvents } from './host-events';
 import { useAction } from './useAction';
 import { useResource } from './useResource';
@@ -589,7 +589,6 @@ export function RemoteHostsSettings({
       {choosing && (
         <RemoteFolderDialog
           remote={choosing}
-          categories={categoryChoices(spaces.data ?? [])}
           onCancel={() => setChoosing(undefined)}
           onRegistered={(space) => {
             setChoosing(undefined);
@@ -780,24 +779,23 @@ export function RemoteHostChoice({ onChoose }: { onChoose: (remote: RemoteHost) 
 /**
  * Choosing a folder of an SSH host to make a vault: the folder on show, the one
  * above, the folders in it (those that are vaults marked) and a path to type;
- * then the vault's name and category. The host connects first when it has not.
+ * then the vault's name and layers. The host connects first when it has not.
  */
 export function RemoteFolderDialog({
   remote: chosen,
-  categories,
   onRegistered,
   onCancel,
 }: {
   remote: RemoteHost;
-  categories?: readonly Category[];
   onRegistered: (space: Space) => void;
   onCancel: () => void;
 }) {
   const remote = useRemoteHosts().hosts?.find((item) => item.id === chosen.id) ?? chosen;
   const [folder, setFolder] = useState<string>();
   const [typed, setTyped] = useState('');
-  const [name, setName] = useState(''),
-    [category, setCategory] = useState('');
+  const [name, setName] = useState('');
+  // The layers a folder that is not a vault yet has as one (ADR 072).
+  const [layers, setLayers] = useState<NamedLayer[]>(() => [...namedLayers]);
   const [retry, setRetry] = useState(0);
   // Opening this is asking for the host: a login given no answer before asks again, and a
   // failure of a moment ago is tried again. Sent before the folders are asked for.
@@ -834,7 +832,8 @@ export function RemoteFolderDialog({
           chosen.id,
           shown.path,
           name.trim() || fallback,
-          categoryValue(category) ?? 'personal',
+          undefined,
+          layers,
         ),
       ),
     );
@@ -960,19 +959,7 @@ export function RemoteFolderDialog({
                 onChange={(event) => setName(event.target.value)}
               />
             </label>
-            <details>
-              <summary>{t('分類', 'Category')}</summary>
-              <label>
-                <CategoryField
-                  label={t('スペースの種類', 'Space type')}
-                  value={category}
-                  choices={categories}
-                  placeholder={categoryName('personal')}
-                  disabled={busy}
-                  onChange={setCategory}
-                />
-              </label>
-            </details>
+            <LayerChoice value={layers} disabled={busy} onChange={setLayers} />
             <p className="remote-note">
               {t(
                 'まだ vault でないフォルダを vault にすると、このコンピューターと同じく、そこに .irori/scope.json を書き、.gitignore に /contents/ を加えます。ほかのファイルは変更しません。',

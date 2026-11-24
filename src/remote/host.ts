@@ -235,12 +235,12 @@ export async function createVaultHost({ dataDir, emit, ask }: VaultHostOptions) 
         ...(names.length > folderLimit && { more: true }),
       };
     },
-    registerVault: async (root, name, category) => {
+    registerVault: async (root, name, category, layers) => {
       // A new vault is out of every run's reach, so runs do not hold it.
       if (git.busy) throw Error(busy());
       const inspection = await inspectRepository(root);
       if (inspection.kind === 'unavailable') throw Error(inspection.detail);
-      const space = await files.register(root, name, category);
+      const space = await files.register(root, name, category ?? undefined, layers ?? undefined);
       watch(space);
       return space;
     },

@@ -1,5 +1,17 @@
 # Implementation status — notes, native agents and connection onboarding
 
+A new vault chooses its layers, 2026-11-24 (**0.2.96**,
+[ADR 072](decisions/072-a-new-vault-chooses-its-layers.md); not yet merged or
+published): the forms that make a vault (`RegisterSpace`, `RemoteFolderDialog`)
+show the layer choice of the settings (`LayerChoice`) and no longer ask for a
+category, which the owner called an empty form; a new vault carries none.
+`register`, `registerRemote`, `createSpace` and the vault host's
+`registerVault` take an optional category and the layers, applied only to a
+declaration irori writes. `irori clone`, `create` and `add` take `--layers`.
+- Verified on Linux: `npm run build`, `npm run format:check`, `npm test` except
+  the `ssh -G` test that fails on this shared host without the change.
+- Not covered: the SSH host's form against a real host; macOS and Windows.
+
 A vault's own files can be its Contents, 2026-11-24 (**0.2.95**,
 [ADR 071](decisions/071-a-vaults-own-files-in-contents.md); not yet merged or
 published): asked which layer the files at the top of a Schema + Contents vault

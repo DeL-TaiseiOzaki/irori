@@ -43,6 +43,7 @@ import type { AttachmentRef } from '../domain/attachments';
 import type { Conversation, ConversationRow } from '../domain/conversation';
 import { readLocalJson, writeLocalJson } from './local-json';
 import { SerialQueue } from './serial-queue';
+import type { NamedLayer } from '../domain/layers';
 import {
   ConnectionEnded,
   LoginCancelled,
@@ -573,7 +574,13 @@ export class RemoteHosts implements RemoteVaults {
     return (await this.link(hostId)).request('folders', folder ? [folder] : []);
   }
   /** Registers a folder of a host as a vault; one whose id is already on this device or another host is refused. */
-  async register(hostId: string, root: string, name: string, category: Category) {
+  async register(
+    hostId: string,
+    root: string,
+    name: string,
+    category?: Category,
+    layers?: NamedLayer[],
+  ) {
     const link = await this.link(hostId);
     const known = new Set(
       z
@@ -583,7 +590,9 @@ export class RemoteHosts implements RemoteVaults {
     );
     let vault: z.infer<typeof vaultRecord>;
     try {
-      vault = vaultRecord.parse(await link.request('registerVault', [root, name, category]));
+      vault = vaultRecord.parse(
+        await link.request('registerVault', [root, name, category ?? null, layers ?? null]),
+      );
     } catch (error) {
       // Registered there already, by this device before or by another of the person's.
       const there = z.array(vaultRecord).parse(await link.request('spaces', []));

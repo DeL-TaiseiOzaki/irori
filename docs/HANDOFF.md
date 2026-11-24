@@ -1,5 +1,10 @@
 # irori continuation handoff
 
+**A new vault chooses its layers, 0.2.96**
+([ADR 072](decisions/072-a-new-vault-chooses-its-layers.md)): the forms that
+make a vault offer its layers and ask for no category; `irori clone`, `create`
+and `add` take `--layers`. In review as a pull request; not merged or published.
+
 **A vault's own files can be its Contents, 0.2.95**
 ([ADR 071](decisions/071-a-vaults-own-files-in-contents.md)): a Schema +
 Contents vault shows its own files in Contents, editable and in Git; a vault

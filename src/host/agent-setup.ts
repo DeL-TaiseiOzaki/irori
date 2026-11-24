@@ -83,7 +83,12 @@ export interface AgentSetupHost {
   /** Where new vaults go when the command names no parent folder. */
   defaultParent: () => Promise<string>;
   /** Registers through the host's own guards and starts watching the vault. */
-  register?: (root: string, name: string, category: Category) => Promise<Space>;
+  register?: (
+    root: string,
+    name: string,
+    category?: Category,
+    layers?: NamedLayer[],
+  ) => Promise<Space>;
   /** Changes a vault's name, category or layer names, as its settings do. */
   update?: (scopeId: string, change: SpaceChange) => Promise<Space>;
   /** Names or renames a vault's knowledge or contents folder, carrying what names it (ADR 024). */
@@ -294,7 +299,7 @@ export class AgentSetup {
         root: space.root,
         repository: (await inspectRepository(space.root)).repository,
         inWorkspace: !!workspace?.scopeIds.includes(space.scopeId),
-        category: categoryName(space.category),
+        ...(space.category && { category: categoryName(space.category) }),
         ...(hasLayer(space, 'Knowledge_Base') && {
           knowledge: shownFolder(knowledgeFolder(space)),
         }),
@@ -348,10 +353,10 @@ export class AgentSetup {
     const real = await fs.realpath(root).catch(() => root);
     return this.host.files.list().find((space) => space.root === real);
   }
-  private register(root: string, name: string, category: Category) {
+  private register(root: string, name: string, category?: Category, layers?: NamedLayer[]) {
     return this.host.register
-      ? this.host.register(root, name, category)
-      : this.host.files.register(root, name, category);
+      ? this.host.register(root, name, category, layers)
+      : this.host.files.register(root, name, category, layers);
   }
   private async clone(
     command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'clone' }>,
@@ -387,7 +392,8 @@ export class AgentSetup {
     const space = await this.register(
       cloned.path,
       command.name ?? repository.split('/')[1],
-      command.category ?? 'personal',
+      command.category,
+      command.layers,
     );
     return vaultRegistered(
       { name: space.name, root: space.root, repository },
@@ -406,7 +412,8 @@ export class AgentSetup {
       space = await this.register(
         root,
         command.name ?? command.folder,
-        command.category ?? 'personal',
+        command.category,
+        command.layers,
       );
     } catch (error) {
       await this.host.git.abandon(root);
@@ -420,7 +427,7 @@ export class AgentSetup {
   }
   private async add(
     root: string,
-    command: { name?: string; category?: Category },
+    command: { name?: string; category?: Category; layers?: NamedLayer[] },
     context: SetupContext,
   ) {
     const found = await this.registered(root);
@@ -439,7 +446,8 @@ export class AgentSetup {
     const space = await this.register(
       inspection.root,
       command.name ?? path.basename(inspection.root),
-      command.category ?? 'personal',
+      command.category,
+      command.layers,
     );
     return vaultRegistered(
       { name: space.name, root: space.root, repository: inspection.repository },
@@ -686,7 +694,7 @@ export class AgentSetup {
     this.host.announce?.({ workspace: undefined });
     return vaultChanged({
       name: next.name,
-      category: categoryName(next.category),
+      ...(next.category && { category: categoryName(next.category) }),
       ...(command.look && {
         look: {
           color: next.appearance?.color,
