@@ -33,9 +33,13 @@ Not every vault is a knowledge base with materials. Under **Layers** in the vaul
 
 These are examples, not kinds: choose the combination that fits how you use the vault.
 
-A layer you leave out is not shown, takes no new notes or connections, and is not described to the vault's agent. No file moves, and turning the layer on again brings it back as it was. Without Knowledge, the vault's files outside Contents appear with Schema, in its file view. Disconnect a vault's folders and repositories before leaving Contents out. Code is Contents when its folder or GitHub repository is connected there; files kept at the vault's own top level appear with Schema.
+A layer you leave out is not shown, takes no new notes or connections, and is not described to the vault's agent. No file moves, and turning the layer on again brings it back as it was. Disconnect a vault's folders and repositories before leaving Contents out.
 
-An agent makes the same choice with `irori set <vault> --layers schema,contents`.
+A vault's own files are those outside Schema and its contents folder. They appear in Knowledge when the vault has that layer, and in Contents otherwise, so a repository of code becomes a Schema + Contents vault as it is: its files open, save, are created, renamed, moved and deleted in Contents, and stay in the vault's Git history. The contents folder is still where folders and repositories from elsewhere are connected; it appears below the vault's own files under its name. A vault with neither Knowledge nor Contents shows its own files with Schema.
+
+A vault with both layers can also keep code beside its notes: turn on **The vault's own files too** on the Contents row. Knowledge is then its folder alone, which must have a name rather than being the vault's root.
+
+An agent makes the same choices with `irori set <vault> --layers schema,contents` and `--own contents`.
 
 ## Renaming a layer's folder
 

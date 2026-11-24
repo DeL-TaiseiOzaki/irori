@@ -173,7 +173,7 @@ irori work <vault> --default
   existing folder, not another vault's. --default goes back to work in the
   vault's contents, which Git ignores.
 
-irori set <vault> [--name <name>] [--category ...] [--knowledge-label <label>] [--contents-label <label>] [--layers <layers>] [--color <color>] [--icon <icon>]
+irori set <vault> [--name <name>] [--category ...] [--knowledge-label <label>] [--contents-label <label>] [--layers <layers>] [--own knowledge|contents] [--color <color>] [--icon <icon>]
   Changes the vault's name, its category, the names its Knowledge and
   Contents layers are shown under (one line, at most 40 characters), its
   color (${brainColors.join(', ')}) or its icon (${brainGlyphs.join(', ')},
@@ -183,9 +183,14 @@ irori set <vault> [--name <name>] [--category ...] [--knowledge-label <label>] [
   a vault starts with), notes alone are schema,knowledge, and a workspace
   for code is schema,contents. Schema is always one of them. Nothing on disk
   moves. A layer left out is not shown, takes no new notes or connections,
-  and is not told to the vault's agent; without Knowledge, the vault's files
-  outside Contents show with Schema. Disconnect the vault's folders before
+  and is not told to the vault's agent. Disconnect the vault's folders before
   leaving Contents out. Naming the layer again brings it back as it was.
+  The vault's own files, those outside Schema and its contents folders, are
+  Knowledge when it has that layer, otherwise Contents (a repository of code
+  is a vault as it is), and Schema when it has neither. --own contents puts
+  them in Contents in a vault with both; Knowledge is then its named folder
+  alone, so name that folder first if it is the root. --own knowledge puts
+  them back. Own files in Contents are changed in place and stay in Git.
 
 irori layer <vault> knowledge <folder>
 irori layer <vault> contents <folder> [--also]
@@ -324,6 +329,8 @@ export interface ListedVault {
   contents?: string[];
   /** The layers the vault left out, by irori's names. */
   without?: string[];
+  /** The layer of the vault's own files when it is not Knowledge (ADR 071). */
+  own?: string;
   connections?: {
     name: string;
     contentsRoot: string;
@@ -371,6 +378,7 @@ const line = (workspace: string | undefined) => (item: ListedVault) => {
   const layers = [
     item.category && `category ${item.category}`,
     item.without?.length && `no ${item.without.join(' or ')} layer`,
+    item.own && `own files in ${item.own}`,
     item.knowledge && `knowledge ${JSON.stringify(item.knowledge)}`,
     item.contents?.length && `contents ${item.contents.map((c) => JSON.stringify(c)).join(', ')}`,
     item.connections?.length &&
@@ -439,6 +447,8 @@ export function vaultChanged(vault: {
   labels?: { knowledge: string; contents: string };
   /** The layers it has now, Schema first, when the command chose them. */
   layers?: string[];
+  /** The layer its own files are in now, when the command chose its layers or that. */
+  own?: string;
   look?: { color?: string; icon?: string };
 }) {
   const look = vault.look
@@ -447,7 +457,7 @@ export function vaultChanged(vault: {
         vault.look.icon && `icon ${vault.look.icon}`,
       ].filter(Boolean)
     : [];
-  return `The vault is now "${vault.name}"${vault.category ? `, category ${vault.category}` : ''}${vault.labels ? `, with its layers shown as ${JSON.stringify(vault.labels.knowledge)} and ${JSON.stringify(vault.labels.contents)}` : ''}${vault.layers ? `, with the layers ${vault.layers.join(', ')}` : ''}${look.length ? `, ${look.join(', ')}` : ''}.`;
+  return `The vault is now "${vault.name}"${vault.category ? `, category ${vault.category}` : ''}${vault.labels ? `, with its layers shown as ${JSON.stringify(vault.labels.knowledge)} and ${JSON.stringify(vault.labels.contents)}` : ''}${vault.layers ? `, with the layers ${vault.layers.join(', ')}` : ''}${vault.own ? `, its own files in ${vault.own}` : ''}${look.length ? `, ${look.join(', ')}` : ''}.`;
 }
 
 /** `irori work`: where the vault's agents work now. */

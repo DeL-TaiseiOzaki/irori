@@ -15,7 +15,7 @@ import {
   writeLocalFile,
   writeLocalJson,
 } from './local-json';
-import { classify, owner, within } from '../domain/scopes';
+import { classify, inContentsFolder, owner, within } from '../domain/scopes';
 import type { Category, Document, Entry, NewEntry, Space, SpaceChange } from '../domain/types';
 import { entryNameError } from '../domain/connections';
 import { copyEntryInto, freeName, renameEntry, writeNewEntry } from './entries';
@@ -77,8 +77,15 @@ const declaration = z.object({
   knowledge: knowledgeFolderName.optional(),
   labels: layerLabels.optional(),
   layers: layerSelection.optional(),
+  rootLayer: z.literal('contents').optional(),
   appearance: brainLook.optional(),
 });
+/** Why the vault's root cannot be both its knowledge folder and its own files in Contents (ADR 071). */
+const rootTaken = (space: Pick<Space, 'labels'>) =>
+  t(
+    `vault のルートが ${layerLabel(space, 'Knowledge_Base')} のフォルダのあいだは、vault 直下のファイルを ${layerLabel(space, 'contents')} にできません。先に ${layerLabel(space, 'Knowledge_Base')} のフォルダに名前を付けてください。`,
+    `The vault's own files cannot be ${layerLabel(space, 'contents')} while its root is the ${layerLabel(space, 'Knowledge_Base')} folder. Give the ${layerLabel(space, 'Knowledge_Base')} folder a name first.`,
+  );
 export const hash = (text: string | Buffer) => createHash('sha256').update(text).digest('hex');
 /** Where the unsaved text of one document is kept on this device. */
 export const draftFile = (dataDir: string, scopeId: string, rel: string) =>
@@ -495,6 +502,19 @@ export class FileService {
         if (layers) raw.layers = layers;
         else delete raw.layers;
       }
+      if (change.rootLayer !== undefined) {
+        if (change.rootLayer) raw.rootLayer = change.rootLayer;
+        else delete raw.rootLayer;
+      }
+      // The vault's own files are Contents beside a Knowledge folder, never in place of one (ADR 071).
+      if (
+        raw.rootLayer === 'contents' &&
+        raw.knowledge === rootKnowledgeFolder &&
+        (change.rootLayer || change.layers !== undefined) &&
+        hasLayer(raw as { layers?: NamedLayer[] }, 'Knowledge_Base') &&
+        hasLayer(raw as { layers?: NamedLayer[] }, 'contents')
+      )
+        throw Error(rootTaken(s));
       const next: Space = { ...declaration.parse(raw), root: s.root };
       // A file of the KB keeps its own mode; only device records are made private.
       await writeFileAtomic(meta, JSON.stringify(raw, null, 2) + '\n');
@@ -591,6 +611,13 @@ export class FileService {
       // A layer the vault left out keeps the folder it declared until it is back (ADR 070).
       if (!hasLayer(s, layer)) throw noLayer(s, layer);
       const previous = layer === 'contents' ? s.contents[0] : knowledgeFolder(s);
+      if (atRoot && s.rootLayer === 'contents' && hasLayer(s, 'contents'))
+        throw Error(
+          t(
+            `vault 直下のファイルが ${layerLabel(s, 'contents')} のあいだは、vault のルートを ${layerLabel(s, 'Knowledge_Base')} のフォルダにできません。`,
+            `The vault's root cannot be the ${layerLabel(s, 'Knowledge_Base')} folder while the vault's own files are ${layerLabel(s, 'contents')}.`,
+          ),
+        );
       if (layer === 'Knowledge_Base' && (atRoot || !previous))
         return this.moveKnowledgeRoot(s, previous, atRoot ? '' : name);
       // A contents folder declared inside another folder keeps its place.
@@ -936,14 +963,13 @@ export class FileService {
     const requested = path.resolve(s.root, rel);
     if (!within(s.root, requested) || owner(this.spaces, requested)?.scopeId !== id)
       throw Error('Path belongs to another space');
-    if (classify(s, rel) === 'contents' && this.cloud) return this.cloud.resolve(id, rel);
+    // A contents folder holds connections, which the cloud service verifies; the
+    // vault's own files in Contents (ADR 071) are reached as any file of the vault.
+    if (inContentsFolder(s, rel) && this.cloud) return this.cloud.resolve(id, rel);
     const actual = await fs.realpath(requested);
     if (!within(s.root, actual) || owner(this.spaces, actual)?.scopeId !== id)
       throw Error('Path alias crosses a space boundary');
-    if (
-      classify(s, rel) === 'contents' ||
-      classify(s, path.relative(s.root, actual)) === 'contents'
-    )
+    if (inContentsFolder(s, rel) || inContentsFolder(s, path.relative(s.root, actual)))
       throw Error(
         'Cloud connection is unverified; contents access is not enabled in this milestone',
       );

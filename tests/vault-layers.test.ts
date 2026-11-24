@@ -43,14 +43,18 @@ test('A vault that declares no layers has all three, and Schema is never left ou
   assert.deepEqual(declaredLayers([]), []);
 });
 
-test('Without Knowledge the vault’s own files are Schema; a contents folder stays Contents', () => {
+test('A vault’s own files are Knowledge, else Contents, else Schema; a contents folder stays Contents', () => {
   const full = { contents: ['contents'] };
   const workspace = { contents: ['contents'], layers: ['contents' as const] };
   const notes = { contents: ['contents'], layers: ['Knowledge_Base' as const] };
   assert.equal(classify(full, 'docs/plan.md'), 'Knowledge_Base');
-  assert.equal(classify(workspace, 'docs/plan.md'), 'schema');
-  assert.equal(classify(workspace, 'Knowledge_Base/old.md'), 'schema');
+  // A workspace for code: its own files are Contents (ADR 071).
+  assert.equal(classify(workspace, 'docs/plan.md'), 'contents');
+  assert.equal(classify(workspace, 'Knowledge_Base/old.md'), 'contents');
   assert.equal(classify(workspace, 'AGENTS.md'), 'schema');
+  assert.equal(classify(workspace, '.github/workflows/ci.yml'), 'schema');
+  // With neither Knowledge nor Contents they are Schema.
+  assert.equal(classify({ contents: ['contents'], layers: [] }, 'docs/plan.md'), 'schema');
   assert.equal(classify(workspace, 'contents/repo/src/main.ts'), 'contents');
   // What was connected is never read as the vault's own files, shown or not.
   assert.equal(classify(notes, 'contents/repo/src/main.ts'), 'contents');
@@ -76,8 +80,8 @@ test('The layers are kept in scope.json and come back as they were', async (t) =
   // The declaration an earlier irori reads is still whole: its folders are as declared.
   assert.deepEqual((await meta()).contents, ['contents']);
   const top = await files.entries(id, '');
-  assert.equal(top.find((entry) => entry.path === 'scripts')?.layer, 'schema');
-  assert.equal(top.find((entry) => entry.path === 'Knowledge_Base')?.layer, 'schema');
+  assert.equal(top.find((entry) => entry.path === 'scripts')?.layer, 'contents');
+  assert.equal(top.find((entry) => entry.path === 'Knowledge_Base')?.layer, 'contents');
   assert.equal(top.find((entry) => entry.path === 'contents')?.layer, 'contents');
   // Nothing moved.
   assert.equal(await readFile(path.join(root, 'Knowledge_Base/Notes/idea.md'), 'utf8'), '# Idea\n');
@@ -88,6 +92,10 @@ test('The layers are kept in scope.json and come back as they were', async (t) =
   const alone = await files.update(id, { layers: [] });
   assert.deepEqual(vaultLayers(alone), []);
   assert.deepEqual((await meta()).layers, []);
+  assert.equal(
+    (await files.entries(id, '')).find((entry) => entry.path === 'scripts')?.layer,
+    'schema',
+  );
 
   const back = await files.update(id, { layers: ['Knowledge_Base', 'contents'] });
   assert.equal(back.layers, undefined);
@@ -207,10 +215,10 @@ test('A vault agent hears the layers its vault has, and a whole vault what it al
 
   const workspace = vaultIntro({ ...vault, layers: ['contents'] }, false);
   assert.match(workspace, /This vault has Schema and Contents and no Knowledge layer:/);
-  assert.match(workspace, /every other file of the vault outside Contents with Schema too/);
+  assert.match(workspace, /and \.irori\. This vault keeps no notes\./);
   assert.match(
     workspace,
-    /- Contents: "contents\/"\. Folders and repositories connected from elsewhere/,
+    /- Contents: the vault's own files, which are every file outside Schema: its code and other working files, changed in place and kept in its Git history\. Also "contents\/", where folders and repositories are connected from elsewhere/,
   );
   assert.match(workspace, /contents\/app/);
   assert.doesNotMatch(workspace, /- Knowledge|Notes link to each other|knowledge base/);
@@ -223,6 +231,7 @@ test('A vault agent hears the layers its vault has, and a whole vault what it al
 
   const alone = vaultIntro({ ...vault, layers: [] }, false);
   assert.match(alone, /This vault has Schema and no Knowledge or Contents layer:/);
+  assert.match(alone, /every other file of the vault with Schema too/);
   assert.doesNotMatch(alone, /- Knowledge|- Contents|as material/);
 
   const handed = brainsCommandPreamble([

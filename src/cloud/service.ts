@@ -12,7 +12,7 @@ import {
 } from '../domain/connections';
 import { githubCloneURL, isBranchName, repositoryFolder } from '../domain/git';
 import type { RepositoryGit } from './repositories';
-import { owner, within } from '../domain/scopes';
+import { ownContents, ownLayer, owner, within } from '../domain/scopes';
 import { isMissing, readLocalJson, writeLocalFile, writeLocalJson } from '../host/local-json';
 import { draftFile, editableText, hash, readDocument } from '../host/files';
 import { copyEntryInto, renameEntry, writeNewEntry } from '../host/entries';
@@ -24,6 +24,7 @@ import type {
   Attachment,
   CloudAccess,
   CloudConnection,
+  CloudRoot,
   Document,
   Entry,
   FolderAttachment,
@@ -45,6 +46,9 @@ const localBindingSchema = z.object({
   path: z.string().min(1),
 });
 type LocalBinding = z.infer<typeof localBindingSchema>;
+/** `name` inside `directory`, where `''` is the vault's root (ADR 071). */
+const inDirectory = (directory: string, name: string) =>
+  directory ? `${directory}/${name}` : name;
 function assertCloudPath(rel: string) {
   if (
     !rel ||
@@ -53,6 +57,11 @@ function assertCloudPath(rel: string) {
   )
     throw Error('Invalid cloud path');
 }
+const leavesOwnFiles = () =>
+  t(
+    'その場所や名前では、vault 自身の Contents のファイルではなくなります。',
+    "That place or name would take it out of the vault's own Contents files.",
+  );
 const connectionFolderError = () =>
   Error(
     t(
@@ -132,6 +141,8 @@ export class CloudService {
   private mounted = new Map<string, Mounted>();
   // Each owner's root, as last read, so writability can be answered without I/O.
   private roots = new Map<string, string>();
+  /** The vaults as last looked at, for what sorts their own files into Contents (ADR 071). */
+  private vaults = new Map<string, CloudRoot>();
   private states = new Map<string, { state: CloudConnection['state']; detail?: string }>();
   /** Connections waiting for their folder to appear, looked for again with a growing delay. */
   private waiting = new Map<string, Waiting>();
@@ -1111,7 +1122,11 @@ export class CloudService {
     const root = this.roots.get(scopeId);
     if (!root) return false;
     const target = path.join(root, rel);
-    return this.places(scopeId).some((item) => item.writable && within(item.entry, target));
+    if (this.places(scopeId).some((item) => item.writable && within(item.entry, target)))
+      return true;
+    // The vault's own files in Contents are its to change (ADR 071).
+    const vault = this.vaults.get(scopeId);
+    return !!vault && ownContents(vault, rel);
   }
   /** The vault's connected folders and its work folder, as last looked at. */
   private places(scopeId: string): Place[] {
@@ -1179,9 +1194,49 @@ export class CloudService {
       );
   }
   private async rootOf(scopeId: string) {
-    const root = (await this.files.get(scopeId)).root;
-    this.roots.set(scopeId, root);
-    return root;
+    return (await this.vault(scopeId)).root;
+  }
+  private async vault(scopeId: string) {
+    const vault = await this.files.get(scopeId);
+    this.roots.set(scopeId, vault.root);
+    this.vaults.set(scopeId, vault);
+    return vault;
+  }
+  /**
+   * The vault's own files as a place (ADR 071): its root, for a path irori sorts
+   * into Contents outside its contents folders. `''` is the root itself, as the
+   * folder a new entry goes into. A path inside another vault kept in this one's
+   * folder is that vault's.
+   */
+  private async own(scopeId: string, rel: string): Promise<Place | undefined> {
+    const vault = await this.vault(scopeId);
+    if (rel ? !ownContents(vault, rel) : ownLayer(vault) !== 'contents') return;
+    const target = path.join(vault.root, rel);
+    const others = (await this.files.list()).filter((other) => other.scopeId !== scopeId);
+    if (owner([...others, vault], target)?.scopeId !== scopeId) return;
+    return { entry: vault.root, target: vault.root, writable: true };
+  }
+  /**
+   * Refuses a change to one of the vault's own folders that would take a contents
+   * folder, the knowledge folder or another vault with it.
+   */
+  private async holdsNoBoundary(scopeId: string, rel: string) {
+    const vault = await this.vault(scopeId);
+    const folder = path.join(vault.root, rel);
+    const inside = (other: string) => other.startsWith(`${rel}/`);
+    if (
+      vault.contents.some(inside) ||
+      (vault.knowledge !== undefined && inside(vault.knowledge)) ||
+      (await this.files.list()).some(
+        (other) => other.scopeId !== scopeId && within(folder, other.root),
+      )
+    )
+      throw Error(
+        t(
+          'このフォルダには別の vault か、ほかの層のフォルダが入っています。',
+          "This folder holds another vault or another layer's folder.",
+        ),
+      );
   }
   /** Writes an edited text file in place, keeping the previous version on this device. */
   write(doc: Document) {
@@ -1213,8 +1268,7 @@ export class CloudService {
    * A format irori shows with a viewer opens view-only, without a draft.
    */
   async document(scopeId: string, rel: string): Promise<Document> {
-    const root = await this.files.get(scopeId);
-    this.roots.set(scopeId, root.root);
+    await this.vault(scopeId);
     const doc = await readDocument(await this.resolve(scopeId, rel), scopeId, rel);
     const writable = this.writable(scopeId, rel);
     const draft =
@@ -1232,11 +1286,13 @@ export class CloudService {
   }
   /** A path inside a verified folder that may be changed, with the folder it lies in. */
   private async editable(scopeId: string, rel: string) {
-    const actual = await this.resolve(scopeId, rel);
+    const { filename: actual, mounted } = await this.locate(scopeId, rel);
     await this.assertWritable(scopeId, rel);
-    const mounted = this.places(scopeId).find((item) => within(item.target, actual))!;
     if (actual === mounted.target) throw connectionFolderError();
-    return { actual, mounted };
+    // One of the vault's own folders goes nowhere with another layer's folder in it.
+    const own = mounted.target === (await this.rootOf(scopeId));
+    if (own) await this.holdsNoBoundary(scopeId, rel);
+    return { actual, mounted, own };
   }
   /**
    * Renames or moves a file or folder inside one editable connection, in place, so
@@ -1246,13 +1302,15 @@ export class CloudService {
    */
   moveEntry(scopeId: string, from: string, to: string): Promise<Entry> {
     return this.mutate(async () => {
-      const { actual, mounted } = await this.editable(scopeId, from);
+      const { actual, mounted, own } = await this.editable(scopeId, from);
       assertCloudPath(to);
       const name = path.posix.basename(to);
       const invalid = entryNameError(name);
       if (invalid) throw Error(invalid);
       const info = await fs.lstat(actual);
-      const directory = path.posix.dirname(to);
+      const directory = path.posix.dirname(to) === '.' ? '' : path.posix.dirname(to);
+      // The vault's own file stays one: not into Schema, Knowledge or a connected folder.
+      if (own && !(await this.own(scopeId, to))) throw Error(leavesOwnFiles());
       if (!within(mounted.entry, path.join(await this.rootOf(scopeId), directory)))
         throw Error(
           t(
@@ -1347,14 +1405,26 @@ export class CloudService {
       await fs.rm(draftFile(this.files.dataDir, scopeId, target), { force: true });
     });
   }
+  /**
+   * The folder a new entry named `name` goes into: one that may be changed, in a
+   * connection or among the vault's own files in Contents, where the entry must
+   * be one of them too (a hidden name at the top would be Schema).
+   */
+  private async target(scopeId: string, directory: string, name: string) {
+    const { filename, mounted } = await this.locate(scopeId, directory);
+    if (directory) await this.assertWritable(scopeId, directory);
+    const own = mounted.target === (await this.rootOf(scopeId));
+    if (own && !(await this.own(scopeId, inDirectory(directory, name))))
+      throw Error(leavesOwnFiles());
+    return filename;
+  }
   /** Adds a file or folder to a folder of an editable connection; an existing entry is never replaced. */
   createEntry(scopeId: string, directory: string, entry: NewEntry): Promise<Entry> {
     return this.mutate(async () => {
-      const folder = await this.resolve(scopeId, directory);
-      await this.assertWritable(scopeId, directory);
+      const folder = await this.target(scopeId, directory, entry.name);
       const { name, upload } = await writeNewEntry(folder, entry);
       return {
-        path: `${directory}/${name}`,
+        path: inDirectory(directory, name),
         name,
         directory: entry.kind === 'folder',
         layer: 'contents',
@@ -1370,11 +1440,10 @@ export class CloudService {
    */
   copyEntry(scopeId: string, directory: string, source: string, name: string): Promise<Entry> {
     return this.mutate(async () => {
-      const folder = await this.resolve(scopeId, directory);
-      await this.assertWritable(scopeId, directory);
+      const folder = await this.target(scopeId, directory, name);
       const copied = await copyEntryInto(source, folder, name, true);
       return {
-        path: `${directory}/${copied.name}`,
+        path: inDirectory(directory, copied.name),
         name: copied.name,
         directory: copied.directory,
         layer: 'contents',
@@ -1387,13 +1456,12 @@ export class CloudService {
   createNote(scopeId: string, directory: string, name: string) {
     return this.mutate(async () => {
       const filename = noteFilename(name);
-      const folder = await this.resolve(scopeId, directory);
-      await this.assertWritable(scopeId, directory);
+      const folder = await this.target(scopeId, directory, filename);
       if (!(await fs.stat(folder)).isDirectory()) throw Error('Choose a folder for the new note');
       await fs.writeFile(path.join(folder, filename), `# ${filename.slice(0, -3)}\n\n`, {
         flag: 'wx',
       });
-      return this.document(scopeId, `${directory}/${filename}`);
+      return this.document(scopeId, inDirectory(directory, filename));
     });
   }
   private async unmount(scopeId: string, mountId: string) {
@@ -1417,6 +1485,12 @@ export class CloudService {
   }
   /** The verified mount holding a path, and the path's location on it. */
   private async locate(scopeId: string, rel: string) {
+    // The vault's root, as the folder its own files in Contents go into (ADR 071).
+    if (rel === '') {
+      const root = await this.own(scopeId, rel);
+      if (!root) throw Error('Invalid cloud path');
+      return { mounted: root, filename: root.target };
+    }
     assertCloudPath(rel);
     const target = path.join(await this.rootOf(scopeId), rel);
     const mounted = [...this.mounted.values()].find(
@@ -1424,7 +1498,9 @@ export class CloudService {
     );
     const work = mounted ? undefined : await this.work(scopeId);
     const entry: Place | undefined =
-      mounted ?? (work && within(work.entry, target) ? work : undefined);
+      mounted ??
+      (work && within(work.entry, target) ? work : undefined) ??
+      (await this.own(scopeId, rel));
     if (!entry)
       throw Error(t('クラウドフォルダは未接続です。', 'The cloud folder is not connected.'));
     if (mounted) await this.assertLinked(mounted);
@@ -1444,7 +1520,8 @@ export class CloudService {
     return { mounted: entry, filename: actual };
   }
   async rootEntries(scopeId: string, rel: string): Promise<Entry[] | undefined> {
-    const space = await this.files.get(scopeId);
+    // Every listing starts here, so `writable` below it reads the vault as it is now.
+    const space = await this.vault(scopeId);
     if (!space.contents.includes(rel)) return;
     const entries: Entry[] = (await this.list(scopeId, false))
       .filter((record) => record.contentsRoot === rel)

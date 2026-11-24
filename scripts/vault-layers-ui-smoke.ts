@@ -9,7 +9,9 @@ import { chooseJapanese } from '../tests/fixtures/japanese-interface';
 
 // A vault chooses the layers it has (ADR 070): the settings leave Knowledge out
 // of a workspace for code, the panel and the home follow, nothing on disk moves,
-// and choosing the layer again brings it back. No model or cloud call is made.
+// and choosing the layer again brings it back. The vault's own files are then
+// Contents (ADR 071), and may be beside a Knowledge folder too. No model or cloud
+// call is made.
 const base = await mkdtemp(path.join(tmpdir(), 'irori vault layers UI '));
 const files = new FileService(path.join(base, 'device'));
 await files.init();
@@ -76,20 +78,31 @@ try {
   expect(await readFile(path.join(root, 'Knowledge_Base', 'note.md'), 'utf8')).toBe('# Note\n');
   await expect(section('Knowledge')).toHaveCount(0);
   await expect(section('Contents')).toBeVisible();
-  // Schema opens on the vault's own files, the former notes among them.
-  const schema = section('Schema');
-  await expect(schema.getByRole('button', { name: 'scripts', exact: true })).toBeVisible();
-  await expect(schema.getByRole('button', { name: 'Knowledge_Base', exact: true })).toBeVisible();
-  await expect(schema.getByRole('button', { name: 'AGENTS.md', exact: true })).toBeVisible();
+  // The vault's own files are Contents now, the former notes' folder among them;
+  // Schema keeps its settings.
+  const contents = section('Contents');
+  await expect(contents.getByRole('button', { name: 'scripts', exact: true })).toBeVisible();
+  await expect(contents.getByRole('button', { name: 'Knowledge_Base', exact: true })).toBeVisible();
+  await expect(contents.getByRole('button', { name: 'AGENTS.md', exact: true })).toHaveCount(0);
+  await expect(section('Schema').getByRole('group', { name: 'Schema の指示' })).toContainText(
+    'AGENTS.md',
+  );
   // The home offers no note and shows no Knowledge card.
   await expect(page.getByRole('button', { name: 'ノートを作成', exact: true })).toHaveCount(0);
   await expect(page.locator('.home-card.Knowledge_Base')).toHaveCount(0);
   await expect(page.locator('.home-card.contents')).toBeVisible();
-  // A file of the vault still opens from the Schema file view.
-  await schema.getByRole('button', { name: 'scripts', exact: true }).click();
-  await schema.getByRole('button', { name: 'build.sh', exact: true }).click();
+  // A file of the vault opens from Contents.
+  await contents.getByRole('button', { name: 'scripts', exact: true }).click();
+  await contents.getByRole('button', { name: 'build.sh', exact: true }).click();
   await expect(page.locator('.cm-content')).toContainText('echo build');
   await page.screenshot({ path: 'test-results/irori-vault-layers-workspace.png' });
+  // Without Knowledge the vault's own files are Contents with no choice to make.
+  const own = sheet.getByRole('checkbox', { name: 'vault 直下のファイルも' });
+  await open();
+  await expect(own).toBeChecked();
+  await expect(own).toBeDisabled();
+  await sheet.getByRole('button', { name: 'キャンセル', exact: true }).click();
+  await expect(sheet).toHaveCount(0);
 
   // Schema and Knowledge: notes alone.
   await open();
@@ -109,9 +122,33 @@ try {
   await save();
   expect('layers' in (await scope())).toBe(false);
   for (const name of ['Schema', 'Knowledge', 'Contents']) await expect(section(name)).toBeVisible();
+  // With both, the vault's own files are Knowledge until chosen otherwise.
+  await expect(
+    section('Knowledge').getByRole('button', { name: 'scripts', exact: true }),
+  ).toBeVisible();
+
+  // Its own files in Contents beside the Knowledge folder.
+  await open();
+  await expect(own).not.toBeChecked();
+  await own.check();
+  await save();
+  expect((await scope()).rootLayer).toBe('contents');
+  await expect(
+    section('Contents').getByRole('button', { name: 'scripts', exact: true }),
+  ).toBeVisible();
+  await expect(
+    section('Knowledge').getByRole('button', { name: 'scripts', exact: true }),
+  ).toHaveCount(0);
+  await expect(section('Knowledge').getByText('note', { exact: true })).toBeVisible();
+  // The root as the knowledge folder leaves none of them for Contents.
+  await open();
+  await sheet.getByRole('checkbox', { name: 'vault のルート' }).check();
+  await expect(own).not.toBeChecked();
+  await expect(own).toBeDisabled();
+  await sheet.getByRole('button', { name: 'キャンセル', exact: true }).click();
   expect(errors).toEqual([]);
   console.log(
-    'Vault layers UI passed: all three by default, Schema and Contents with the vault’s files under Schema and no note offered, Schema and Knowledge, and all three again with nothing moved.',
+    'Vault layers UI passed: all three by default, Schema and Contents with the vault’s own files in Contents and no note offered, Schema and Knowledge, all three again with nothing moved, and the vault’s own files in Contents beside its Knowledge folder.',
   );
 } finally {
   await app.close();

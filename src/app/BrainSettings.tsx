@@ -295,6 +295,11 @@ export function BrainSettings({
   const has = (layer: NamedLayer) => chosen.includes(layer);
   // The vault's root as the knowledge folder (ADR 035).
   const [knowledgeAtRoot, setKnowledgeAtRoot] = useState(!knowledgeFolder(space));
+  // The vault's own files in Contents beside a named Knowledge folder (ADR 071).
+  // Without Knowledge they are Contents anyway; with its folder at the root they cannot be.
+  const [ownChosen, setOwnChosen] = useState(space.rootLayer === 'contents');
+  const ownChoice = has('Knowledge_Base') && has('contents') && !knowledgeAtRoot;
+  const ownInContents = has('contents') && (!has('Knowledge_Base') || (ownChoice && ownChosen));
   const chosenFolder = (layer: NamedLayer) =>
     layer === 'Knowledge_Base' && knowledgeAtRoot ? rootKnowledgeFolder : folders[layer].trim();
   const folderProblems = Object.fromEntries(
@@ -353,6 +358,8 @@ export function BrainSettings({
     });
     chooseIcon(() => setPicked({ bytes, url }));
   }
+  // What the declaration keeps: the choice, where there is one to make.
+  const wantsOwn = ownChoice && ownChosen;
   async function save() {
     if (saving || textProblem || imageMissing || folderProblem || !name.trim()) return;
     await run(async () => {
@@ -372,6 +379,8 @@ export function BrainSettings({
         },
         // Sent only when chosen anew: a run in the vault keeps the layers it was told.
         ...(chosen.join() !== vaultLayers(space).join() && { layers: chosen }),
+        // Taken back before a folder change, which may make the root the knowledge folder.
+        ...(space.rootLayer === 'contents' && !wantsOwn && { rootLayer: null }),
       });
       const renamed: (LayerFolderRename & { layer: NamedLayer })[] = [];
       for (const layer of namedLayers) {
@@ -382,6 +391,9 @@ export function BrainSettings({
         next = result.space;
         renamed.push({ ...result, layer });
       }
+      // Chosen after the folders, once the knowledge folder has its name.
+      if (wantsOwn && next.rootLayer !== 'contents')
+        next = await host.updateSpace(space.scopeId, { rootLayer: 'contents' });
       onSaved(next, renamed);
     });
   }
@@ -521,8 +533,8 @@ export function BrainSettings({
             </fieldset>
             <p className="brain-sheet-note">
               {t(
-                '外した層は表示されず、ノートや接続を受け付けません。ファイルは動かず、選び直すと元に戻ります。Knowledge を外すと、Contents 以外のファイルは Schema に並びます。',
-                'A layer left out is not shown and takes no notes or connections. No file moves, and choosing it again brings it back. Without Knowledge, the files outside Contents show with Schema.',
+                '外した層は表示されず、ノートや接続を受け付けません。ファイルは動かず、選び直すと元に戻ります。vault 直下のファイル（Schema と Contents のフォルダ以外）は、Knowledge があれば Knowledge、なければ Contents に並びます。',
+                "A layer left out is not shown and takes no notes or connections. No file moves, and choosing it again brings it back. The vault's own files, outside Schema and its contents folder, show in Knowledge when it has that layer and in Contents otherwise.",
               )}
             </p>
             <div className="brain-sheet-layer-grid">
@@ -579,6 +591,17 @@ export function BrainSettings({
                         onChange={(event) => setKnowledgeAtRoot(event.target.checked)}
                       />{' '}
                       {t('vault のルート', "The vault's root")}
+                    </label>
+                  )}
+                  {layer === 'contents' && (
+                    <label className="brain-sheet-layer-root">
+                      <input
+                        type="checkbox"
+                        checked={ownInContents}
+                        disabled={running || !ownChoice}
+                        onChange={(event) => setOwnChosen(event.target.checked)}
+                      />{' '}
+                      {t('vault 直下のファイルも', "The vault's own files too")}
                     </label>
                   )}
                   {folderProblems[layer] && <small role="alert">{folderProblems[layer]}</small>}

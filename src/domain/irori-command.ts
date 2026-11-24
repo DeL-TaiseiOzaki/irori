@@ -52,6 +52,8 @@ export type IroriCommand =
       labels?: Partial<Record<NamedLayer, string>>;
       /** The Knowledge and Contents layers the vault has from now on (ADR 070). */
       layers?: NamedLayer[];
+      /** The layer of the vault's own files beside its Knowledge folder (ADR 071). */
+      own?: NamedLayer;
       look?: { color?: BrainLook['color']; icon?: BrainLook['icon'] };
     }
   | { kind: 'layer'; vault: string; layer: NamedLayer; folder: string; also: boolean }
@@ -75,7 +77,7 @@ const options: Record<Exclude<IroriCommand['kind'], 'help' | 'list' | 'routines'
   add: ['name', 'category'],
   connect: ['name', 'read-only', 'into', 'existing', 'branch', 'editable'],
   disconnect: [],
-  set: ['name', 'category', 'knowledge-label', 'contents-label', 'layers', 'color', 'icon'],
+  set: ['name', 'category', 'knowledge-label', 'contents-label', 'layers', 'own', 'color', 'icon'],
   layer: ['also'],
   work: ['default'],
   workspace: ['leave'],
@@ -264,6 +266,16 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
           );
         layers = namedLayers.filter((layer) => words.some((word) => named[word] === layer));
       }
+      let own: NamedLayer | undefined;
+      if (text('own') !== undefined) {
+        own = { knowledge: 'Knowledge_Base' as const, contents: 'contents' as const }[
+          text('own')!.trim().toLowerCase()
+        ];
+        if (!own)
+          throw Error(
+            "--own is knowledge or contents: the layer of the vault's own files outside its Knowledge folder.",
+          );
+      }
       const look: NonNullable<Extract<IroriCommand, { kind: 'set' }>['look']> = {};
       const color = text('color')?.trim();
       if (color !== undefined) {
@@ -288,10 +300,11 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
         !common.category &&
         !Object.keys(labels).length &&
         !layers &&
+        !own &&
         !Object.keys(look).length
       )
         throw Error(
-          '"irori set" needs --name, --category, --knowledge-label, --contents-label, --layers, --color or --icon.',
+          '"irori set" needs --name, --category, --knowledge-label, --contents-label, --layers, --own, --color or --icon.',
         );
       return {
         kind,
@@ -299,6 +312,7 @@ export function parseIroriCommand(argv: unknown): IroriCommand {
         ...common,
         ...(Object.keys(labels).length ? { labels } : {}),
         ...(layers && { layers }),
+        ...(own && { own }),
         ...(Object.keys(look).length ? { look } : {}),
       };
     }
