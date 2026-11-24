@@ -5,6 +5,9 @@ Extends [ADR 024](024-layer-names.md) (a vault names its Knowledge and Contents
 layers) and [ADR 035](035-knowledge-at-the-vault-root.md) (classification).
 Changes what [ADR 039](039-what-a-vault-agent-is-told.md) decision 1 tells a
 vault agent about a vault that left a layer out.
+Decision 4 revised by [ADR 071](071-a-vaults-own-files-in-contents.md) (0.2.95):
+without Knowledge, a vault's own files are Contents when it has that layer, and
+Schema only when it has neither.
 
 ## Context
 

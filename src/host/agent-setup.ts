@@ -50,7 +50,7 @@ import type { Routine, RoutineRef, RunRoutine } from '../domain/routines';
 import type { NewComment, NoteComment } from '../domain/comments';
 import type { IndexUpdate } from '../domain/bundle';
 import type { Ontology } from '../domain/ontology';
-import { owner } from '../domain/scopes';
+import { ownLayer, owner } from '../domain/scopes';
 import { brainAgentNames } from '../domain/you';
 import type { CloudService } from '../cloud/service';
 import { githubCloneURL, type GitService } from '../git/service';
@@ -302,6 +302,7 @@ export class AgentSetup {
         without: namedLayers
           .filter((layer) => !hasLayer(space, layer))
           .map((layer) => defaultLayerLabel(layer)),
+        ...(ownLayer(space) !== 'Knowledge_Base' && { own: defaultLayerLabel(ownLayer(space)) }),
         connections: (await this.host.cloud.connections(space.scopeId).catch(() => [])).map(
           (item) => ({
             name: item.name,
@@ -668,12 +669,13 @@ export class AgentSetup {
     // so they change during it as in the vault's settings (ADR 020 D5).
     const space = this.vault(command.vault, cwd, context.vault, context.handedScopes);
     // Its layers sort its files anew, so they wait for another's run as its folders do.
-    if (command.layers) this.idle(space, 'Choose its layers', context.vault);
+    if (command.layers || command.own) this.idle(space, 'Choose its layers', context.vault);
     const change: SpaceChange = {
       ...(command.name && { name: command.name }),
       ...(command.category && { category: command.category }),
       ...(command.labels && { labels: command.labels }),
       ...(command.layers && { layers: command.layers }),
+      ...(command.own && { rootLayer: command.own === 'contents' ? 'contents' : null }),
       // An icon or color keeps the other one.
       ...(command.look && { appearance: { ...space.appearance, ...command.look } }),
     };
@@ -705,6 +707,7 @@ export class AgentSetup {
       ...(command.layers && {
         layers: ['Schema', ...vaultLayers(next).map((layer) => defaultLayerLabel(layer))],
       }),
+      ...((command.layers || command.own) && { own: defaultLayerLabel(ownLayer(next)) }),
     });
   }
   private async work(

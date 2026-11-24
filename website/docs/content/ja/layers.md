@@ -33,9 +33,13 @@ vault の設定の **層** では、Knowledge と Contents のそれぞれにつ
 
 これは例であり、vault の種類ではありません。使い方に合う組み合わせを選んでください。
 
-外した層は表示されず、新しいノートや接続を受け付けず、vault agent にも伝えられません。ファイルは動かず、選び直すと元の状態に戻ります。Knowledge を外すと、Contents 以外のファイルは Schema のファイル表示に並びます。Contents を外す前に、その vault のフォルダとリポジトリの接続を解除してください。コードは、そのフォルダや GitHub リポジトリを Contents に接続したときに Contents になります。vault の直下に置いたファイルは Schema に並びます。
+外した層は表示されず、新しいノートや接続を受け付けず、vault agent にも伝えられません。ファイルは動かず、選び直すと元の状態に戻ります。Contents を外す前に、その vault のフォルダとリポジトリの接続を解除してください。
 
-エージェントは `irori set <vault> --layers schema,contents` で同じ選択をします。
+Schema と Contents のフォルダ以外にある、vault 自身のファイルは、Knowledge がある vault では Knowledge に、ない vault では Contents に並びます。そのため、コードのリポジトリはそのまま Schema + Contents の vault になります。Contents に並んだファイルは、開く・保存・作成・名前の変更・移動・削除ができ、vault の Git の履歴にも残ります。Contents のフォルダは、これまでどおり外のフォルダやリポジトリを接続する場所で、vault 自身のファイルの下にフォルダ名つきで表示されます。Knowledge も Contents もない vault では、vault 自身のファイルは Schema に並びます。
+
+両方の層がある vault でも、ノートの横にコードを置けます。Contents の行の **vault 直下のファイルも** をオンにすると、Knowledge はそのフォルダの中だけになります。このとき Knowledge のフォルダは vault のルートではなく、名前のあるフォルダである必要があります。
+
+エージェントは `irori set <vault> --layers schema,contents` と `--own contents` で同じ選択をします。
 
 ## 層のフォルダ名を変える
 

@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { FileService, hash, utf8Text } from '../host/files';
 import { textFileByteLimit } from '../domain/viewers';
 import { isMissing, replaceFile } from '../host/local-json';
-import { classify, owner, within } from '../domain/scopes';
+import { classify, inContentsFolder, owner, within } from '../domain/scopes';
 import { lineRanges } from '../domain/knowledge';
 import { lineKey, type AuthorshipStore } from '../knowledge/authorship';
 import type { Space } from '../domain/types';
@@ -288,7 +288,8 @@ export class GitService {
   private boundary(s: Repo, p: string) {
     this.validateName(p);
     const target = path.join(s.root, p);
-    if (classify(s.space, s.prefix + p) === 'contents')
+    // A contents folder holds connections; the vault's own files in Contents are Git's (ADR 071).
+    if (inContentsFolder(s.space, s.prefix + p))
       throw Error(
         t('クラウド資料は Git の対象にできません。', 'Cloud materials cannot be a Git target.'),
       );

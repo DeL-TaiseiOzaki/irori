@@ -32,7 +32,7 @@ import { SearchService } from './search';
 import { relink } from './relink';
 import { carryMove, renameLayerFolder } from './layer-folders';
 import { appendUpload, discardUpload } from './entries';
-import { classify } from '../domain/scopes';
+import { classify, ownContents } from '../domain/scopes';
 import { DraftService } from './drafts';
 import { writeExclusive } from './local-json';
 import { UpdateService } from './updates';
@@ -1154,23 +1154,32 @@ app
       appendEntry: (upload, bytes) => changeFiles(() => appendUpload(upload, bytes)),
       discardEntry: (upload) => discardUpload(upload),
       moveEntry: (scopeId, from, to) =>
-        classify(files.get(scopeId), from) === 'contents'
-          ? changeFiles(() =>
-              changed(scopeId, async () => ({ entry: await cloud.moveEntry(scopeId, from, to) })),
-            )
-          : classify(files.get(scopeId), from) === 'schema'
-            ? changeVault(scopeId, organizing(), () => renameSchemaEntry(scopeId, from, to))
-            : changeVault(scopeId, organizing(), () => moveKnowledgeEntry(scopeId, from, to)),
+        ownContents(files.get(scopeId), from)
+          ? // The vault's own files wait for its runs, as knowledge does (ADR 071).
+            changeVault(scopeId, organizing(), async () => ({
+              entry: await cloud.moveEntry(scopeId, from, to),
+            }))
+          : classify(files.get(scopeId), from) === 'contents'
+            ? changeFiles(() =>
+                changed(scopeId, async () => ({
+                  entry: await cloud.moveEntry(scopeId, from, to),
+                })),
+              )
+            : classify(files.get(scopeId), from) === 'schema'
+              ? changeVault(scopeId, organizing(), () => renameSchemaEntry(scopeId, from, to))
+              : changeVault(scopeId, organizing(), () => moveKnowledgeEntry(scopeId, from, to)),
       copyEntry: (scopeId, from, toScopeId, directory) =>
         changeFiles(() => changed(toScopeId, () => copyEntry(scopeId, from, toScopeId, directory))),
       trashEntry: (scopeId, target) =>
-        classify(files.get(scopeId), target) === 'contents'
-          ? changeFiles(() => changed(scopeId, () => cloud.deleteEntry(scopeId, target)))
-          : classify(files.get(scopeId), target) === 'schema'
-            ? changeVault(scopeId, organizing(), () =>
-                files.trashSchemaEntry(scopeId, target, (filename) => shell.trashItem(filename)),
-              )
-            : changeVault(scopeId, organizing(), () => trashKnowledgeEntry(scopeId, target)),
+        ownContents(files.get(scopeId), target)
+          ? changeVault(scopeId, organizing(), () => cloud.deleteEntry(scopeId, target))
+          : classify(files.get(scopeId), target) === 'contents'
+            ? changeFiles(() => changed(scopeId, () => cloud.deleteEntry(scopeId, target)))
+            : classify(files.get(scopeId), target) === 'schema'
+              ? changeVault(scopeId, organizing(), () =>
+                  files.trashSchemaEntry(scopeId, target, (filename) => shell.trashItem(filename)),
+                )
+              : changeVault(scopeId, organizing(), () => trashKnowledgeEntry(scopeId, target)),
       vaultMoveLinks: (scopeId, target) => vaultMoveLinks(scopeId, target),
       moveToVault: (scopeId, from, toScopeId, directory) =>
         changeVault(scopeId, organizing(), () =>

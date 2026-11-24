@@ -22,7 +22,7 @@ import {
 } from 'react-resizable-panels';
 import type { CloudConnection, Document, Entry, Layer, Space } from '../domain/types';
 import { categoryIcon, categoryName } from '../domain/brains';
-import { classify } from '../domain/scopes';
+import { classify, ownLayer } from '../domain/scopes';
 import { t } from '../domain/i18n';
 import { BrainTile } from './BrainTile';
 import { EntryMenu, ExplorerItems, entryActions, type Explorer } from './EntryActions';
@@ -670,6 +670,84 @@ function NoLayers() {
 const headingHeight = 36;
 
 /**
+ * A vault's Contents: its own files when they are Contents (ADR 071), then what
+ * its contents folders hold. Connected folders sit directly under the section; a
+ * contents folder names itself when there is a second one or the vault's own
+ * files stand above it.
+ */
+function ContentsTrees({
+  space,
+  roots,
+  revision,
+  selected,
+  connections,
+  explorer,
+  onOpen,
+}: {
+  space: Space;
+  roots?: Listing;
+  revision: number;
+  selected?: Selected;
+  connections: CloudConnection[];
+  explorer?: Explorer;
+  onOpen: (space: Space, entry: Entry) => void;
+}) {
+  const own = useMemo(
+    () =>
+      roots && ownLayer(space) === 'contents'
+        ? {
+            ...roots,
+            entries: roots.entries.filter(
+              (entry) => entry.layer === 'contents' && !space.contents.includes(entry.path),
+            ),
+          }
+        : undefined,
+    [roots, space],
+  );
+  if (!roots) return <small className="tree-empty">{t('読み込み中…', 'Loading…')}</small>;
+  const folders = roots.entries.filter(
+    (entry) => entry.layer === 'contents' && space.contents.includes(entry.path),
+  );
+  return (
+    <>
+      {own && (
+        <div className="contents-root own">
+          <Tree
+            space={space}
+            layer="contents"
+            roots={own}
+            revision={revision}
+            selected={selected}
+            connections={connections}
+            onOpen={onOpen}
+            {...(explorer && { explorer, writable: true })}
+          />
+        </div>
+      )}
+      {folders.map((root) => (
+        <div key={root.path} className="contents-root">
+          {(folders.length > 1 || own) && <span className="contents-root-name">{root.path}</span>}
+          {root.blocked ? (
+            <small className="tree-empty">{root.blocked}</small>
+          ) : (
+            <Tree
+              space={space}
+              layer="contents"
+              directory={root.path}
+              revision={revision}
+              selected={selected}
+              connections={connections}
+              onOpen={onOpen}
+              explorer={explorer}
+            />
+          )}
+        </div>
+      ))}
+    </>
+  );
+}
+
+/**
  * A vault's knowledge and contents trees: the vault beside (ADR 038) and irori
  * mode's files view (ADR 068). Without an explorer they only open files.
  */
@@ -690,9 +768,6 @@ export function VaultSections({
   explorer?: Explorer;
   onOpen: (space: Space, entry: Entry) => void;
 }) {
-  const contentRoots = roots?.entries.filter(
-    (entry) => entry.layer === 'contents' && space.contents.includes(entry.path),
-  );
   // Only the layers the vault has (ADR 070).
   const layers = vaultLayers(space);
   return (
@@ -722,30 +797,16 @@ export function VaultSections({
                 onOpen={onOpen}
                 {...(explorer && { explorer, writable: true })}
               />
-            ) : !contentRoots ? (
-              <small className="tree-empty">{t('読み込み中…', 'Loading…')}</small>
             ) : (
-              contentRoots.map((root) => (
-                <div key={root.path} className="contents-root">
-                  {contentRoots.length > 1 && (
-                    <span className="contents-root-name">{root.path}</span>
-                  )}
-                  {root.blocked ? (
-                    <small className="tree-empty">{root.blocked}</small>
-                  ) : (
-                    <Tree
-                      space={space}
-                      layer="contents"
-                      directory={root.path}
-                      revision={revision}
-                      selected={selected}
-                      connections={connections}
-                      onOpen={onOpen}
-                      explorer={explorer}
-                    />
-                  )}
-                </div>
-              ))
+              <ContentsTrees
+                space={space}
+                roots={roots}
+                revision={revision}
+                selected={selected}
+                connections={connections}
+                explorer={explorer}
+                onOpen={onOpen}
+              />
             )}
           </div>
         </section>
@@ -943,8 +1004,8 @@ export const BrainPanel = memo(function BrainPanel({
   const remote = !!space.host;
   const editLocked = locked || remote;
   const [folded, setFolded] = useState<Layer[]>([]);
-  // Without Knowledge, Schema holds the vault's own files (ADR 070): it opens on them.
-  const ownFiles = !hasLayer(space, 'Knowledge_Base');
+  // With neither Knowledge nor Contents, Schema holds the vault's own files (ADR 070): it opens on them.
+  const ownFiles = ownLayer(space) === 'schema';
   const [schemaFiles, setSchemaFiles] = useState(ownFiles);
   useEffect(() => {
     if (ownFiles) setSchemaFiles(true);
@@ -971,9 +1032,6 @@ export const BrainPanel = memo(function BrainPanel({
     storage: layoutStorage,
   });
   const category = categoryName(space.category);
-  const contentRoots = roots?.entries.filter(
-    (entry) => entry.layer === 'contents' && space.contents.includes(entry.path),
-  );
   const actions: Record<Layer, ReactNode> = {
     schema: (
       <>
@@ -1061,27 +1119,17 @@ export const BrainPanel = memo(function BrainPanel({
                   }))}
         />
       );
-    // Connected folders sit directly under the section; a second contents root names itself.
-    if (!contentRoots) return <small className="tree-empty">{t('読み込み中…', 'Loading…')}</small>;
-    return contentRoots.map((root) => (
-      <div key={root.path} className="contents-root">
-        {contentRoots.length > 1 && <span className="contents-root-name">{root.path}</span>}
-        {root.blocked ? (
-          <small className="tree-empty">{root.blocked}</small>
-        ) : (
-          <Tree
-            space={space}
-            layer="contents"
-            directory={root.path}
-            revision={revision}
-            selected={selected}
-            connections={connections}
-            onOpen={onOpen}
-            explorer={editLocked ? undefined : held ? addingOnly(explorer) : explorer}
-          />
-        )}
-      </div>
-    ));
+    return (
+      <ContentsTrees
+        space={space}
+        roots={roots}
+        revision={revision}
+        selected={selected}
+        connections={connections}
+        explorer={editLocked ? undefined : held ? addingOnly(explorer) : explorer}
+        onOpen={onOpen}
+      />
+    );
   }
   return (
     <section className="brain-panel chrome" aria-label={space.name}>
