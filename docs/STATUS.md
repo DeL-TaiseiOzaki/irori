@@ -1,7 +1,9 @@
 # Implementation status — notes, native agents and connection onboarding
 
 The `irori` command has what the window has, 2026-11-24 (**0.2.99**, with the
-entry below; [ADR 075](decisions/075-the-irori-command-has-what-the-window-has.md)):
+entry below; [ADR 075](decisions/075-the-irori-command-has-what-the-window-has.md),
+[#382](https://github.com/DeL-TaiseiOzaki/irori/pull/382), published as
+`v0.2.99-preview.1`):
 the owner asked for every window action the irori agent could not reach.
 `AgentSetup` gains `copy`, `stop`, `connection`, `strays`, `skills`,
 `install python`, `move` across vaults, `workspace --rename/--delete/--group/--ungroup`,
@@ -13,12 +15,19 @@ the owner asked for every window action the irori agent could not reach.
 `remove`/`saveGroups`, `FileService.saveIcon`, `RemoteHosts.saveHost`/
 `unregister`); deleting a workspace, removing a stray, renewing skills,
 installing uv and adding a host wait for the person's 許可.
-- Verified by `tests/irori-command.test.ts` and `tests/remote-hosts.test.ts`.
+- Verified by `tests/irori-command.test.ts` and `tests/remote-hosts.test.ts`;
+  pull request run `45418513073` passed `verify` (UI smokes) and packaging.
+- Published from `8be5506` (publish run `45423824103`, packages of run
+  `45418513073`): Windows 179,443,712 bytes, Mac 145,714,787 bytes,
+  `irori-0.2.99-full.nupkg` 178,614,676 bytes, with `SHA256SUMS.txt`; the three
+  downloaded anonymously match it. The live download page links the 0.2.99
+  installers.
 - Not covered: a real CLI agent using them; the move across vaults was run
   through `FileService.moveAcross` in the test, not through main's wrapper.
 
 The irori agent makes vaults on SSH hosts, 2026-11-24 (**0.2.99**,
-[ADR 074](decisions/074-the-irori-agent-makes-vaults-on-ssh-hosts.md)): asked
+[ADR 074](decisions/074-the-irori-agent-makes-vaults-on-ssh-hosts.md),
+published with the entry above): asked
 for six vaults on an SSH host, the irori agent answered that only the window
 could make a host's folder a vault. `irori clone`, `create` and `add` now take
 `--host <host>` (`AgentSetup.onHost`): `add` goes through
@@ -28,8 +37,8 @@ operation `newVault` (`RemoteHosts.create`), which runs the host's own
 there are absolute or from the host's home, where new vaults go by default.
 `irori hosts [<host> [<folder>]]` lists the hosts or a folder's folders there,
 and `irori list` names the vaults on SSH hosts. The `new-vault` and
-`add-vaults` skills mention `--host` (only for folders created or completed
-after this; a present skill is not replaced).
+`add-vaults` skills mention `--host`; a folder made earlier gets them with
+`irori skills --update` (ADR 075).
 - Verified by `tests/remote-hosts.test.ts` (this machine standing in for the
   host: hosts and folders listed, a folder added and added again, a vault
   created on `main` with its first commit and refused a second time, a GitHub
