@@ -384,7 +384,17 @@ export class FileService {
         throw Error('A space cannot be registered inside contents (including aliases)');
     }
   }
-  async register(root: string, name: string, category: Category): Promise<Space> {
+  /**
+   * Registers a folder as a vault. One that declares itself already is taken as
+   * it is; otherwise irori writes its declaration with the name and, when given,
+   * a category and the layers it has (ADR 072).
+   */
+  async register(
+    root: string,
+    name: string,
+    category?: Category,
+    layers?: readonly NamedLayer[],
+  ): Promise<Space> {
     return this.queue.run(async () => {
       root = await fs.realpath(root);
       if (!(await fs.stat(root)).isDirectory()) throw Error('Choose a KB directory');
@@ -401,6 +411,7 @@ export class FileService {
             name,
             category,
             contents: ['contents'],
+            ...(declaredLayers(layers) && { layers: declaredLayers(layers) }),
             ...((await bundleAtRoot(root)) && { knowledge: rootKnowledgeFolder }),
           }),
           root,

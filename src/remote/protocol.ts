@@ -4,6 +4,7 @@ import { attachmentByteLimit, attachmentRef } from '../domain/attachments';
 import { agentEffort, agentModel } from '../domain/conversation';
 import { agentAccessModes, agentIds, type AgentEvent } from '../domain/types';
 import { categoryText } from '../domain/brains';
+import { layerSelection } from '../domain/layers';
 import { languages } from '../domain/i18n';
 import { remotePath, sentFileName, type RemoteHostAbout } from '../domain/remote-hosts';
 import type { VaultRead } from '../host/vault-reads';
@@ -117,7 +118,8 @@ export const handedTask = z.object({
 export const hostOperations = {
   spaces: z.tuple([]),
   folders: z.tuple([remotePath.optional()]),
-  registerVault: z.tuple([remotePath, name, categoryText]),
+  // JSON carries a missing category or choice of layers as null.
+  registerVault: z.tuple([remotePath, name, categoryText.nullish(), layerSelection.nullish()]),
   unregisterVault: z.tuple([id]),
   brief: z.tuple([id, z.enum(agentIds)]),
   sendFile: z.tuple([

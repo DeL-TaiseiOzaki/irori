@@ -1309,7 +1309,7 @@ button.home-row:hover {
   font-size: 14px;
 }
 /* Which layers the vault has (ADR 070); Schema is always one. */
-.brain-sheet-layer-choice {
+.layer-choice {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1318,28 +1318,37 @@ button.home-row:hover {
   padding: 0;
   border: 0;
 }
-.brain-sheet-layer-choice legend {
+.layer-choice legend {
   padding: 0;
   margin-bottom: 6px;
   font-size: 12px;
   color: var(--ink-3);
 }
-.brain-sheet-layer-choice label {
+.layer-choice label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-size: 13px;
 }
-.brain-sheet-layer-choice input {
+.layer-choice input {
   margin: 0;
 }
-.brain-sheet-layer-choice .layer-icon.schema {
+/* In a form that makes a vault, the form's own label rule gives way. */
+.modal .layer-choice {
+  margin: 15px 0;
+}
+.modal .layer-choice label {
+  display: inline-flex;
+  margin: 0;
+  font-size: 13px;
+}
+.layer-choice .layer-icon.schema {
   color: var(--schema);
 }
-.brain-sheet-layer-choice .layer-icon.Knowledge_Base {
+.layer-choice .layer-icon.Knowledge_Base {
   color: var(--know);
 }
-.brain-sheet-layer-choice .layer-icon.contents {
+.layer-choice .layer-icon.contents {
   color: var(--cont);
 }
 .brain-sheet-layer-grid {
