@@ -9,9 +9,10 @@ and `add` take `--layers`. In review as a pull request; not merged or published.
 ([ADR 071](decisions/071-a-vaults-own-files-in-contents.md)): a Schema +
 Contents vault shows its own files in Contents, editable and in Git; a vault
 with both layers may choose the same beside a named knowledge folder
-(`rootLayer`, `irori set --own`). In review as a pull request; not merged or
-published. Next: try a repository of code as a vault with a real CLI agent.
-Not covered: search in these files.
+(`rootLayer`, `irori set --own`). Merged in
+[#375](https://github.com/DeL-TaiseiOzaki/irori/pull/375) and published as
+`v0.2.95-preview.1`; UI smokes ran on Linux only. Next: try a repository of
+code as a vault with a real CLI agent. Not covered: search in these files.
 
 **A vault chooses its layers, 0.2.94**
 ([ADR 070](decisions/070-a-vault-chooses-its-layers.md)): Knowledge and
