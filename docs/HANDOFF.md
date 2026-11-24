@@ -10,7 +10,9 @@ and a real CLI agent. Open request, not started: the vault's root as its content
 that code at a vault's top level is Contents rather than Schema.
 
 **The latest 3 runs in a routine's history, 0.2.93**: an opened routine lists
-its latest 3 runs; 20 are still kept on the device. Not tried on macOS or Windows.
+its latest 3 runs; 20 are still kept on the device. Merged in #372 and
+published as `v0.2.93-preview.1`; UI smokes ran on Linux only. Not tried on
+macOS or Windows.
 
 **The session board at the right, 0.2.92**: the board stands right of the
 agents' columns; its panel opens to its left. Published as
