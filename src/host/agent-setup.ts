@@ -23,17 +23,38 @@ import {
   workspaceSaved,
   routineRunRefused,
   routineStarted,
+  sshHostList,
+  hostFolders,
+  hostAdded,
+  noteMovedAcross,
+  entryCopied,
+  routineStopped,
+  connectionChanged,
+  strayList,
+  strayAdopted,
+  strayRemoved,
+  standardSkills,
+  pythonInstalled,
+  workspaceRenamed,
+  workspaceDeleted,
+  workspaceGrouped,
   type ListedVault,
 } from '../../prompts';
 import { parseIroriCommand } from '../domain/irori-command';
 import type {
   AgentId,
   Category,
+  Entry,
+  EntryMove,
   LayerFolderRename,
   Space,
   SpaceChange,
+  VaultGroup,
   WorkspaceProfile,
 } from '../domain/types';
+import { randomUUID } from 'node:crypto';
+import type { SshConfigHost } from '../domain/remote-hosts';
+import type { YourAiService } from './you';
 import {
   defaultLayerLabel,
   hasLayer,
@@ -56,15 +77,18 @@ import type { CloudService } from '../cloud/service';
 import { githubCloneURL, type GitService } from '../git/service';
 import type { FileService } from './files';
 import { inspectRepository, type WorkspaceService } from './workspaces';
+import { imageType } from './images';
 import { githubRepository, repositoryFolder } from '../domain/git';
 import { renameLayerFolder } from './layer-folders';
 import type { WorkFolders } from './work-folders';
+import type { RemoteHosts } from './remote-hosts';
 
 /** What the `irori` command reaches in the host. */
 export interface AgentSetupHost {
   files: FileService;
   git: Pick<GitService, 'clone' | 'create' | 'abandon' | 'firstCommit'>;
-  workspaces: Pick<WorkspaceService, 'list' | 'update'> & Partial<Pick<WorkspaceService, 'forget'>>;
+  workspaces: Pick<WorkspaceService, 'list' | 'update'> &
+    Partial<Pick<WorkspaceService, 'forget' | 'save' | 'remove' | 'saveGroups'>>;
   cloud: Pick<
     CloudService,
     | 'addLocal'
@@ -77,11 +101,47 @@ export interface AgentSetupHost {
     | 'edit'
     | 'suspend'
     | 'resume'
-  >;
+  > &
+    Partial<Pick<CloudService, 'setAccess' | 'strays' | 'adoptStray' | 'removeStray'>>;
   /** The folder each vault's agents work in. */
   work?: Pick<WorkFolders, 'folder' | 'choose'>;
   /** Where new vaults go when the command names no parent folder. */
   defaultParent: () => Promise<string>;
+  /** The person's SSH hosts and their vaults, where `--host` makes a vault (ADR 061, ADR 074). */
+  remote?: Pick<
+    RemoteHosts,
+    'hosts' | 'list' | 'register' | 'create' | 'folders' | 'saveHost' | 'unregister'
+  >;
+  /** The hosts the person's ssh configuration names, offered as SSH hosts to add. */
+  sshConfigHosts?: () => Promise<SshConfigHost[]>;
+  /** Moves knowledge into another vault's, as the explorer's move to a vault does (ADR 038). */
+  moveToVault?: (
+    scopeId: string,
+    from: string,
+    toScopeId: string,
+    directory: string,
+  ) => Promise<EntryMove>;
+  /** How many links such a move would break. */
+  vaultMoveLinks?: (
+    scopeId: string,
+    from: string,
+  ) => Promise<{ links: number; incomplete: boolean }>;
+  /** Copies a file or folder into a folder of any vault, as the explorer's paste does. */
+  copyEntry?: (
+    scopeId: string,
+    from: string,
+    toScopeId: string,
+    directory: string,
+  ) => Promise<Entry>;
+  /** Ends a routine's run in progress, as 停止 does. */
+  stopRoutine?: (ref: RoutineRef) => Promise<void>;
+  /** Downloads uv for the Python steps of routines, as the routines page does. */
+  installPython?: () => Promise<void>;
+  /** The irori agent's standard skills, as its screen adds them. */
+  skills?: Pick<
+    YourAiService,
+    'standardSkillState' | 'addStandardSkills' | 'replaceStandardSkills'
+  >;
   /** Registers through the host's own guards and starts watching the vault. */
   register?: (
     root: string,
@@ -161,13 +221,40 @@ export interface SetupContext {
 type Joined = 'joined' | 'member' | 'no workspace';
 
 /** Forms only the irori agent has: they register, group or remove vaults, or start routines. */
-const irori = new Set(['clone', 'create', 'add', 'workspace', 'remove', 'run']);
+const irori = new Set([
+  'clone',
+  'create',
+  'add',
+  'hosts',
+  'workspace',
+  'remove',
+  'run',
+  'stop',
+  'skills',
+  'install',
+]);
 /**
  * Forms the person confirms each time: they add a folder agents may write in,
  * clone, create, register or remove a vault, or start a routine with its secrets. Any process
  * the agent starts holds the command too, so a request alone is not enough.
  */
-const confirmed = new Set(['clone', 'create', 'add', 'connect', 'work', 'remove', 'run']);
+const confirmed = new Set([
+  'clone',
+  'create',
+  'add',
+  'connect',
+  'work',
+  'remove',
+  'run',
+  'install',
+]);
+/** The forms the person confirms only in one of their variants. */
+const confirmedWhen = (command: ReturnType<typeof parseIroriCommand>) =>
+  confirmed.has(command.kind) ||
+  (command.kind === 'hosts' && !!command.add) ||
+  (command.kind === 'workspace' && !!command.delete) ||
+  (command.kind === 'strays' && !!command.remove) ||
+  (command.kind === 'skills' && command.update);
 
 /**
  * Carries out the irori agent's `irori` command: what the person does in
@@ -205,7 +292,7 @@ export class AgentSetup {
       );
     const relativePathArg =
       command.kind === 'add'
-        ? !path.isAbsolute(command.folder) && !/^~(?:[\\/]|$)/.test(command.folder)
+        ? !command.host && !path.isAbsolute(command.folder) && !/^~(?:[\\/]|$)/.test(command.folder)
         : command.kind === 'connect'
           ? !command.repository &&
             !path.isAbsolute(command.folder) &&
@@ -214,7 +301,7 @@ export class AgentSetup {
             ? !!command.folder &&
               !path.isAbsolute(command.folder) &&
               !/^~(?:[\\/]|$)/.test(command.folder)
-            : command.kind === 'clone' || command.kind === 'create'
+            : (command.kind === 'clone' || command.kind === 'create') && !command.host
               ? !!command.parent &&
                 !path.isAbsolute(command.parent) &&
                 !/^~(?:[\\/]|$)/.test(command.parent)
@@ -224,7 +311,7 @@ export class AgentSetup {
       2000,
     );
     if (
-      confirmed.has(command.kind) &&
+      confirmedWhen(command) &&
       this.host.confirm &&
       !(await this.host.confirm(shownCommand, context.by ?? 'agent'))
     )
@@ -236,6 +323,8 @@ export class AgentSetup {
         return iroriCommandHelp(await this.host.defaultParent(), !!context.vault);
       case 'list':
         return this.list(context);
+      case 'hosts':
+        return this.hosts(command);
       case 'routines': {
         if (!this.host.routines) throw Error('Routines are not available here.');
         const workspace = context.vault ? undefined : await this.workspace(context);
@@ -249,10 +338,13 @@ export class AgentSetup {
         );
       }
       case 'clone':
-        return this.clone(command, cwd, context);
       case 'create':
-        return this.create(command, cwd, context);
+        if (command.host) return this.onHost(command, command.host, context);
+        return command.kind === 'clone'
+          ? this.clone(command, cwd, context)
+          : this.create(command, cwd, context);
       case 'add':
+        if (command.host) return this.onHost(command, command.host, context);
         return this.add(this.folder(cwd, command.folder), command, context);
       case 'connect':
         return this.connect(command, cwd, context);
@@ -270,6 +362,21 @@ export class AgentSetup {
         return this.remove(command, cwd, context);
       case 'run':
         return this.startRoutine(command, cwd, context);
+      case 'stop':
+        return this.stopRoutine(command, cwd, context);
+      case 'copy':
+        return this.copy(command, cwd, context);
+      case 'connection':
+        return this.connection(command, cwd, context);
+      case 'strays':
+        return this.strays(command, cwd, context);
+      case 'skills':
+        return this.standardSkills(command);
+      case 'install': {
+        if (!this.host.installPython) throw Error('Installing Python is not available here.');
+        await this.host.installPython();
+        return pythonInstalled();
+      }
       case 'move':
         return this.moveNote(command, cwd, context);
       case 'trash':
@@ -319,8 +426,27 @@ export class AgentSetup {
         ),
         ...(this.host.work && { work: (await this.host.work.folder(space.scopeId)).path }),
       });
+    // The vaults on SSH hosts, which only the irori agent sees.
+    const far = context.vault ? [] : (this.host.remote?.list() ?? []);
+    for (const space of far)
+      vaults.push({
+        name: space.name,
+        root: space.root,
+        host: space.host.name,
+        inWorkspace: !!workspace?.scopeIds.includes(space.scopeId),
+        ...(space.category && { category: categoryName(space.category) }),
+        ...(hasLayer(space, 'Knowledge_Base') && {
+          knowledge: shownFolder(knowledgeFolder(space)),
+        }),
+        ...(hasLayer(space, 'contents') && { contents: space.contents }),
+        without: namedLayers
+          .filter((layer) => !hasLayer(space, layer))
+          .map((layer) => defaultLayerLabel(layer)),
+      });
     const names = (scopeIds: string[]) =>
-      scopeIds.map((id) => spaces.find((space) => space.scopeId === id)?.name ?? 'unavailable');
+      scopeIds.map(
+        (id) => [...spaces, ...far].find((space) => space.scopeId === id)?.name ?? 'unavailable',
+      );
     return vaultList(
       vaults,
       await this.host.defaultParent(),
@@ -454,6 +580,127 @@ export class AgentSetup {
       { already: false, joined: await this.join(space.scopeId, context) },
     );
   }
+  private get remote() {
+    if (!this.host.remote) throw Error('SSH hosts are not available here.');
+    return this.host.remote;
+  }
+  /** The SSH host a command names, by its name or its destination. */
+  private sshHost(name: string) {
+    const hosts = this.remote.hosts();
+    const wanted = name.trim().toLowerCase();
+    const found = hosts.filter(
+      (item) => item.name.toLowerCase() === wanted || item.destination.toLowerCase() === wanted,
+    );
+    if (found.length === 1) return found[0];
+    if (found.length)
+      throw Error(
+        `More than one SSH host is named "${name}": ${found.map((item) => item.destination).join(', ')}. Name it by its destination.`,
+      );
+    throw Error(
+      hosts.length
+        ? `No SSH host is named "${name}". irori has ${hosts.map((item) => JSON.stringify(item.name)).join(', ')}; "irori hosts" lists them. Another host is added by the person in irori's settings, under SSH ホスト (SSH hosts).`
+        : `irori has no SSH hosts. The person adds "${name}" in irori's settings, under SSH ホスト (SSH hosts), first.`,
+    );
+  }
+  /** A folder on a host: absolute, or taken from the host's home folder. */
+  private async hostFolder(hostId: string, value?: string) {
+    if (value?.startsWith('/')) return value;
+    const home = (await this.remote.folders(hostId)).path;
+    if (!value || value === '~') return home;
+    return path.posix.join(home, value.startsWith('~/') ? value.slice(2) : value);
+  }
+  /** `irori hosts`: the SSH hosts, or the folders in a folder of one. */
+  private async hosts(command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'hosts' }>) {
+    if (command.add) {
+      const { destination, name, port } = command.add;
+      const same = this.remote
+        .hosts()
+        .find((item) => item.destination === destination && item.port === port);
+      if (same) return hostAdded(same.name, destination, true);
+      const saved = await this.remote.saveHost({
+        name: name ?? destination.slice(0, 60),
+        destination,
+        ...(port && { port }),
+      });
+      return hostAdded(saved.name, destination, false);
+    }
+    if (!command.host) {
+      const vaults = this.host.remote?.list() ?? [];
+      const hosts = this.host.remote?.hosts() ?? [];
+      const configured = (await this.host.sshConfigHosts?.().catch(() => [])) ?? [];
+      return sshHostList(
+        hosts.map((item) => ({
+          name: item.name,
+          destination: item.port ? `${item.destination}:${item.port}` : item.destination,
+          state: item.state,
+          vaults: vaults.filter((vault) => vault.host.id === item.id).map((vault) => vault.name),
+        })),
+        configured
+          .filter((item) => !hosts.some((host) => host.destination === item.alias))
+          .map((item) => item.alias),
+      );
+    }
+    const host = this.sshHost(command.host);
+    return hostFolders(
+      host.name,
+      await this.remote.folders(host.id, await this.hostFolder(host.id, command.folder)),
+    );
+  }
+  /**
+   * `irori clone`, `create` and `add` with `--host` (ADR 074): the vault is made
+   * or registered on that SSH host, as the window's 「SSH ホストのフォルダを vault にする」
+   * does, and joins the request's workspace.
+   */
+  private async onHost(
+    command: Extract<
+      ReturnType<typeof parseIroriCommand>,
+      { kind: 'clone' } | { kind: 'create' } | { kind: 'add' }
+    >,
+    name: string,
+    context: SetupContext,
+  ) {
+    const host = this.sshHost(name);
+    const before = new Set(this.remote.list().map((vault) => vault.scopeId));
+    let vault: Space;
+    let notice: string | undefined;
+    let repository: string | undefined;
+    if (command.kind === 'add') {
+      const root = await this.hostFolder(host.id, command.folder);
+      vault = await this.remote.register(
+        host.id,
+        root,
+        command.name ?? (path.posix.basename(root) || root),
+        command.category,
+        command.layers,
+      );
+    } else {
+      if (command.kind === 'clone') {
+        repository = githubRepository(command.url);
+        if (!repository || !githubCloneURL(command.url))
+          throw Error(
+            `"${command.url}" is not a GitHub repository. Give its URL or owner/name, for example octo/notes.`,
+          );
+      }
+      const folder =
+        command.kind === 'clone' ? (command.folder ?? repository!.split('/')[1]) : command.folder;
+      ({ vault, notice } = await this.remote.create(host.id, {
+        ...(command.parent && { parent: await this.hostFolder(host.id, command.parent) }),
+        folder,
+        name: command.name ?? (command.kind === 'clone' ? repository!.split('/')[1] : folder),
+        ...(command.category && { category: command.category }),
+        ...(command.layers && { layers: command.layers }),
+        ...(command.kind === 'clone' && { url: command.url }),
+      }));
+    }
+    return vaultRegistered(
+      { name: vault.name, root: vault.root, host: host.name, repository },
+      {
+        already: before.has(vault.scopeId),
+        joined: await this.join(vault.scopeId, context),
+        notice,
+      },
+    );
+  }
   /**
    * Starts a routine the person asked the irori agent to run (ADR 016 D6). It
    * runs only as reviewed on this device, so the agent cannot run files the
@@ -468,6 +715,39 @@ export class AgentSetup {
     if (!this.host.routines || !this.host.runRoutine)
       throw Error('Routines are not available here.');
     if (context.inRoutine) throw Error(routineRunRefused.inRoutine);
+    const { routine, workspace } = await this.findRoutine(command, cwd, context);
+    if (routine.problem) throw Error(routineRunRefused.problem(routine.problem));
+    if (routine.needs) throw Error(routineRunRefused.needs(routine.needs.text));
+    if (routine.review !== 'reviewed') throw Error(routineRunRefused.review(routine.review));
+    if (routine.running) throw Error(routineRunRefused.running);
+    await this.host.runRoutine!(routine.ref, {
+      workspaceId: workspace.id,
+      agents: context.agent ? { [routine.ref.owner]: context.agent } : {},
+    });
+    return routineStarted(
+      routine.name,
+      routine.steps.some((step) => step.kind === 'agent'),
+    );
+  }
+  /** `irori stop`: ends the routine's run in progress, as 停止 does. */
+  private async stopRoutine(
+    command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'stop' }>,
+    cwd: string,
+    context: SetupContext,
+  ) {
+    if (!this.host.stopRoutine) throw Error('Routines are not available here.');
+    const { routine } = await this.findRoutine(command, cwd, context);
+    if (!routine.running) return routineStopped(routine.name, false);
+    await this.host.stopRoutine(routine.ref);
+    return routineStopped(routine.name, true);
+  }
+  /** The one routine a command names, among this request's workspace's. */
+  private async findRoutine(
+    command: { routine: string; vault?: string },
+    cwd: string,
+    context: SetupContext,
+  ) {
+    if (!this.host.routines) throw Error('Routines are not available here.');
     const workspace = await this.workspace(context);
     if (!workspace) throw Error(routineRunRefused.noWorkspace);
     const owner = command.vault ? this.vault(command.vault, cwd).scopeId : undefined;
@@ -492,19 +772,7 @@ export class AgentSetup {
         ),
       );
     }
-    const routine = found[0];
-    if (routine.problem) throw Error(routineRunRefused.problem(routine.problem));
-    if (routine.needs) throw Error(routineRunRefused.needs(routine.needs.text));
-    if (routine.review !== 'reviewed') throw Error(routineRunRefused.review(routine.review));
-    if (routine.running) throw Error(routineRunRefused.running);
-    await this.host.runRoutine(routine.ref, {
-      workspaceId: workspace.id,
-      agents: context.agent ? { [routine.ref.owner]: context.agent } : {},
-    });
-    return routineStarted(
-      routine.name,
-      routine.steps.some((step) => step.kind === 'agent'),
-    );
+    return { routine: found[0], workspace };
   }
   /** The registered vault a command names: by name, sub-agent name or folder. */
   private vault(name: string, cwd: string, scope?: string, handed?: string[]) {
@@ -523,7 +791,52 @@ export class AgentSetup {
       throw Error(
         `More than one vault is named "${name}". Name it by its folder: ${found.map((space) => JSON.stringify(space.root)).join(', ')}.`,
       );
+    if (this.remote_(name).length)
+      throw Error(
+        `"${name}" is a vault on an SSH host. This form reaches vaults on this computer; on an SSH host, "irori workspace" and "irori remove" do, and its own agent does the rest.`,
+      );
     throw Error(`No vault is named "${name}". Run "irori list" for their names and folders.`);
+  }
+  /** The vaults on SSH hosts a command's word names, by name or folder there. */
+  private remote_(name: string) {
+    const wanted = name.trim().toLowerCase();
+    return (this.host.remote?.list() ?? []).filter(
+      (vault) => vault.name.trim().toLowerCase() === wanted || vault.root === name,
+    );
+  }
+  /** A vault on this computer or on an SSH host, for the forms that reach both. */
+  private anyVault(name: string, cwd: string): Space & { host?: { id: string; name: string } } {
+    const far = this.remote_(name);
+    let here: Space | undefined;
+    try {
+      here = this.vault(name, cwd);
+    } catch (error) {
+      if (!far.length) throw error;
+    }
+    if ((here ? 1 : 0) + far.length > 1)
+      throw Error(
+        `More than one vault is named "${name}". Name it by its folder: ${[...(here ? [here] : []), ...far].map((space) => JSON.stringify(space.root)).join(', ')}.`,
+      );
+    return here ?? far[0];
+  }
+  /** A folder of a vault this run reaches, its root included. */
+  private async locatedFolder(
+    cwd: string,
+    folder: string,
+    scope: string | undefined,
+    handed?: string[],
+  ) {
+    const absolute = this.folder(cwd, folder);
+    const space = owner(this.host.files.list(), absolute);
+    const directory = await fs
+      .stat(absolute)
+      .then((stat) => stat.isDirectory())
+      .catch(() => false);
+    if (!space || !directory) throw Error(`${JSON.stringify(folder)} is not a folder in a vault.`);
+    return {
+      space: this.allowed(space, scope, handed),
+      path: path.relative(space.root, absolute).split(path.sep).join('/'),
+    };
   }
   /** Refuses another vault to a vault agent's command, or an unhanded vault when scopes were handed. */
   private allowed(space: Space, scope: string | undefined, handed?: string[]) {
@@ -668,6 +981,101 @@ export class AgentSetup {
     }
     return folderDisconnected(space.name, connection);
   }
+  /** `irori connection`: renames a connected folder, or chooses whether agents may change it. */
+  private async connection(
+    command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'connection' }>,
+    cwd: string,
+    context: SetupContext,
+  ) {
+    const space = this.vault(command.vault, cwd, context.vault, context.handedScopes);
+    this.idle(space, 'Change the connected folder', context.vault);
+    const wanted = command.name.replace(/^.*[\\/]/, '');
+    const connection = (await this.host.cloud.connections(space.scopeId)).find(
+      (item) => item.name === wanted,
+    );
+    if (!connection)
+      throw Error(
+        `The vault "${space.name}" has no connected folder named "${wanted}". Run "irori list" for them.`,
+      );
+    try {
+      if (command.access && command.access !== connection.access) {
+        if (connection.provider === 'github' || !this.host.cloud.setAccess)
+          throw Error(
+            'A GitHub repository is read-only or editable as it was connected: disconnect it and connect it again, with --editable or without.',
+          );
+        await this.host.cloud.setAccess(space.scopeId, connection.mountId, command.access);
+      }
+      if (command.rename && command.rename !== connection.name) {
+        // A connection is renamed while it is not linked, then linked again.
+        const linked = connection.state === 'mounted' || connection.state === 'waiting';
+        if (linked) await this.host.cloud.disconnect(space.scopeId, connection.mountId);
+        await this.host.cloud.edit(space.scopeId, connection.mountId, command.rename);
+        if (linked) await this.host.cloud.connect(space.scopeId, connection.mountId);
+      }
+    } finally {
+      this.host.announce?.({ scopeId: space.scopeId });
+    }
+    return connectionChanged(space.name, {
+      contentsRoot: connection.contentsRoot,
+      name: command.rename ?? connection.name,
+      readOnly: (command.access ?? connection.access) === 'read-only',
+    });
+  }
+  /** `irori strays`: what a vault's contents holds that no connection names, adopted or removed. */
+  private async strays(
+    command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'strays' }>,
+    cwd: string,
+    context: SetupContext,
+  ) {
+    const space = this.vault(command.vault, cwd, context.vault, context.handedScopes);
+    const { strays, adoptStray, removeStray } = this.host.cloud;
+    if (!strays || !adoptStray || !removeStray) throw Error('Contents is not available here.');
+    const found = await strays.call(this.host.cloud, space.scopeId);
+    const wanted = command.adopt ?? command.remove;
+    if (!wanted) return strayList(space.name, found);
+    const matches = found.filter(
+      (item) => item.name === wanted || `${item.contentsRoot}/${item.name}` === wanted,
+    );
+    if (matches.length !== 1)
+      throw Error(
+        matches.length
+          ? `More than one stray is named "${wanted}": name it as <contents folder>/<name>.`
+          : `The vault "${space.name}" has no stray named "${wanted}". Run "irori strays ${command.vault}" for them.`,
+      );
+    const [stray] = matches;
+    this.idle(space, 'Change its contents', context.vault);
+    try {
+      if (command.adopt) {
+        const connection = await adoptStray.call(
+          this.host.cloud,
+          space.scopeId,
+          stray.contentsRoot,
+          stray.name,
+          command.folder ? this.folder(cwd, command.folder) : undefined,
+        );
+        return strayAdopted(space.name, stray, connection.state);
+      }
+      await removeStray.call(this.host.cloud, space.scopeId, stray.contentsRoot, stray.name);
+      return strayRemoved(space.name, stray);
+    } finally {
+      this.host.announce?.({ scopeId: space.scopeId });
+    }
+  }
+  /** `irori skills`: adds the standard skills the irori agent's folder lacks, and with --update renews the changed ones. */
+  private async standardSkills(
+    command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'skills' }>,
+  ) {
+    if (!this.host.skills) throw Error('The standard skills are not available here.');
+    const state = await this.host.skills.standardSkillState();
+    if (state.missing.length) await this.host.skills.addStandardSkills();
+    if (command.update && state.changed.length)
+      await this.host.skills.replaceStandardSkills(state.changed);
+    return standardSkills({
+      added: state.missing,
+      updated: command.update ? state.changed : [],
+      differ: command.update ? [] : state.changed,
+    });
+  }
   private async set(
     command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'set' }>,
     cwd: string,
@@ -678,6 +1086,16 @@ export class AgentSetup {
     const space = this.vault(command.vault, cwd, context.vault, context.handedScopes);
     // Its layers sort its files anew, so they wait for another's run as its folders do.
     if (command.layers || command.own) this.idle(space, 'Choose its layers', context.vault);
+    let look = command.look;
+    if (command.iconImage) {
+      const file = this.folder(cwd, command.iconImage);
+      const info = await fs.stat(file).catch(() => undefined);
+      if (!info?.isFile()) throw Error(`${JSON.stringify(command.iconImage)} is not a file.`);
+      if (info.size > 2 * 1024 * 1024) throw Error('An icon image is at most 2 MiB.');
+      const bytes = new Uint8Array(await fs.readFile(file));
+      const saved = await this.host.files.saveIcon(space.scopeId, bytes, imageType(bytes));
+      look = { ...look, icon: { kind: 'image', path: saved } };
+    }
     const change: SpaceChange = {
       ...(command.name && { name: command.name }),
       ...(command.category && { category: command.category }),
@@ -685,7 +1103,7 @@ export class AgentSetup {
       ...(command.layers && { layers: command.layers }),
       ...(command.own && { rootLayer: command.own === 'contents' ? 'contents' : null }),
       // An icon or color keeps the other one.
-      ...(command.look && { appearance: { ...space.appearance, ...command.look } }),
+      ...(look && { appearance: { ...space.appearance, ...look } }),
     };
     const next = await (this.host.update ?? ((id, c) => this.host.files.update(id, c)))(
       space.scopeId,
@@ -695,7 +1113,7 @@ export class AgentSetup {
     return vaultChanged({
       name: next.name,
       ...(next.category && { category: categoryName(next.category) }),
-      ...(command.look && {
+      ...(look && {
         look: {
           color: next.appearance?.color,
           icon:
@@ -781,8 +1199,56 @@ export class AgentSetup {
     cwd: string,
     context: SetupContext,
   ) {
-    const spaces = command.vaults.map((name) => this.vault(name, cwd));
+    const spaces = command.vaults.map((name) => this.anyVault(name, cwd));
     const ids = spaces.map((space) => space.scopeId);
+    const all = [...this.host.files.list(), ...(this.host.remote?.list() ?? [])];
+    const named = (scopeIds: string[]) =>
+      scopeIds.map((id) => all.find((space) => space.scopeId === id)?.name ?? 'unavailable');
+    if (command.rename || command.delete || command.group !== undefined) {
+      const workspace = (await this.host.workspaces.list()).find(
+        (item) => item.name === command.name,
+      );
+      if (!workspace) throw Error(`There is no workspace named "${command.name}".`);
+      if (command.rename) {
+        if (!this.host.workspaces.save) throw Error('Renaming workspaces is not available here.');
+        const saved = await this.host.workspaces.save(
+          command.rename,
+          workspace.scopeIds,
+          workspace.id,
+        );
+        this.host.announce?.({ workspace: saved });
+        return workspaceRenamed(command.name, saved.name);
+      }
+      if (command.delete) {
+        if (!this.host.workspaces.remove) throw Error('Deleting workspaces is not available here.');
+        await this.host.workspaces.remove(workspace.id);
+        this.host.announce?.({});
+        return workspaceDeleted(workspace.name, named(workspace.scopeIds));
+      }
+      if (!this.host.workspaces.saveGroups) throw Error('Groups are not available here.');
+      const outside = spaces.filter((space) => !workspace.scopeIds.includes(space.scopeId));
+      if (outside.length)
+        throw Error(
+          `${outside.map((space) => `"${space.name}"`).join(', ')} ${outside.length === 1 ? 'is' : 'are'} not in the workspace "${workspace.name}". Add ${outside.length === 1 ? 'it' : 'them'} first with irori workspace "${workspace.name}" <vault>.`,
+        );
+      // A vault is in one group at most: it leaves the one it was in.
+      let groups: VaultGroup[] = (workspace.groups ?? []).map((group) => ({
+        ...group,
+        scopeIds: group.scopeIds.filter((id) => !ids.includes(id)),
+      }));
+      if (command.group) {
+        const found = groups.find((group) => group.name === command.group);
+        if (found) found.scopeIds.push(...ids);
+        else groups.push({ id: randomUUID(), name: command.group, scopeIds: ids, open: true });
+      }
+      groups = groups.filter((group) => group.scopeIds.length);
+      const saved = await this.host.workspaces.saveGroups(workspace.id, groups);
+      this.host.announce?.({ workspace: saved });
+      return workspaceGrouped(
+        saved.name,
+        (saved.groups ?? []).map((group) => ({ name: group.name, vaults: named(group.scopeIds) })),
+      );
+    }
     const { before: existing, saved: written } = await this.host.workspaces.update(
       { name: command.name },
       (current) => {
@@ -795,14 +1261,8 @@ export class AgentSetup {
     );
     const saved = written!;
     this.host.announce?.({ workspace: saved });
-    const all = this.host.files.list();
     return workspaceSaved(
-      {
-        name: saved.name,
-        vaults: saved.scopeIds.map(
-          (id) => all.find((space) => space.scopeId === id)?.name ?? 'unavailable',
-        ),
-      },
+      { name: saved.name, vaults: named(saved.scopeIds) },
       { created: !existing, current: saved.id === context.workspaceId },
     );
   }
@@ -811,7 +1271,18 @@ export class AgentSetup {
     cwd: string,
     context: SetupContext,
   ) {
-    const space = this.vault(command.vault, cwd);
+    const space = this.anyVault(command.vault, cwd);
+    if (space.host) {
+      // A vault on an SSH host leaves this device's list; its folder stays there (ADR 061).
+      if (command.trash)
+        throw Error(
+          `The vault "${space.name}" is on the SSH host "${space.host.name}": irori takes it off the list only, and its folder stays there. Leave out --trash.`,
+        );
+      await this.remote.unregister(space.scopeId);
+      await this.host.workspaces.forget?.(space.scopeId);
+      this.host.announce?.({ workspace: await this.workspace(context) });
+      return vaultRemoved(space, false, space.host.name);
+    }
     this.idle(space, 'Remove it', context.vault);
     if (this.host.remove) await this.host.remove(space.scopeId, command.trash);
     else {
@@ -828,19 +1299,76 @@ export class AgentSetup {
     cwd: string,
     context: SetupContext,
   ) {
-    if (!this.host.moveNote) throw Error('Moving notes is not available here.');
     const from = this.located(cwd, command.note, context.vault, context.handedScopes);
-    let to = this.located(cwd, command.destination, context.vault, context.handedScopes);
-    if (to.space.scopeId !== from.space.scopeId) throw Error('A note moves within its own vault.');
-    // A folder as the destination keeps the note's name.
-    const folder = await fs
-      .stat(path.join(to.space.root, to.path))
-      .then((stat) => stat.isDirectory())
-      .catch(() => false);
-    if (folder) to = { ...to, path: `${to.path}/${path.posix.basename(from.path)}` };
+    // A folder as the destination keeps the note's name; a vault's root is one too.
+    const folder = await this.locatedFolder(
+      cwd,
+      command.destination,
+      context.vault,
+      context.handedScopes,
+    ).catch(() => undefined);
+    if (folder && folder.space.scopeId !== from.space.scopeId) return this.moveAcross(from, folder);
+    let to = folder ?? this.located(cwd, command.destination, context.vault, context.handedScopes);
+    if (to.space.scopeId !== from.space.scopeId)
+      throw Error(
+        'A note moves into another vault into one of its folders, keeping its name: name a folder there.',
+      );
+    if (!this.host.moveNote) throw Error('Moving notes is not available here.');
+    if (folder)
+      to = {
+        ...to,
+        path: to.path
+          ? `${to.path}/${path.posix.basename(from.path)}`
+          : path.posix.basename(from.path),
+      };
     const moved = await this.host.moveNote(from.space.scopeId, from.path, to.path);
     this.host.announce?.({ scopeId: from.space.scopeId });
     return noteMoved(from.space.name, from.path, moved);
+  }
+  /** `irori move` into another vault: as the explorer's move to a vault, links to it break (ADR 038). */
+  private async moveAcross(
+    from: { space: Space; path: string },
+    to: { space: Space; path: string },
+  ) {
+    if (!this.host.moveToVault) throw Error('Moving into another vault is not available here.');
+    const broken = await this.host
+      .vaultMoveLinks?.(from.space.scopeId, from.path)
+      .catch(() => undefined);
+    const moved = await this.host.moveToVault(
+      from.space.scopeId,
+      from.path,
+      to.space.scopeId,
+      to.path,
+    );
+    this.host.announce?.({ scopeId: from.space.scopeId });
+    this.host.announce?.({ scopeId: to.space.scopeId });
+    return noteMovedAcross(from.space.name, from.path, to.space.name, moved.entry.path, {
+      links: broken?.links,
+      notice: moved.notice,
+    });
+  }
+  /** `irori copy`: as the explorer's paste, never over an entry; a copy keeps where its links lead. */
+  private async copy(
+    command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'copy' }>,
+    cwd: string,
+    context: SetupContext,
+  ) {
+    if (!this.host.copyEntry) throw Error('Copying is not available here.');
+    const from = this.located(cwd, command.source, context.vault, context.handedScopes);
+    const to = await this.locatedFolder(
+      cwd,
+      command.destination,
+      context.vault,
+      context.handedScopes,
+    );
+    const entry = await this.host.copyEntry(
+      from.space.scopeId,
+      from.path,
+      to.space.scopeId,
+      to.path,
+    );
+    this.host.announce?.({ scopeId: to.space.scopeId });
+    return entryCopied(from.space.name, from.path, to.space.name, entry.path);
   }
   private async trashNote(
     command: Extract<ReturnType<typeof parseIroriCommand>, { kind: 'trash' }>,

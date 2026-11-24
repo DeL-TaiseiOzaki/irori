@@ -224,7 +224,9 @@ weighed and dropped:
   host; its agent's `irori` command; connected folders; routines; the shared
   Schema for runs there; hosts other than Linux on x64 and arm64. (SSH's
   prompts are answered in the window since 0.2.78; conversations with its own
-  agent and the terminal since 0.2.79.)
+  agent and the terminal since 0.2.79. The irori agent registers, creates and
+  clones vaults there with `--host` since 0.2.99,
+  [ADR 074](074-the-irori-agent-makes-vaults-on-ssh-hosts.md).)
 - A host with glibc older than 2.28 cannot run the Node that is sent.
 - Where `systemd-logind` kills a user's processes at logout
   (`KillUserProcesses=yes`), the vault host ends with the login; the common

@@ -1,5 +1,43 @@
 # Implementation status — notes, native agents and connection onboarding
 
+The `irori` command has what the window has, 2026-11-24 (**0.2.99**, with the
+entry below; [ADR 075](decisions/075-the-irori-command-has-what-the-window-has.md)):
+the owner asked for every window action the irori agent could not reach.
+`AgentSetup` gains `copy`, `stop`, `connection`, `strays`, `skills`,
+`install python`, `move` across vaults, `workspace --rename/--delete/--group/--ungroup`,
+`set --icon-image`, `hosts --add`, and vault-on-host names in `workspace` and
+`remove`. Each calls what the window's action calls (`moveToVault`,
+`copyEntry`, `RoutineService.stop`, `CloudService.edit`/`setAccess`/`strays`/
+`adoptStray`/`removeStray`, `YourAiService.standardSkillState`/
+`replaceStandardSkills`, `PythonRuntime.install`, `WorkspaceService.save`/
+`remove`/`saveGroups`, `FileService.saveIcon`, `RemoteHosts.saveHost`/
+`unregister`); deleting a workspace, removing a stray, renewing skills,
+installing uv and adding a host wait for the person's 許可.
+- Verified by `tests/irori-command.test.ts` and `tests/remote-hosts.test.ts`.
+- Not covered: a real CLI agent using them; the move across vaults was run
+  through `FileService.moveAcross` in the test, not through main's wrapper.
+
+The irori agent makes vaults on SSH hosts, 2026-11-24 (**0.2.99**,
+[ADR 074](decisions/074-the-irori-agent-makes-vaults-on-ssh-hosts.md)): asked
+for six vaults on an SSH host, the irori agent answered that only the window
+could make a host's folder a vault. `irori clone`, `create` and `add` now take
+`--host <host>` (`AgentSetup.onHost`): `add` goes through
+`RemoteHosts.register`, and `create` and `clone` through the new vault host
+operation `newVault` (`RemoteHosts.create`), which runs the host's own
+`GitService.create`/`clone`, `FileService.register` and `firstCommit`. Folders
+there are absolute or from the host's home, where new vaults go by default.
+`irori hosts [<host> [<folder>]]` lists the hosts or a folder's folders there,
+and `irori list` names the vaults on SSH hosts. The `new-vault` and
+`add-vaults` skills mention `--host` (only for folders created or completed
+after this; a present skill is not replaced).
+- Verified by `tests/remote-hosts.test.ts` (this machine standing in for the
+  host: hosts and folders listed, a folder added and added again, a vault
+  created on `main` with its first commit and refused a second time, a GitHub
+  repository cloned through `insteadOf`, all three joining the workspace, a
+  vault agent refused) and `tests/irori-command.test.ts` (the forms parsed).
+- Not covered: a real SSH host, a real CLI agent using the forms, putting a
+  vault on a host on GitHub from irori.
+
 Connections stay connected, 2026-11-24 (**0.2.98**,
 [ADR 073](decisions/073-connections-belong-to-the-vault.md),
 [#380](https://github.com/DeL-TaiseiOzaki/irori/pull/380), published as

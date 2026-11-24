@@ -289,6 +289,10 @@ For each repository the person gave, one at a time:
 
 A repository the person keeps on this computer already: \`irori add <folder>\`.
 
+When the person wants a vault on one of their SSH hosts, add \`--host <host>\`
+to \`irori clone\` or \`irori add\`: \`irori hosts\` names the hosts, and
+\`irori hosts <host> [<folder>]\` lists the folders there to find one to add.
+
 Do not change files in the new vaults in this request; they are handed to
 you, with their vault agents, from the next request. Report what was added
 and suggest a next step, such as reading each vault's AGENTS.md.
@@ -300,15 +304,22 @@ and suggest a next step, such as reading each vault's AGENTS.md.
     `
 # Start a new vault
 
-Ask for its name and whether it should be on GitHub (private unless the
-person says public), and whose account or organization owns it.
+Ask for its name, whether it goes on this computer or on one of the
+person's SSH hosts (\`irori hosts\` names them), and whether it should be on
+GitHub (private unless the person says public), and whose account or
+organization owns it.
 
 1. \`irori create <folder name> --name <vault name>\`. It makes the folder a
-   Git repository on main with a first commit.
-2. On GitHub too, when the person wants it:
+   Git repository on main with a first commit. On an SSH host, add
+   \`--host <host>\`; the folder is then made in the host's home unless
+   \`--parent\` names another folder there.
+2. On GitHub too, when the person wants it, for a vault on this computer:
    \`gh repo create <owner>/<name> --private --source <folder> --remote origin --push\`
+   A vault on an SSH host is put on GitHub there, by the person or the
+   vault's agent with the host's own \`gh\`; or create the repository first
+   and \`irori clone <owner>/<name> --host <host>\`.
 
-Report the vault's folder and its GitHub repository, if any.
+Report the vault's folder, its host if any, and its GitHub repository, if any.
 `,
   ),
   'write-routine': skill(

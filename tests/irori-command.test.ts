@@ -6,6 +6,7 @@ import {
   lstat,
   mkdir,
   mkdtemp,
+  readdir,
   readFile,
   readlink,
   rm,
@@ -602,6 +603,298 @@ test('layer knowledge . moves the knowledge folder to the vault’s root and bac
     /^Moved the knowledge folder of the vault "Root" from the vault's root to "Knowledge_Base"/,
   );
   assert.equal(await readFile(path.join(vault, 'Knowledge_Base', 'wiki', 'a.md'), 'utf8'), '# A\n');
+});
+
+test('create, add and clone take --host, and hosts lists the SSH hosts or a folder of one', () => {
+  assert.deepEqual(parseIroriCommand(['add', '~/lab', '--host', 'gpu']), {
+    kind: 'add',
+    folder: '~/lab',
+    host: 'gpu',
+  });
+  assert.deepEqual(parseIroriCommand(['create', 'Lab', '--host=gpu', '--parent', '/data']), {
+    kind: 'create',
+    folder: 'Lab',
+    parent: '/data',
+    host: 'gpu',
+  });
+  assert.deepEqual(parseIroriCommand(['clone', 'octo/kb', '--host', 'gpu']), {
+    kind: 'clone',
+    url: 'https://github.com/octo/kb.git',
+    host: 'gpu',
+  });
+  assert.deepEqual(parseIroriCommand(['hosts']), { kind: 'hosts' });
+  assert.deepEqual(parseIroriCommand(['hosts', 'gpu', '/data']), {
+    kind: 'hosts',
+    host: 'gpu',
+    folder: '/data',
+  });
+  assert.throws(() => parseIroriCommand(['hosts', 'gpu', 'a', 'b']), /at most an SSH host/);
+  assert.throws(() => parseIroriCommand(['add', 'x', '--host']), /--host needs a value/);
+  assert.throws(() => parseIroriCommand(['set', 'x', '--host', 'gpu']), /has no --host/);
+});
+
+test('the forms the window has: what they read and refuse', () => {
+  assert.deepEqual(
+    parseIroriCommand(['hosts', '--add', 'me@gpu', '--name', 'GPU', '--port', '2222']),
+    {
+      kind: 'hosts',
+      add: { destination: 'me@gpu', name: 'GPU', port: 2222 },
+    },
+  );
+  assert.throws(() => parseIroriCommand(['hosts', 'gpu', '--name', 'x']), /go with --add/);
+  assert.deepEqual(parseIroriCommand(['workspace', 'Work', '--rename', 'Lab']), {
+    kind: 'workspace',
+    name: 'Work',
+    vaults: [],
+    leave: false,
+    rename: 'Lab',
+  });
+  assert.equal(parseIroriCommand(['workspace', 'Work', '--delete']).kind, 'workspace');
+  assert.throws(() => parseIroriCommand(['workspace', 'Work', 'A', '--delete']), /names no vaults/);
+  assert.throws(() => parseIroriCommand(['workspace', 'Work', '--group', 'G']), /needs the vaults/);
+  assert.throws(
+    () => parseIroriCommand(['workspace', 'Work', 'A', '--group', 'G', '--leave']),
+    /not several/,
+  );
+  assert.deepEqual(parseIroriCommand(['workspace', 'Work', 'A', '--ungroup']), {
+    kind: 'workspace',
+    name: 'Work',
+    vaults: ['A'],
+    leave: false,
+    group: null,
+  });
+  assert.deepEqual(parseIroriCommand(['stop', 'Mail', '--vault', 'Lab']), {
+    kind: 'stop',
+    routine: 'Mail',
+    vault: 'Lab',
+  });
+  assert.deepEqual(parseIroriCommand(['copy', 'a.md', 'b']), {
+    kind: 'copy',
+    source: 'a.md',
+    destination: 'b',
+  });
+  assert.deepEqual(
+    parseIroriCommand(['connection', 'Lab', 'Drive', '--name', 'Papers', '--read-only']),
+    {
+      kind: 'connection',
+      vault: 'Lab',
+      name: 'Drive',
+      rename: 'Papers',
+      access: 'read-only',
+    },
+  );
+  assert.throws(() => parseIroriCommand(['connection', 'Lab', 'Drive']), /needs --name/);
+  assert.throws(() => parseIroriCommand(['strays', 'Lab', '--folder', 'x']), /goes with --adopt/);
+  assert.deepEqual(parseIroriCommand(['skills', '--update']), { kind: 'skills', update: true });
+  assert.throws(() => parseIroriCommand(['skills', 'x']), /takes no words/);
+  assert.deepEqual(parseIroriCommand(['install', 'Python']), { kind: 'install', what: 'python' });
+  assert.throws(() => parseIroriCommand(['install', 'node']), /installs python/);
+  assert.throws(
+    () => parseIroriCommand(['set', 'Lab', '--icon', 'leaf', '--icon-image', 'a.png']),
+    /not both/,
+  );
+});
+
+test('workspace renames, deletes and groups; move and copy cross vaults; set takes an icon image', async (t) => {
+  const { base, files, workspaces, deps } = await device(t);
+  const made: string[] = [];
+  for (const name of ['Lab', 'Notes']) {
+    const root = path.join(base, name);
+    await mkdir(path.join(root, 'papers'), { recursive: true });
+    await files.register(root, name);
+    made.push(root);
+  }
+  const [lab, notes] = made;
+  await writeFile(path.join(lab, 'idea.md'), '# Idea\n\nSee [the paper](papers/p.md).\n');
+  await writeFile(path.join(lab, 'papers', 'p.md'), '# Paper\n');
+  const setup = new AgentSetup({
+    ...deps,
+    vaultMoveLinks: async () => ({ links: 1, incomplete: false }),
+    moveToVault: async (scopeId, from, toScopeId, directory) => ({
+      entry: (await files.moveAcross(scopeId, from, toScopeId, directory, async () => {})).entry,
+    }),
+    copyEntry: async (scopeId, from, toScopeId, directory) =>
+      files.copyEntry(
+        toScopeId,
+        directory,
+        await files.copySource(scopeId, from),
+        path.posix.basename(from),
+        { scopeId, path: from },
+      ),
+  });
+
+  // Copy keeps the original; a second copy takes a free name.
+  assert.match(
+    await setup.run(['copy', 'Lab/papers/p.md', 'Notes/papers'], base),
+    /^Copied papers\/p\.md of the vault "Lab" to papers\/p\.md in the vault "Notes"\./,
+  );
+  assert.match(await setup.run(['copy', 'Lab/papers/p.md', 'Notes/papers'], base), /to papers\/p/);
+  assert.equal(await readFile(path.join(lab, 'papers', 'p.md'), 'utf8'), '# Paper\n');
+  assert.equal((await readdir(path.join(notes, 'papers'))).length, 2);
+  // Move into another vault's folder, or its root, keeping the name; within one vault as before.
+  assert.match(
+    await setup.run(['move', 'Lab/idea.md', 'Notes'], base),
+    /^Moved idea\.md from the vault "Lab" to idea\.md in the vault "Notes"\.\n1 links/,
+  );
+  await assert.rejects(lstat(path.join(lab, 'idea.md')));
+  assert.match(await readFile(path.join(notes, 'idea.md'), 'utf8'), /# Idea/);
+  await assert.rejects(
+    setup.run(['move', 'Notes/idea.md', 'Lab/nowhere.md'], base),
+    /name a folder there/,
+  );
+  // A vault agent stays in its own vault.
+  const notesId = files.list().find((space) => space.name === 'Notes')!.scopeId;
+  await assert.rejects(
+    setup.run(['copy', 'Notes/idea.md', 'Lab'], base, { vault: notesId }),
+    /not yours/,
+  );
+
+  // A workspace renamed, grouped, ungrouped and deleted; its vaults stay.
+  await setup.run(['workspace', 'Work', 'Lab', 'Notes'], base);
+  assert.match(
+    await setup.run(['workspace', 'Work', '--rename', 'Research'], base),
+    /to "Research"/,
+  );
+  assert.match(
+    await setup.run(['workspace', 'Research', 'Lab', 'Notes', '--group', 'Writing'], base),
+    /groups its vaults as: Writing \(Lab, Notes\)/,
+  );
+  assert.match(
+    await setup.run(['workspace', 'Research', 'Notes', '--ungroup'], base),
+    /Writing \(Lab\)\./,
+  );
+  await setup.run(['workspace', 'Other', 'Lab'], base);
+  await assert.rejects(
+    setup.run(['workspace', 'Other', 'Notes', '--group', 'G'], base),
+    /not in the workspace "Other"/,
+  );
+  assert.match(
+    await setup.run(['workspace', 'Research', '--delete'], base),
+    /Deleted the workspace/,
+  );
+  assert.deepEqual(
+    (await workspaces.list()).map((item) => item.name),
+    ['Other'],
+  );
+  assert.equal(files.list().length, 2);
+  await assert.rejects(setup.run(['workspace', 'Gone', '--delete'], base), /no workspace named/);
+
+  // An icon image from a file; anything but an image is refused.
+  const png = path.join(base, 'icon.png');
+  await writeFile(png, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0]));
+  assert.match(await setup.run(['set', 'Lab', '--icon-image', png], base), /icon an image/);
+  const icon = files.list().find((space) => space.name === 'Lab')!.appearance?.icon;
+  assert.equal(icon?.kind, 'image');
+  assert.ok((await stat(path.join(lab, (icon as { path: string }).path))).isFile());
+  await writeFile(path.join(base, 'not.png'), 'text');
+  await assert.rejects(
+    setup.run(['set', 'Lab', '--icon-image', path.join(base, 'not.png')], base),
+    /PNG/,
+  );
+});
+
+test('connection renames and locks a connected folder; strays are listed, adopted and removed', async (t) => {
+  const { base, files, setup, deps } = await device(t);
+  const root = path.join(base, 'Lab');
+  await mkdir(root);
+  await files.register(root, 'Lab');
+  const drive = path.join(base, 'Drive');
+  await mkdir(drive);
+  await writeFile(path.join(drive, 'a.md'), 'a\n');
+  await setup.run(['connect', 'Lab', drive], base);
+  assert.match(
+    await setup.run(['connection', 'Lab', 'Drive', '--name', 'Papers', '--read-only'], base),
+    /shows it as contents\/Papers, read-only/,
+  );
+  const [connection] = await deps.cloud.connections(files.list()[0].scopeId);
+  assert.equal(connection.name, 'Papers');
+  assert.equal(connection.access, 'read-only');
+  assert.equal(await readFile(path.join(root, 'contents', 'Papers', 'a.md'), 'utf8'), 'a\n');
+  await assert.rejects(
+    setup.run(['connection', 'Lab', 'Nope', '--editable'], base),
+    /no connected folder/,
+  );
+
+  // A link made by hand and a folder put there: no connection names them.
+  const other = path.join(base, 'Other');
+  await mkdir(other);
+  await symlink(other, path.join(root, 'contents', 'Other'));
+  await mkdir(path.join(root, 'contents', 'loose'));
+  const listed = await setup.run(['strays', 'Lab'], base);
+  assert.match(listed, /contents\/Other \(a link to /);
+  assert.match(listed, /contents\/loose \(a folder\)/);
+  assert.match(
+    await setup.run(['strays', 'Lab', '--adopt', 'Other'], base),
+    /is a connected folder/,
+  );
+  assert.ok(
+    (await deps.cloud.connections(files.list()[0].scopeId)).some((item) => item.name === 'Other'),
+  );
+  assert.match(
+    await setup.run(['strays', 'Lab', '--remove', 'contents/loose'], base),
+    /to the system trash/,
+  );
+  // The device's trash here keeps the folder; the adopted link is no stray now.
+  assert.doesNotMatch(await setup.run(['strays', 'Lab'], base), /Other/);
+});
+
+test('stop ends a running routine, install prepares uv, skills adds and renews the standard ones', async (t) => {
+  const { base, deps } = await device(t);
+  const work = await deps.workspaces.list().then(() => deps.workspaces);
+  const saved = await (work as WorkspaceService).save('Work', []);
+  const stopped: string[] = [];
+  let installs = 0;
+  const you = new YourAiService(path.join(base, 'you-device'), path.join(base, 'you'));
+  const created = await you.create();
+  const asked: string[] = [];
+  const setup = new AgentSetup({
+    ...deps,
+    routines: async () => [
+      {
+        name: 'Mail',
+        owner: 'irori',
+        ref: { owner: 'irori', folder: 'mail' },
+        running: 'run-1',
+        steps: [],
+        review: 'reviewed',
+      } as never,
+    ],
+    stopRoutine: async (ref) => {
+      stopped.push(ref.folder);
+    },
+    installPython: async () => {
+      installs++;
+    },
+    skills: you,
+    confirm: async (command) => {
+      asked.push(command);
+      return true;
+    },
+  });
+  assert.match(await setup.run(['stop', 'Mail'], base, { workspaceId: saved.id }), /^Stopped/);
+  assert.deepEqual(stopped, ['mail']);
+  await assert.rejects(setup.run(['stop', 'Mail'], base), /workspace/);
+  assert.match(await setup.run(['install', 'python'], base), /uv is ready/);
+  assert.equal(installs, 1);
+  // A skill the person edited and one deleted: the deleted one comes back, the edit is named.
+  const newVault = path.join(created.root, '.agents/skills/new-vault/SKILL.md');
+  await writeFile(newVault, 'edited');
+  await rm(path.join(created.root, '.agents/skills/add-vaults'), { recursive: true });
+  const report = await setup.run(['skills'], base);
+  assert.match(report, /Added the standard skills add-vaults\./);
+  assert.match(report, /new-vault differ/);
+  assert.equal(await readFile(newVault, 'utf8'), 'edited');
+  assert.match(
+    await setup.run(['skills', '--update'], base),
+    /Wrote this irori's version of new-vault/,
+  );
+  assert.equal(await readFile(newVault, 'utf8'), iroriAgentSkills['new-vault']);
+  assert.match(await setup.run(['skills'], base), /are those of this irori/);
+  // Installing and renewing skills were asked; reading the skills was not.
+  assert.deepEqual(asked, ['irori install python', 'irori skills --update']);
+  // None of them is a vault agent's.
+  for (const argv of [['stop', 'Mail'], ['install', 'python'], ['skills']])
+    await assert.rejects(setup.run(argv, base, { vault: 'x' }), /irori agent's/);
 });
 
 test('create, add and clone take --layers for a vault irori declares, and ask for no category', async (t) => {

@@ -244,6 +244,34 @@ export async function createVaultHost({ dataDir, emit, ask }: VaultHostOptions) 
       watch(space);
       return space;
     },
+    newVault: async (input) => {
+      // As registering: the new folder is out of every run's reach, so runs do not hold it.
+      if (git.busy) throw Error(busy());
+      const parent = input.parent ?? os.homedir();
+      let root: string;
+      let notice: string | undefined;
+      if (input.url) {
+        const cloned = await git.clone({ url: input.url, parent, name: input.folder }, true);
+        root = cloned.path;
+        notice = cloned.notice;
+      } else root = await git.create({ parent, folder: input.folder }, true);
+      let space: Space;
+      try {
+        space = await files.register(
+          root,
+          input.name,
+          input.category ?? undefined,
+          input.layers ?? undefined,
+        );
+      } catch (error) {
+        // A clone is kept, as a failed clone's folder is; a new folder holding only irori's files goes.
+        if (!input.url) await git.abandon(root);
+        throw error;
+      }
+      if (!input.url) notice = await git.firstCommit(space.scopeId, true);
+      watch(space);
+      return { space, ...(notice && { notice }) };
+    },
     unregisterVault: async (scopeId) => {
       if (agents.busy(scopeId) || git.busy) throw Error(busy());
       await unwatch(scopeId);

@@ -577,6 +577,7 @@ app
       cloud,
       work,
       defaultParent,
+      remote,
       register: registerWatched,
       // As the settings and explorer do, but the irori agent's own hold on a vault does not count.
       update: (scopeId, change) => {
@@ -610,6 +611,20 @@ app
         );
       },
       routines: (workspaceId, only) => routines.list(workspaceId, only),
+      stopRoutine: (ref) => routines.stop(ref),
+      installPython: async () => {
+        await python.install();
+      },
+      skills: you,
+      sshConfigHosts: () => readSshConfigHosts(),
+      // As the explorer's move to another vault and paste do (ADR 038).
+      vaultMoveLinks: (scopeId, from) => vaultMoveLinks(scopeId, from),
+      moveToVault: (scopeId, from, toScopeId, directory) =>
+        changeVault(scopeId, organizing(), () =>
+          changed(toScopeId, () => moveToVault(scopeId, from, toScopeId, directory)),
+        ),
+      copyEntry: (scopeId, from, toScopeId, directory) =>
+        changeFiles(() => changed(toScopeId, () => copyEntry(scopeId, from, toScopeId, directory))),
       moveNote: (scopeId, from, to) =>
         agentChange(scopeId, async () => {
           const moved = await moveKnowledgeEntry(scopeId, from, to);

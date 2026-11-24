@@ -25,6 +25,7 @@ import type { AgentEvent, HostEvent } from '../src/domain/types';
 import type { Conversation, ConversationSummary } from '../src/domain/conversation';
 import { AttachmentStore } from '../src/agents/attachments';
 import { sshTerminalArgs } from '../src/host/remote-payload';
+import { AgentSetup } from '../src/host/agent-setup';
 
 const posixOnly = {
   skip: process.platform === 'win32' && 'the stand-in for an SSH host is a POSIX shell',
@@ -293,6 +294,161 @@ test('a vault is registered in one place only', posixOnly, async (t) => {
   await files.unregister(local.scopeId);
   assert.equal((await remote.register(host.id, far.code, 'Code', 'team')).scopeId, first.scopeId);
 });
+
+test(
+  'the irori agent finds, adds, creates and clones vaults on an SSH host with --host',
+  posixOnly,
+  async (t) => {
+    const far = await farHost(t);
+    // Git on the far side signs commits as a fixture and clones octo/kb from a folder.
+    const seed = path.join(far.base, 'seed');
+    const bare = path.join(far.base, 'kb.git');
+    const global = path.join(far.base, 'gitconfig');
+    await writeFile(
+      global,
+      `[user]\n\tname = Git fixture\n\temail = fixture@example.invalid\n[commit]\n\tgpgsign = false\n` +
+        `[init]\n\tdefaultBranch = main\n[url "${bare}"]\n\tinsteadOf = https://github.com/octo/kb.git\n`,
+    );
+    const previous = process.env.GIT_CONFIG_GLOBAL;
+    process.env.GIT_CONFIG_GLOBAL = global;
+    t.after(() => {
+      if (previous === undefined) delete process.env.GIT_CONFIG_GLOBAL;
+      else process.env.GIT_CONFIG_GLOBAL = previous;
+    });
+    const git = (cwd: string, ...args: string[]) =>
+      spawnSync('git', args, { cwd, encoding: 'utf8' }).stdout;
+    await mkdir(seed);
+    git(seed, 'init', '-q');
+    await writeFile(path.join(seed, 'README.md'), '# KB\n');
+    git(seed, 'add', '.');
+    git(seed, 'commit', '-qm', 'seed');
+    git(far.base, 'clone', '-q', '--bare', seed, bare);
+
+    const { remote, files, dataDir } = await hub(t, far);
+    const workspaces = new WorkspaceService(files);
+    workspaces.elsewhere = (scopeId) => remote.has(scopeId);
+    const work = await workspaces.save('Work', []);
+    const context = { workspaceId: work.id };
+    const setup = new AgentSetup({
+      files,
+      git: {} as never,
+      workspaces,
+      cloud: { connections: async () => [] } as never,
+      defaultParent: async () => path.join(dataDir, 'vaults'),
+      remote,
+    });
+
+    // The hosts, and the folders of one, to find what to add.
+    assert.match(await setup.run(['hosts'], far.base), /- box: box, offline; no vaults yet/);
+    const listed = await setup.run(['hosts', 'box', 'projects'], far.base);
+    assert.match(
+      listed,
+      new RegExp(
+        `Folders in ${JSON.stringify(path.join(far.home, 'projects')).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
+      ),
+    );
+    assert.match(listed, /^- Code$/m);
+    await assert.rejects(
+      setup.run(['hosts', 'nowhere'], far.base),
+      /No SSH host is named "nowhere"/,
+    );
+    await assert.rejects(
+      setup.run(['add', 'projects/Code', '--host', 'nowhere'], far.base),
+      /SSH ホスト/,
+    );
+
+    // An existing folder there, from the host's home; adding it again only joins.
+    const added = await setup.run(['add', '~/projects/Code', '--host', 'box'], far.base, context);
+    assert.match(added, /^Registered the vault "Code" at ".*" on the SSH host "box"\./);
+    assert.match(added, /Added it to this workspace/);
+    const code = remote.list().find((vault) => vault.name === 'Code')!;
+    assert.equal(code.root, far.code);
+    assert.match(
+      await setup.run(['add', far.code, '--host', 'box'], far.base, context),
+      /^Already a vault "Code"[\s\S]*already in this workspace/,
+    );
+
+    // A new vault there: a Git repository on main with its first commit, in the host's home.
+    const created = await setup.run(
+      ['create', 'Lab', '--host', 'box', '--layers', 'schema,contents'],
+      far.base,
+      context,
+    );
+    assert.match(created, /^Registered the vault "Lab" at ".*" on the SSH host "box"\./);
+    const lab = remote.list().find((vault) => vault.name === 'Lab')!;
+    assert.equal(lab.root, path.join(far.home, 'Lab'));
+    assert.deepEqual(lab.layers, ['contents']);
+    assert.match(git(lab.root, 'log', '--format=%s'), /Lab/);
+    assert.equal(git(lab.root, 'branch', '--show-current').trim(), 'main');
+    await assert.rejects(
+      setup.run(['create', 'Lab', '--host', 'box'], far.base, context),
+      /already exists|同じ名前/,
+    );
+
+    // A clone there, into a folder under the home named by --parent.
+    const cloned = await setup.run(
+      ['clone', 'octo/kb', '--host', 'box', '--parent', 'projects', '--name', 'Team KB'],
+      far.base,
+      context,
+    );
+    assert.match(
+      cloned,
+      /^Registered the vault "Team KB" at ".*" on the SSH host "box" \(GitHub octo\/kb\)\./,
+    );
+    const kb = remote.list().find((vault) => vault.name === 'Team KB')!;
+    assert.equal(kb.root, path.join(far.home, 'projects', 'kb'));
+    assert.equal(await readFile(path.join(kb.root, 'README.md'), 'utf8'), '# KB\n');
+
+    // All three are in the workspace, and the list and hosts name them with their host.
+    assert.deepEqual((await workspaces.list())[0].scopeIds, [
+      code.scopeId,
+      lab.scopeId,
+      kb.scopeId,
+    ]);
+    const list = await setup.run(['list'], far.base, context);
+    assert.match(
+      list,
+      /Vaults on SSH hosts:\n- Code: folder ".*" on the SSH host "box", in this workspace/,
+    );
+    assert.match(list, /- Work: Code, Lab, Team KB/);
+    assert.match(
+      await setup.run(['hosts'], far.base),
+      /- box: box, connected; vaults Code, Lab, Team KB/,
+    );
+
+    // A vault there is named in workspace and remove as one here is.
+    assert.match(
+      await setup.run(['workspace', 'Remote', 'Lab'], far.base, context),
+      /Made the workspace "Remote" holds Lab|"Remote" holds Lab/,
+    );
+    await assert.rejects(setup.run(['remove', 'Lab', '--trash'], far.base), /Leave out --trash/);
+    await assert.rejects(setup.run(['set', 'Lab', '--name', 'X'], far.base), /on an SSH host/);
+    assert.match(
+      await setup.run(['remove', 'Lab'], far.base, context),
+      /^Took the vault "Lab" off this computer's list[\s\S]*on the SSH host "box" is as it was/,
+    );
+    assert.equal(remote.has(lab.scopeId), false);
+    assert.ok(!(await workspaces.list()).some((item) => item.scopeIds.includes(lab.scopeId)));
+    assert.equal(git(lab.root, 'branch', '--show-current').trim(), 'main');
+
+    // Another host, added by its destination once.
+    assert.match(
+      await setup.run(['hosts', '--add', 'me@other', '--name', 'Other'], far.base),
+      /^Added the SSH host "Other" for me@other\./,
+    );
+    assert.match(await setup.run(['hosts', '--add', 'me@other'], far.base), /already/);
+    assert.deepEqual(
+      remote.hosts().map((item) => item.name),
+      ['box', 'Other'],
+    );
+
+    // A vault agent cannot make vaults, here or there.
+    await assert.rejects(
+      setup.run(['create', 'Other', '--host', 'box'], far.base, { vault: code.scopeId }),
+      /irori agent's/,
+    );
+  },
+);
 
 async function handing(t: TestContext) {
   const far = await farHost(t);

@@ -38,6 +38,7 @@ import {
   type ForwardedAgent,
   type ForwardedRead,
   type HandOffState,
+  type NewVault,
 } from '../remote/protocol';
 import type { AttachmentRef } from '../domain/attachments';
 import type { Conversation, ConversationRow } from '../domain/conversation';
@@ -582,12 +583,7 @@ export class RemoteHosts implements RemoteVaults {
     layers?: NamedLayer[],
   ) {
     const link = await this.link(hostId);
-    const known = new Set(
-      z
-        .array(vaultRecord)
-        .parse(await link.request('spaces', []))
-        .map((v) => v.scopeId),
-    );
+    const known = await this.registeredThere(link);
     let vault: z.infer<typeof vaultRecord>;
     try {
       vault = vaultRecord.parse(
@@ -601,6 +597,39 @@ export class RemoteHosts implements RemoteVaults {
       if (!found) throw error;
       vault = found;
     }
+    return this.adopt(hostId, link, vault, known);
+  }
+  /**
+   * Makes a new vault on a host, as `irori create` or `irori clone` does here
+   * (ADR 074): a new folder there, made a Git repository with its first commit
+   * or cloned from GitHub, and registered on the host and on this device.
+   */
+  async create(hostId: string, input: NewVault) {
+    const link = await this.link(hostId);
+    const known = await this.registeredThere(link);
+    const made = z
+      .object({ space: vaultRecord, notice: z.string().optional() })
+      .parse(await link.request('newVault', [input]));
+    return {
+      vault: await this.adopt(hostId, link, made.space, known),
+      ...(made.notice && { notice: made.notice }),
+    };
+  }
+  private async registeredThere(link: RemoteLink) {
+    return new Set(
+      z
+        .array(vaultRecord)
+        .parse(await link.request('spaces', []))
+        .map((v) => v.scopeId),
+    );
+  }
+  /** Puts a vault registered on its host on this device's list, unless it is registered elsewhere. */
+  private adopt(
+    hostId: string,
+    link: RemoteLink,
+    vault: z.infer<typeof vaultRecord>,
+    known: Set<string>,
+  ) {
     return this.queue.run(async () => {
       const record = this.record(hostId);
       if (record.vaults.some((item) => item.scopeId === vault.scopeId))

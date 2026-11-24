@@ -57,6 +57,8 @@ irori が読むのは `~/.ssh/config`、そこから Include されるファイ�
 
 追加した vault は、表示中のワークスペースに入ります。
 
+[irori mode](irori-mode.md) で irori agent に頼むこともできます（「gpu-box の `~/projects` の下のフォルダを vault にして」「gpu-box に Lab という新しい vault を作って」など）。irori agent は `irori hosts` でホストとそのフォルダを確かめ（頼めば `irori hosts --add` でホストも追加します）、`irori add --host` でフォルダを登録し、`irori create --host` で新しい vault（最初の commit を持つ Git リポジトリ）を作り、`irori clone --host` で GitHub のリポジトリをホストに取得します。このコンピューターでの操作と同じく、どれもあなたの許可を待ちます。作った vault は、頼んだワークスペースに入ります。
+
 ## 表示されるもの
 
 ファイル、ノート、検索、バックリンク、コメント、プロパティ、オントロジー、Git の状態・履歴・差分は、ホストから読んで表示します。ノートは読み取り専用で開きます。
