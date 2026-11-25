@@ -215,10 +215,11 @@ try {
   await expect(card(page, '最初の話題')).toHaveCount(1);
 
   // A card's × closes its conversation: the card goes, and the column shows another.
+  // `has` matches inside each row, so its locator starts from the row, not the board.
   const row = (title: string) =>
     board(page)
       .locator('.session-card-row')
-      .filter({ has: card(page, title) });
+      .filter({ has: page.locator('.session-card:not(.sub-agent)', { hasText: title }) });
   const userMessage = (text: string) =>
     panel(page).locator('.message.user').filter({ hasText: text });
   await row('三つ目 dialog').hover();
