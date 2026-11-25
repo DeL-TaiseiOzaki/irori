@@ -1,5 +1,29 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Desktop UI redesign, 2026-11-25 (**0.3.0**,
+[#384](https://github.com/DeL-TaiseiOzaki/irori/pull/384), published as
+`v0.3.0-preview.1`; direction in [UI-DESIGN](UI-DESIGN.md)): the owner asked
+for a calmer, less generic UI that VS Code, Obsidian and Notion users find
+predictable. `tokens.css` recalibrates hearth, light and dark to slate-graphite
+chrome and neutral paper (`windowChrome` and the download site follow); the
+rail narrows to 52 px with `Icon` glyphs for irori mode and Routines; `Tree`
+draws indentation guides and local vaults get a settings button in
+`.brain-identity`; `Settings` toggles on `⌘,` / `Ctrl+,` outside the terminal
+and filters its sections by name, summary, lead and keywords;
+`ArrowFillButton`, the composer and the Overview's agent nodes use
+rectilinear radii, with a reduced-motion aware arrow nudge.
+- Verified by `scripts/ui-smoke.ts` (shortcut toggle and filter) and
+  `scripts/routines-ui-smoke.ts` (vector rail icons); pull request run
+  `45532423190` passed `verify` (UI smokes, screen renders uploaded as an
+  artifact on pull requests) and packaging.
+- Published from `b1f24b3` (publish run `45539360685`, packages of run
+  `45532423190`): Windows 179,446,784 bytes, Mac 145,709,836 bytes,
+  `irori-0.3.0-full.nupkg` 178,616,099 bytes, with `SHA256SUMS.txt`; the three
+  downloaded anonymously match it. The live download page links the 0.3.0
+  installers.
+- Not covered: the screens with Japanese fonts installed (CI renders lack
+  them, so Japanese copy shows as boxes there).
+
 The `irori` command has what the window has, 2026-11-24 (**0.2.99**, with the
 entry below; [ADR 075](decisions/075-the-irori-command-has-what-the-window-has.md),
 [#382](https://github.com/DeL-TaiseiOzaki/irori/pull/382), published as
