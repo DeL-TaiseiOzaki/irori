@@ -126,7 +126,7 @@ export function RegisterSpace({
     return (
       <Dialog label={t('スペース登録', 'Register space')} onClose={onCancel}>
         <div className="modal register-space" aria-label={t('スペース登録', 'Register space')}>
-          <h2>{t('スペースを登録', 'Register a space')}</h2>
+          <h2>{t('vault を追加', 'Add a vault')}</h2>
           {ways}
           <RemoteHostChoice onChoose={setRemote} />
           <div className="actions">
@@ -147,7 +147,7 @@ export function RegisterSpace({
           void submit();
         }}
       >
-        <h2>{t('スペースを登録', 'Register a space')}</h2>
+        <h2>{t('vault を追加', 'Add a vault')}</h2>
         {!folder && !created && ways}
         {creating ? (
           <>
@@ -576,7 +576,10 @@ export function Startup({
             </div>
           ) : (
             <p className="start-note">
-              {t('まだワークスペースはありません。', 'No workspaces yet.')}
+              {t(
+                'まだワークスペースはありません。まず vault を追加するか、下の vault を選んで開いてください。',
+                'No workspaces yet. Add a vault first, or select vaults below to open one.',
+              )}
             </p>
           )}
           <section

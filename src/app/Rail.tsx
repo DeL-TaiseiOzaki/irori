@@ -11,7 +11,7 @@ import {
   ungroup,
 } from '../domain/vault-groups';
 import { t } from '../domain/i18n';
-import { appIcon, iroriModeIcon, routinesIcon } from './branding';
+import { appIcon } from './branding';
 import { BrainTile } from './BrainTile';
 import { Dialog } from './Dialog';
 import { Icon } from './Icon';
@@ -99,7 +99,7 @@ export const Rail = memo(function Rail({
                 <span />
               </span>
             )}
-            <BrainTile space={space} size={40} radius={12} ring={active ? 'active' : 'panel'} />
+            <BrainTile space={space} size={34} radius={9} ring={active ? 'active' : 'panel'} />
             {state === 'waiting' && <span className="rail-dot" aria-hidden="true" />}
           </button>
           <span className="rail-label" aria-hidden="true">
@@ -149,7 +149,7 @@ export const Rail = memo(function Rail({
         disabled={homeDisabled}
         onClick={onHome}
       >
-        <img src={appIcon} alt="" width="28" height="28" />
+        <img src={appIcon} alt="" width="24" height="24" />
       </button>
       <div className={`rail-slot ${overview ? 'active' : ''}`}>
         {overview && <span className="rail-bar" aria-hidden="true" />}
@@ -160,7 +160,7 @@ export const Rail = memo(function Rail({
           disabled={!spaces.length}
           onClick={onOverview}
         >
-          <img src={iroriModeIcon} alt="" width="40" height="40" />
+          <Icon name="hearth" size={18} />
         </button>
         <span className="rail-label" aria-hidden="true">
           {t('irori mode', 'irori mode')}
@@ -174,7 +174,7 @@ export const Rail = memo(function Rail({
           aria-current={routines ? 'page' : undefined}
           onClick={onRoutines}
         >
-          <img src={routinesIcon} alt="" width="40" height="40" />
+          <Icon name="routine" size={18} />
         </button>
         <span className="rail-label" aria-hidden="true">
           {t('ルーティン', 'Routines')}
@@ -219,7 +219,7 @@ export const Rail = memo(function Rail({
                     )}
                     <span className="rail-folder" aria-hidden="true">
                       {members.slice(0, 4).map((space) => (
-                        <BrainTile key={space.scopeId} space={space} size={15} radius={5} />
+                        <BrainTile key={space.scopeId} space={space} size={13} radius={4} />
                       ))}
                     </span>
                     {state === 'waiting' && <span className="rail-dot" aria-hidden="true" />}

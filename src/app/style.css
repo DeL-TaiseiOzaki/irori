@@ -83,21 +83,17 @@ body {
   background: var(--card);
   color: var(--ink);
   border: 0;
-  border-radius: 9px;
-  padding: 7px 12px;
+  border-radius: 6px;
+  padding: 6px 12px;
   box-shadow: var(--card-shadow);
   font-weight: 500;
   transition:
-    transform var(--quick) var(--ease),
-    background-color 160ms ease,
-    color 160ms ease,
-    box-shadow 200ms ease;
+    background-color 120ms ease,
+    color 120ms ease,
+    box-shadow 140ms ease;
 }
 :where(button:hover) {
   background: var(--stage-2);
-}
-:where(button:active:not(:disabled)) {
-  transform: scale(0.97);
 }
 :where(button:disabled) {
   cursor: default;
@@ -111,8 +107,8 @@ body {
   background: var(--card);
   color: var(--ink);
   border: 1px solid var(--rule-2);
-  border-radius: 9px;
-  padding: 8px 10px;
+  border-radius: 6px;
+  padding: 7px 10px;
   max-width: 100%;
 }
 :where(input[type='checkbox'], input[type='radio']) {
@@ -310,19 +306,19 @@ body {
   background: var(--surface);
   color: var(--ink);
   border: 1px solid var(--rule-soft);
-  border-radius: 14px;
+  border-radius: 12px;
   box-shadow: var(--shadow-modal);
-  padding: 30px;
-  width: 510px;
+  padding: 24px 26px;
+  width: 500px;
   max-width: 100%;
   max-height: 90vh;
   overflow: auto;
   overscroll-behavior: contain;
 }
 .modal h2 {
-  font-size: 20px;
-  font-weight: 600;
-  margin: 0 0 24px;
+  font-size: 17px;
+  font-weight: 650;
+  margin: 0 0 18px;
 }
 .modal label {
   display: block;

@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type DragEvent,
   type ReactNode,
 } from 'react';
@@ -385,6 +386,7 @@ export function Tree({
         render={<div />}
         className={`tree ${drop.over === directory && writable ? 'drop-target' : ''}`}
         role={depth ? 'group' : undefined}
+        style={depth ? ({ '--guide-x': `${15 + (depth - 1) * 14}px` } as CSSProperties) : undefined}
         onContextMenuCapture={(event) => {
           const row = (event.target as HTMLElement).closest<HTMLElement>('[data-entry]');
           const entry = row && entries.find((item) => item.path === row.dataset.entry);
@@ -416,8 +418,11 @@ export function Tree({
         {data && !data.error && !entries.length && (
           <small className="tree-empty" style={indent}>
             {layer === 'contents' && !depth
-              ? t('フォルダ未接続', 'No folder connected')
-              : t('項目がありません', 'No items')}
+              ? t(
+                  '接続フォルダはありません（クラウド接続から追加）',
+                  'No connected folders — add one above',
+                )
+              : t('まだファイルがありません', 'Empty folder')}
           </small>
         )}
         {entries.map((entry) => {
@@ -667,7 +672,7 @@ function NoLayers() {
   );
 }
 // A folded section keeps its heading line.
-const headingHeight = 36;
+const headingHeight = 30;
 
 /**
  * A vault's Contents: its own files when they are Contents (ADR 071), then what
@@ -859,7 +864,7 @@ export const SideBrainPanel = memo(function SideBrainPanel({
   const shown = locked || space.host ? undefined : held ? addingOnly(explorer) : explorer;
   const identity = (
     <>
-      <BrainTile space={space} size={34} radius={10} />
+      <BrainTile space={space} size={28} radius={7} />
       <span className="brain-names side-names">
         <strong>{space.name}</strong>
         {space.host && (
@@ -1136,7 +1141,7 @@ export const BrainPanel = memo(function BrainPanel({
       <header className="brain-header">
         <div className="brain-identity">
           <button className="brain-home-link" onClick={onHome}>
-            <BrainTile space={space} size={34} radius={10} />
+            <BrainTile space={space} size={28} radius={7} />
             <span className="brain-names">
               <strong>{space.name}</strong>
               {space.host ? (
@@ -1160,7 +1165,18 @@ export const BrainPanel = memo(function BrainPanel({
               title={t('横に vault を開く', 'Open a vault beside')}
               onClick={onSplit}
             >
-              <Icon name="split" size={16} />
+              <Icon name="split" size={15} />
+            </button>
+          )}
+          {!remote && (
+            <button
+              className="icon-button"
+              aria-label={t(`${space.name} の設定`, `${space.name} settings`)}
+              title={t(`${space.name} の設定`, `${space.name} settings`)}
+              disabled={locked || held}
+              onClick={onSettings}
+            >
+              <Icon name="sliders" size={15} />
             </button>
           )}
           <Menu.Root modal={false}>

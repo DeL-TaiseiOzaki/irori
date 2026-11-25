@@ -97,13 +97,14 @@
 .start-main {
   display: flex;
   flex-direction: column;
-  gap: 36px;
+  gap: 28px;
 }
 .start-main h2 {
-  font-size: 22px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
   font-feature-settings: 'palt';
-  margin-bottom: -20px;
+  margin-bottom: -12px;
 }
 .start-main h3 {
   font-size: 12.5px;
@@ -387,29 +388,40 @@
 .start-name input:focus-visible {
   outline: 0;
 }
-.start .obsidian-arrow-fill-btn {
-  min-height: 38px;
+.start .start-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 6px;
   background: var(--solid);
   color: var(--on-solid);
-  border-color: transparent;
-  font-size: 13.5px;
-  font-weight: 650;
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 600;
   white-space: nowrap;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease,
+    filter 120ms ease;
 }
-.start .obsidian-arrow-fill-btn__circle {
-  background: var(--on-solid);
-  color: var(--solid);
+.start .start-submit:hover:not(:disabled) {
+  background: var(--solid);
+  filter: brightness(0.92);
 }
 /* With a workspace to open, creating another is the second thing: framed. */
-.start .start-secondary .obsidian-arrow-fill-btn {
+.start .start-secondary .start-submit {
   background: none;
   color: var(--tx);
-  border-color: var(--hair-2);
+  box-shadow: inset 0 0 0 1px var(--hair-2);
   font-weight: 500;
 }
-.start .start-secondary .obsidian-arrow-fill-btn__circle {
-  background: var(--raised-2);
-  color: var(--tx);
+.start .start-secondary .start-submit:hover:not(:disabled) {
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--hair-3);
+  filter: none;
 }
 .start .start-text-button {
   height: 36px;
@@ -471,21 +483,21 @@
 
 /* Registering a brain: a paper sheet over the start screen or the workspace. */
 .register-space {
-  width: 520px;
-  padding: 28px 30px;
+  width: 500px;
+  padding: 24px 26px;
   border: 0;
-  border-radius: 20px;
+  border-radius: 12px;
   background: var(--stage);
   box-shadow: var(--pop);
 }
 .register-space h2 {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 650;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 .register-space .repository-preview {
   background: var(--stage-2);
-  border-radius: 12px;
+  border-radius: 8px;
 }
 .register-space label .actions {
   flex-wrap: nowrap;
@@ -502,15 +514,24 @@
   font-size: 12px;
   color: var(--ink-2);
 }
-.register-space .obsidian-arrow-fill-btn {
+.register-space .register-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 6px;
   background: var(--ink-solid);
   color: var(--on-ink-solid);
-  border-color: transparent;
+  box-shadow: none;
   font-weight: 600;
+  transition:
+    background-color 120ms ease,
+    filter 120ms ease;
 }
-.register-space .obsidian-arrow-fill-btn__circle {
-  background: var(--on-ink-solid);
-  color: var(--ink-solid);
+.register-space .register-submit:hover:not(:disabled) {
+  background: var(--ink-solid);
+  filter: brightness(1.12);
 }
 .modal .checkbox-row {
   display: flex;

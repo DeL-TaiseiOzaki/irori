@@ -21,13 +21,13 @@
   flex: none;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 14px 10px 12px 14px;
+  gap: 8px;
+  padding: 10px 10px 8px 12px;
 }
 .brain-identity {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 9px;
   min-width: 0;
 }
 .brain-names {
@@ -38,8 +38,8 @@
 }
 .brain-names strong {
   font-family: var(--font-jp);
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 650;
   font-feature-settings: 'palt';
   overflow: hidden;
   text-overflow: ellipsis;
@@ -49,16 +49,16 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--tx-3);
 }
 .brain-panel .brain-search {
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 32px;
-  padding: 0 7px 0 10px;
-  border-radius: 9px;
+  gap: 7px;
+  height: 30px;
+  padding: 0 6px 0 9px;
+  border-radius: 6px;
   background: var(--field);
   border: 1px solid var(--hair);
   box-shadow: none;
@@ -69,6 +69,7 @@
 .brain-panel .brain-search:hover {
   background: var(--field);
   border-color: var(--hair-3);
+  color: var(--tx-2);
 }
 .brain-search > span {
   flex: 1;
@@ -78,31 +79,31 @@
   font-family: var(--font-mono);
   font-size: 10.5px;
   line-height: 1;
-  padding: 3px 5px;
-  border-radius: 5px;
+  padding: 2px 5px;
+  border-radius: 4px;
   border: 1px solid var(--hair-2);
   color: var(--tx-3);
 }
 
-/* Files | Changes: a segmented pair on the field colour. */
+/* Files | Changes: a crisp segmented switch on the field colour. */
 .brain-modes {
   --magnet-highlight: transparent;
-  gap: 3px !important;
-  padding: 3px;
-  border-radius: 10px;
+  gap: 2px !important;
+  padding: 2px;
+  border-radius: 7px;
   background: var(--field);
   box-shadow: inset 0 0 0 1px var(--hair);
 }
 .brain-modes .obsidian-magnet-tab,
 .git-tabs .obsidian-magnet-tab {
   flex: 1;
-  height: 28px;
+  height: 26px;
   padding: 0;
-  border-radius: 8px;
+  border-radius: 5px;
   background: none;
   box-shadow: none;
   color: var(--tx-3);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 500;
 }
 .brain-modes .obsidian-magnet-tab[aria-pressed='true'],
@@ -112,18 +113,18 @@
 .brain-modes .obsidian-magnet-marker {
   inset: 0;
   height: auto;
-  border-radius: 8px;
+  border-radius: 5px;
   background: var(--raised-2);
-  box-shadow: inset 0 0 0 1px var(--hair);
+  box-shadow: inset 0 0 0 1px var(--hair-2);
 }
 .brain-modes .count {
-  min-width: 18px;
-  height: 17px;
+  min-width: 17px;
+  height: 16px;
   padding: 0 5px;
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--solid);
   color: var(--on-solid);
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -170,22 +171,22 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  height: 36px;
-  padding: 0 6px;
+  height: 30px;
+  padding: 0 4px;
 }
 .brain-panel .section-toggle {
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 28px;
+  gap: 7px;
+  height: 24px;
   padding: 0 6px;
-  border-radius: 8px;
+  border-radius: 5px;
   background: none;
   box-shadow: none;
   color: var(--tx-3);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
 }
 .brain-panel .section-toggle:hover {
@@ -205,14 +206,14 @@
 }
 .brain-panel .section-action,
 .you-panel .section-action {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  border-radius: 8px;
+  border-radius: 5px;
   background: none;
   box-shadow: none;
   color: var(--tx-3);
@@ -226,7 +227,7 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 0 6px 10px;
+  padding: 0 4px 8px;
 }
 .contents-root-name {
   display: block;
@@ -236,11 +237,27 @@
   color: var(--tx-3);
 }
 
-/* The tree. */
+/* The tree, with subtle vertical folder guides like VS Code and Obsidian. */
 .tree {
   display: flex;
   flex-direction: column;
   gap: 1px;
+}
+.tree[role='group'] {
+  position: relative;
+}
+.tree[role='group']::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 4px;
+  left: var(--guide-x, 16px);
+  width: 1px;
+  background: var(--hair);
+  pointer-events: none;
+}
+.tree-item:hover > .tree[role='group']::before {
+  background: var(--hair-2);
 }
 /* The empty space below the knowledge tree takes a right click or a drop for its folder. */
 .section-body > .tree {
@@ -248,7 +265,7 @@
 }
 .tree.drop-target,
 .brain-panel .tree-row.drop-target {
-  border-radius: 7px;
+  border-radius: 5px;
   background: var(--act-soft);
   box-shadow: inset 0 0 0 1px var(--act-line);
 }
@@ -259,15 +276,15 @@
 .you-panel .tree-row {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   width: 100%;
-  height: 28px;
+  height: 26px;
   padding-right: 8px;
-  border-radius: 8px;
+  border-radius: 5px;
   background: none;
   box-shadow: none;
   color: var(--tx-2);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 400;
   text-align: left;
 }
@@ -367,7 +384,7 @@
 }
 .brain-panel .tree-action {
   position: absolute;
-  top: 3px;
+  top: 2px;
   right: 4px;
   width: 22px;
   height: 22px;
@@ -375,7 +392,7 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  border-radius: 6px;
+  border-radius: 5px;
   background: none;
   box-shadow: none;
   color: var(--tx-3);

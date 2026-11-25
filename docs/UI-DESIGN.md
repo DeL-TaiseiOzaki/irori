@@ -1,5 +1,32 @@
 # UI direction
 
+## 0.3.0 — Desktop IDE discipline and subtractive polish (2026-11-25)
+
+Refines the ADR 053 colour-role system for readers coming from VS Code, Obsidian
+and Notion while keeping every role boundary intact:
+
+- **Palette.** Hearth pairs calibrated slate-graphite chrome (`#121417` /
+  `#171a1e`) with crisp neutral paper (`#fbfbfa`) rather than warm cream, so the
+  note stage stands out by luminance without tint cast. Light (`#ededeb` /
+  `#ffffff`) and Dark (`#121417` / `#191c21`) share the same neutral ink scale,
+  matched by `windowChrome` in `src/domain/window-frame.ts` and the download
+  website.
+- **Shell & grid.** A 52 px vector rail (`Icon` glyphs for `irori mode` and
+  `Routines`, 34 px vault tiles) joins the vault explorer via a 1 px hairline.
+  The stage bar, agent column header and session board header share a 42 px
+  height.
+- **Explorer & properties.** Nested `Tree` groups draw 1 px vertical indentation
+  guides under parent chevrons; local vaults expose a direct settings button in
+  `.brain-identity`. Notes without frontmatter properties keep `+ Add property`
+  as a quiet ghost affordance until hovered or focused.
+- **Settings (`⌘,` / `Ctrl+,`).** Opens from keyboard anywhere outside an active
+  terminal, flattens sidebar navigation rows without nested group boxes, and
+  filters sections live by name, summary and keywords.
+- **Controls & copy.** Primary actions (`ArrowFillButton`) and the agent
+  composer use rectilinear 6–10 px radii with restrained motion (`translateX`
+  nudge, disabled under `prefers-reduced-motion: reduce`), and empty states
+  name the next concrete action.
+
 ## One subject per screen, one meaning per colour (2026-11-01)
 
 [ADR 053](decisions/053-priority-and-colour-roles.md) revises v5's visual

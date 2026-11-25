@@ -157,7 +157,7 @@
   align-items: center;
   gap: 2px;
   padding: 1px 4px 1px 8px;
-  border-radius: 999px;
+  border-radius: 5px;
   background: var(--stage-3);
   color: var(--ink);
   font-size: 12.5px;
@@ -216,7 +216,25 @@
   background: var(--stage-2);
 }
 .page-properties.empty {
-  padding-bottom: 0;
+  padding: 24px calc(48px + var(--page-gutter)) 0;
+}
+.page-properties .properties-add-first {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: -6px;
+  padding: 2px 6px;
+  font-size: 12.5px;
+  box-shadow: none;
+  opacity: 0.52;
+  transition:
+    opacity 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
+}
+.page-properties:hover .properties-add-first,
+.page-properties .properties-add-first:focus-visible {
+  opacity: 1;
 }
 /* The disclosure that folds the properties under the title. */
 .page-properties .properties-fold {
@@ -241,8 +259,9 @@
   font-size: 11px;
   color: var(--ink-3);
   background: var(--stage-3);
-  border-radius: 999px;
-  padding: 0 6px;
+  border-radius: 5px;
+  padding: 0 5px;
+  font-variant-numeric: tabular-nums;
 }
 .page-properties .properties-raw {
   display: block;

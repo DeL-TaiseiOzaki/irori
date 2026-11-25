@@ -40,12 +40,12 @@
 
 /* The crumb bar. */
 .stage-bar {
-  height: 50px;
+  height: 42px;
   flex: none;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 10px 0 18px;
+  gap: 8px;
+  padding: 0 10px 0 16px;
   box-shadow: inset 0 -1px 0 var(--rule);
 }
 .crumbs {
@@ -1167,12 +1167,12 @@ button.comment-quote:hover {
 .document-editor .callout-marker {
   margin-right: 8px;
   padding: 1px 6px;
+  border-radius: 4px;
   color: var(--callout-mark, var(--ink-2));
   background: var(--card);
-  font: 600 0.72em/1.6 var(--font-ui);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  vertical-align: 0.12em;
+  font: 600 0.76em/1.5 var(--font-ui);
+  letter-spacing: 0.01em;
+  vertical-align: 0.08em;
 }
 .document-editor .callout-title {
   font-weight: 600;

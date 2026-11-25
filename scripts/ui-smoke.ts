@@ -88,9 +88,9 @@ try {
   const startupMs = Date.now() - launchStart;
   const createWorkspace = page.getByRole('button', { name: 'ワークスペースを作成', exact: true });
   await createWorkspace.hover();
-  await expect(createWorkspace.locator('.obsidian-arrow-fill-btn__circle')).toHaveCSS(
-    'clip-path',
-    'inset(0px round 999px)',
+  await expect(createWorkspace.locator('.obsidian-arrow-fill-btn__arrow')).toHaveCSS(
+    'transform',
+    'matrix(1, 0, 0, 1, 2, 0)',
   );
   await page.screenshot({ path: 'test-results/obsidian-startup.png', fullPage: true });
   await page.getByRole('button', { name: 'KBフォルダを開く' }).click();
@@ -115,7 +115,7 @@ try {
   await expect(cloneMode).toHaveAttribute('aria-pressed', 'true');
   // The OS setting takes effect while the dialog is already mounted.
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await expect(registration.locator('.obsidian-arrow-fill-btn__circle')).toHaveCSS(
+  await expect(registration.locator('.obsidian-arrow-fill-btn__arrow')).toHaveCSS(
     'transition-duration',
     '0s',
   );
