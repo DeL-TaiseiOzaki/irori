@@ -132,7 +132,7 @@ export function AiToggle({
       onClick={onToggle}
     >
       <Icon name="agent" size={14} />
-      AI
+      {name}
     </button>
   ) : (
     <button className="ai-toggle" onClick={onToggle}>

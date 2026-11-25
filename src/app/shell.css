@@ -38,7 +38,7 @@
 }
 /* The menu sits over the rail, so the tabs begin where the vault panel does. */
 .titlebar-start {
-  width: 64px;
+  width: 52px;
   flex: none;
   display: grid;
   place-items: center;
@@ -376,13 +376,14 @@
 .rail {
   position: relative;
   z-index: 20;
-  width: 64px;
+  width: 52px;
   flex: none;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 14px 0 12px;
+  gap: 4px;
+  padding: 10px 0;
+  border-right: 1px solid var(--hair);
 }
 .rail button {
   background: none;
@@ -392,18 +393,18 @@
 }
 .rail-button,
 .rail-home {
-  width: 40px;
-  height: 40px;
-  border-radius: 11px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
 }
 .rail-home img {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
   display: block;
 }
 .rail .rail-button:hover:not(:disabled),
@@ -411,58 +412,37 @@
   background: var(--raised);
   color: var(--tx);
 }
-.rail-overview,
-.rail-routines {
-  border-radius: 12px;
+.rail .rail-overview[aria-current],
+.rail .rail-routines[aria-current] {
+  background: var(--raised-2);
+  color: var(--tx);
+  box-shadow: inset 0 0 0 1px var(--hair);
 }
-.rail-overview img,
-.rail-routines img {
-  width: 40px;
-  height: 40px;
-  display: block;
-  opacity: 0.72;
-  transition: opacity 0.15s;
-}
-.rail .rail-overview:hover:not(:disabled),
-.rail .rail-routines:hover:not(:disabled) {
-  background: none;
-}
-.rail-overview:hover:not(:disabled) img,
-.rail-overview[aria-current] img,
-.rail-routines:hover:not(:disabled) img,
-.rail-routines[aria-current] img {
-  opacity: 1;
-}
-.rail-overview:disabled img,
-.rail-routines:disabled img {
-  opacity: 0.35;
-}
-/* Keep the generated tile's silhouette smooth at the rail's small size. */
-.rail-routines img {
-  clip-path: inset(6.4% round 17%);
+.rail .rail-overview[aria-current] {
+  color: var(--brand);
 }
 .rail-slot {
   position: relative;
-  width: 64px;
-  height: 48px;
+  width: 52px;
+  height: 42px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .rail-home + .rail-slot {
-  height: 46px;
-  margin-top: 6px;
+  height: 40px;
+  margin-top: 4px;
 }
 .rail-rule {
-  width: 22px;
+  width: 20px;
   height: 1px;
   background: var(--hair-2);
-  margin: 6px 0;
+  margin: 5px 0;
 }
 .rail .rail-brain {
   position: relative;
   display: flex;
-  border-radius: 12px;
+  border-radius: 10px;
 }
 .rail .rail-brain:hover:not(:disabled) {
   filter: brightness(1.08);
@@ -473,18 +453,18 @@
 .rail-bar {
   position: absolute;
   left: 0;
-  top: 13px;
-  width: 3px;
-  height: 22px;
-  border-radius: 0 3px 3px 0;
+  top: 11px;
+  width: 2.5px;
+  height: 20px;
+  border-radius: 0 2px 2px 0;
   background: var(--solid);
 }
 /* A vault whose agent works: a neutral arc turns around its tile. Motion, not
    colour, says it runs. */
 .rail-ring {
   position: absolute;
-  inset: -4px;
-  border-radius: 16px;
+  inset: -3px;
+  border-radius: 13px;
   overflow: hidden;
   pointer-events: none;
 }
@@ -501,7 +481,7 @@
   content: '';
   position: absolute;
   inset: 2px;
-  border-radius: 14px;
+  border-radius: 11px;
   background: var(--bg);
 }
 /* A vault whose agent waits for the person: the attention dot, the one thing in
@@ -511,11 +491,11 @@
   z-index: 2;
   top: -3px;
   right: -3px;
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
   background: var(--attn);
-  box-shadow: 0 0 0 2.5px var(--bg);
+  box-shadow: 0 0 0 2px var(--bg);
 }
 .rail-dot::after {
   content: '';
@@ -526,14 +506,14 @@
 }
 .rail-label {
   position: absolute;
-  left: 58px;
-  top: 9px;
-  height: 30px;
-  padding: 0 11px;
-  border-radius: 9px;
+  left: 48px;
+  top: 7px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
   background: var(--solid);
   color: var(--on-solid);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
   display: flex;
@@ -542,15 +522,15 @@
   box-shadow: var(--label-shadow);
   z-index: 60;
   opacity: 0;
-  transform: translateX(-6px);
+  transform: translateX(-4px);
   transition:
-    opacity 160ms ease,
-    transform 220ms var(--ease);
+    opacity 120ms ease,
+    transform 160ms var(--ease);
   pointer-events: none;
 }
 /* A long vault name gives way to an ellipsis; its state always shows. */
 .rail-label {
-  max-width: min(320px, calc(100vw - 80px));
+  max-width: min(320px, calc(100vw - 72px));
 }
 .rail-label-name {
   min-width: 0;
@@ -588,9 +568,9 @@
    behind its brains with the folder on top. */
 .rail .rail-group {
   position: relative;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -600,7 +580,7 @@
   background: var(--raised-2);
 }
 .rail .rail-group.open {
-  height: 30px;
+  height: 28px;
   background: none;
   color: var(--tx-3);
 }
@@ -611,11 +591,11 @@
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: repeat(2, 15px);
-  grid-auto-rows: 15px;
+  grid-template-columns: repeat(2, 13px);
+  grid-auto-rows: 13px;
   gap: 3px;
   padding: 1px;
-  border-radius: 12px;
+  border-radius: 9px;
   background: var(--raised);
 }
 .rail-group-open {
@@ -623,30 +603,30 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding-bottom: 6px;
+  gap: 4px;
+  padding-bottom: 5px;
 }
 .rail-group-open::before {
   content: '';
   position: absolute;
-  inset: 0 6px;
-  border-radius: 16px;
+  inset: 0 5px;
+  border-radius: 12px;
   background: var(--raised);
   opacity: 0.6;
   pointer-events: none;
 }
 .rail-group-open > .rail-group-slot {
-  height: 34px;
+  height: 32px;
 }
 .rail-group-open > .rail-group-slot .rail-label {
   top: 2px;
 }
 .rail .rail-add {
-  margin-top: 6px;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  border: 1.5px dashed var(--hair-2);
+  margin-top: 4px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px dashed var(--hair-2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -761,14 +741,14 @@
 
 /* Controls on the chrome. */
 .icon-button {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  border-radius: 9px;
+  border-radius: 6px;
   color: var(--tx-3);
   background: none;
   box-shadow: none;
@@ -797,7 +777,7 @@
   gap: 7px;
   height: 30px;
   padding: 0 12px;
-  border-radius: 9px;
+  border-radius: 6px;
   font-size: 12.5px;
   white-space: nowrap;
 }
@@ -820,20 +800,20 @@
 
 /* Menus and popovers opened from the chrome. */
 .menu {
-  min-width: 210px;
-  padding: 6px;
-  border-radius: 14px;
+  min-width: 204px;
+  padding: 4px;
+  border-radius: 10px;
   /* The window shows faintly through a menu, which sits over it for a moment. */
-  background: color-mix(in srgb, var(--panel) 86%, transparent);
-  backdrop-filter: blur(24px) saturate(1.3);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  backdrop-filter: blur(20px) saturate(1.2);
   color: var(--tx);
   box-shadow: var(--pop);
   font-size: 12.5px;
   outline: none;
   transform-origin: var(--transform-origin);
   transition:
-    opacity var(--medium) ease,
-    transform var(--medium) var(--ease);
+    opacity var(--quick) ease,
+    transform var(--quick) var(--ease);
 }
 .menu[data-starting-style],
 .menu[data-ending-style] {
@@ -845,10 +825,10 @@
 .menu [role='menuitemcheckbox'] {
   display: flex;
   align-items: center;
-  gap: 9px;
-  min-height: 32px;
-  padding: 0 10px;
-  border-radius: 8px;
+  gap: 8px;
+  min-height: 29px;
+  padding: 0 9px;
+  border-radius: 6px;
   cursor: default;
   outline: none;
   white-space: nowrap;
@@ -947,10 +927,10 @@
   /* Clear of the title bar, which moves the window wherever it is pressed. */
   height: min(720px, calc(100vh - 104px));
   display: grid;
-  grid-template-columns: 252px minmax(0, 1fr);
+  grid-template-columns: 244px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--panel);
   color: var(--tx);
   box-shadow:
@@ -958,58 +938,86 @@
     var(--pop);
 }
 
-/* The side: the groups, each a frame of entries. */
+/* The side: flat IDE categories with a quick filter, no nested frames. */
 .settings-side {
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 20px 14px;
+  gap: 12px;
+  padding: 16px 12px;
   border-right: 1px solid var(--hair);
   background: var(--bg);
 }
-.settings-sheet .settings-side > h2 {
-  margin: 0 8px;
-  font-size: 15px;
-  font-weight: 700;
+.settings-side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px;
+}
+.settings-sheet .settings-side-head > h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+}
+.settings-filter {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--field);
+  box-shadow: inset 0 0 0 1px var(--hair-2);
+  color: var(--tx-3);
+}
+.settings-filter:focus-within {
+  box-shadow: inset 0 0 0 1.5px var(--focus);
+}
+.settings-filter > input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tx);
+  font-size: 12.5px;
+  outline: none;
+}
+.settings-filter > input::-webkit-search-cancel-button {
+  display: none;
 }
 .settings-side nav {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 .settings-nav-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
 }
 .settings-nav-label {
-  padding: 0 8px;
+  padding: 0 8px 3px;
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.02em;
   color: var(--tx-3);
 }
-.settings-nav-frame {
+.settings-nav-items {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 4px;
-  border-radius: 11px;
-  background: var(--panel);
-  box-shadow: inset 0 0 0 1px var(--hair);
+  gap: 1px;
 }
 .settings-side nav button {
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr) auto;
-  column-gap: 10px;
+  column-gap: 9px;
   row-gap: 1px;
   align-items: center;
-  min-height: 44px;
-  padding: 6px 10px;
-  border-radius: 8px;
+  min-height: 38px;
+  padding: 5px 8px;
+  border-radius: 6px;
   background: none;
   box-shadow: none;
   color: var(--tx-2);
@@ -1020,6 +1028,7 @@
 }
 .settings-side nav button > svg {
   grid-row: 1 / 3;
+  color: var(--tx-3);
 }
 .settings-nav-name {
   grid-column: 2;
@@ -1027,8 +1036,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
-  font-weight: 550;
+  font-size: 12.5px;
+  font-weight: 500;
   color: var(--tx);
 }
 .settings-nav-value {
@@ -1037,7 +1046,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--tx-3);
 }
 .settings-nav-value.attention {
@@ -1058,11 +1067,21 @@
 /* The part on show is where the person is: the focus colour marks its icon. */
 .settings-side nav button[aria-current='page'] {
   background: var(--raised-2);
+  color: var(--tx);
+}
+.settings-side nav button[aria-current='page'] > svg {
   color: var(--act);
-  box-shadow: inset 0 0 0 1px var(--hair-2);
+}
+.settings-side nav button[aria-current='page'] .settings-nav-name {
+  font-weight: 600;
 }
 .settings-side nav button[aria-current='page'] .settings-nav-value:not(.attention) {
   color: var(--tx-2);
+}
+.settings-nav-empty {
+  margin: 4px 8px;
+  font-size: 12px;
+  color: var(--tx-3);
 }
 
 /* The part on show. */
@@ -1117,7 +1136,7 @@
 .settings-group {
   display: flex;
   flex-direction: column;
-  border-radius: 12px;
+  border-radius: 8px;
   background: var(--raised);
   box-shadow: inset 0 0 0 1px var(--hair);
 }
@@ -1214,9 +1233,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 38px;
-  padding: 8px 10px 8px 12px;
-  border-radius: 9px;
+  min-height: 36px;
+  padding: 7px 10px 7px 12px;
+  border-radius: 7px;
   box-shadow: inset 0 0 0 1px var(--hair-2);
   font-size: 12.5px;
   color: var(--tx-2);
@@ -1680,8 +1699,8 @@
 .menu .run-settings-levels [role='menuitemradio'] {
   gap: 5px;
   min-height: 26px;
-  padding: 0 11px;
-  border-radius: 999px;
+  padding: 0 10px;
+  border-radius: 6px;
   box-shadow: inset 0 0 0 1px var(--hair-2);
   color: var(--tx-2);
   font-size: 12px;

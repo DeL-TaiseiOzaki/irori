@@ -64,6 +64,6 @@ export function stripUnder<T>(
  */
 export function windowChrome(theme: Theme): { background: string; symbol: string } {
   return theme === 'light'
-    ? { background: '#e7e5e0', symbol: '#4a5058' }
-    : { background: '#0c0d0f', symbol: '#aab0b7' };
+    ? { background: '#ededeb', symbol: '#525863' }
+    : { background: '#121417', symbol: '#9ea5b0' };
 }

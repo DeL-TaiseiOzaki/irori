@@ -1,75 +1,47 @@
-/* Adapted from ObsidianUI Arrow Fill Button (MIT). */
+/* Rectilinear primary action button with restrained arrow response. */
 .obsidian-arrow-fill-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 42px;
-  padding: 10px 48px 10px 18px;
-  position: relative;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px;
   width: fit-content;
   max-width: 100%;
-  border-radius: 999px;
-  background: var(--nav);
-  color: var(--nav-text-strong);
-  border: 1px solid var(--nav-border);
+  border-radius: 6px;
+  background: var(--solid);
+  color: var(--on-solid);
+  border: 1px solid transparent;
+  font-size: 13px;
   font-weight: 500;
-  overflow: hidden;
   text-align: center;
+  transition:
+    background-color 140ms ease,
+    opacity 140ms ease;
 }
-.obsidian-arrow-fill-btn:hover {
-  background: var(--nav);
-  border-color: var(--nav-border-hover);
+.obsidian-arrow-fill-btn:is(:hover, :focus-visible):not(:disabled) {
+  background: var(--solid);
+  opacity: 0.92;
+}
+.obsidian-arrow-fill-btn:disabled {
+  opacity: 0.42;
 }
 .obsidian-arrow-fill-btn__text {
-  position: relative;
-  z-index: 1;
+  line-height: 1.2;
 }
-.obsidian-arrow-fill-btn__circle {
-  clip-path: inset(5px 5px 5px calc(100% - 35px) round 999px);
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px 48px 10px 18px;
-  z-index: 2;
-  pointer-events: none;
-  background: var(--nav-selected);
-  color: var(--nav-selected-text);
-  transition: clip-path 0.45s cubic-bezier(0.785, 0.135, 0.15, 0.86);
+.obsidian-arrow-fill-btn__arrow {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  transform: translateX(0);
+  transition: transform 150ms ease;
 }
-.obsidian-arrow-fill-btn__icon {
-  width: 12px;
-  height: 12px;
-  position: absolute;
-  right: 15px;
-  overflow: hidden;
-}
-.obsidian-arrow-fill-btn__path {
-  transition: transform 0.45s cubic-bezier(0.785, 0.135, 0.15, 0.86);
-  transform-origin: center;
-  fill: currentColor;
-}
-.obsidian-arrow-fill-btn__path:first-child {
-  transform: translateX(-120%) scale(0);
-}
-.obsidian-arrow-fill-btn:is(:hover, :focus-visible):not(:disabled)
-  .obsidian-arrow-fill-btn__path:first-child {
-  transform: translateX(0) scale(1);
-}
-.obsidian-arrow-fill-btn:is(:hover, :focus-visible):not(:disabled)
-  .obsidian-arrow-fill-btn__path:last-child {
-  transform: translateX(120%) scale(0);
-}
-.obsidian-arrow-fill-btn:is(:hover, :focus-visible):not(:disabled)
-  .obsidian-arrow-fill-btn__circle {
-  clip-path: inset(0 round 999px);
+.obsidian-arrow-fill-btn:is(:hover, :focus-visible):not(:disabled) .obsidian-arrow-fill-btn__arrow {
+  transform: translateX(2px);
 }
 @media (prefers-reduced-motion: reduce) {
   .obsidian-arrow-fill-btn,
-  .obsidian-arrow-fill-btn__circle,
-  .obsidian-arrow-fill-btn__path {
+  .obsidian-arrow-fill-btn__arrow {
     transition: none;
   }
 }

@@ -346,7 +346,10 @@ export function BrainHome({
               ))}
               {!knowledge.shown.length && (
                 <small className="home-more">
-                  {t('ノートはまだありません。', 'No notes yet.')}
+                  {t(
+                    'ノートはまだありません。右上の「ノートを作成」から書き始められます。',
+                    'No notes yet. Use “Create note” above to start writing.',
+                  )}
                 </small>
               )}
               {knowledge.more > 0 && (
@@ -482,7 +485,10 @@ export function BrainHome({
               ))}
               {!connections.length && (
                 <small className="home-more">
-                  {t('接続はまだありません。', 'No connections yet.')}
+                  {t(
+                    '接続フォルダはありません。「接続」からローカルやクラウドの資料を参照できます。',
+                    'No connected folders yet. Use “Connect” to mount local or cloud references.',
+                  )}
                 </small>
               )}
             </Card>

@@ -88,9 +88,9 @@ try {
   const startupMs = Date.now() - launchStart;
   const createWorkspace = page.getByRole('button', { name: 'ワークスペースを作成', exact: true });
   await createWorkspace.hover();
-  await expect(createWorkspace.locator('.obsidian-arrow-fill-btn__circle')).toHaveCSS(
-    'clip-path',
-    'inset(0px round 999px)',
+  await expect(createWorkspace.locator('.obsidian-arrow-fill-btn__arrow')).toHaveCSS(
+    'transform',
+    'matrix(1, 0, 0, 1, 2, 0)',
   );
   await page.screenshot({ path: 'test-results/obsidian-startup.png', fullPage: true });
   await page.getByRole('button', { name: 'KBフォルダを開く' }).click();
@@ -115,7 +115,7 @@ try {
   await expect(cloneMode).toHaveAttribute('aria-pressed', 'true');
   // The OS setting takes effect while the dialog is already mounted.
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await expect(registration.locator('.obsidian-arrow-fill-btn__circle')).toHaveCSS(
+  await expect(registration.locator('.obsidian-arrow-fill-btn__arrow')).toHaveCSS(
     'transition-duration',
     '0s',
   );
@@ -181,6 +181,15 @@ try {
     await expect(page.getByRole('radio', { name, exact: true })).toBeAttached();
   await page.screenshot({ path: 'test-results/irori-settings.png', fullPage: true });
   await page.getByRole('radio', { name: '教科書体', exact: true }).check();
+  const settingsFilter = page.getByRole('searchbox', { name: '設定を検索' });
+  await settingsFilter.fill('python');
+  await expect(page.getByRole('heading', { name: 'ルーティン', exact: true })).toBeVisible();
+  await settingsFilter.fill('');
+  // Cmd/Ctrl+, toggles preferences open and closed.
+  await page.keyboard.press('ControlOrMeta+,');
+  await expect(page.getByRole('dialog', { name: '設定' })).toHaveCount(0);
+  await page.keyboard.press('ControlOrMeta+,');
+  await expect(page.getByRole('dialog', { name: '設定' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect
     .poll(() => page.evaluate(() => document.documentElement.dataset.markdownFont))

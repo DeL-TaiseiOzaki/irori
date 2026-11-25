@@ -10,11 +10,11 @@
 }
 .agent-header {
   position: relative;
-  height: 54px;
+  height: 42px;
   flex: none;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   padding: 0 8px 0 10px;
   box-shadow: inset 0 -1px 0 var(--hair);
 }
@@ -22,10 +22,10 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 9px;
-  height: 36px;
-  padding: 0 8px 0 5px;
-  border-radius: 10px;
+  gap: 8px;
+  height: 30px;
+  padding: 0 7px 0 5px;
+  border-radius: 6px;
   min-width: 0;
   transition: background-color var(--quick) ease;
 }
@@ -261,10 +261,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 30px;
-  margin: 10px 12px 0;
-  padding: 0 12px;
-  border-radius: 999px;
+  height: 26px;
+  margin: 8px 12px 0;
+  padding: 0 10px;
+  border-radius: 6px;
   background: var(--chip);
   font-size: 11.5px;
   color: var(--tx-3);
@@ -347,13 +347,13 @@
   line-height: 1.6;
 }
 .conversation-empty-mark {
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   margin-bottom: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  border-radius: 10px;
   background: var(--chip);
   box-shadow: inset 0 0 0 1px var(--hair);
   color: var(--tx-2);
@@ -398,10 +398,10 @@
 }
 .message.user {
   align-self: flex-end;
-  max-width: 86%;
+  max-width: 88%;
   margin-top: 6px;
-  padding: 10px 14px;
-  border-radius: 18px 18px 6px 18px;
+  padding: 8px 12px;
+  border-radius: 10px 10px 4px 10px;
   background: var(--chip-2);
   color: var(--tx);
   white-space: pre-wrap;
@@ -934,8 +934,8 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 12px 12px 10px;
-  border-radius: 20px;
+  padding: 10px 10px 8px;
+  border-radius: 10px;
   border: 1px solid var(--hair-2);
   background: var(--composer);
   box-shadow: var(--composer-shadow);
@@ -949,7 +949,7 @@
 .composer-box:focus-within {
   border-color: var(--act-line);
   box-shadow:
-    0 0 0 3px var(--act-soft),
+    0 0 0 2px var(--act-soft),
     var(--composer-shadow);
 }
 /* The CLI's commands, offered above the box while a request is `/` and a name (ADR 040). */
@@ -1013,8 +1013,8 @@
   gap: 6px;
   height: 24px;
   max-width: 100%;
-  padding: 0 10px 0 5px;
-  border-radius: 999px;
+  padding: 0 8px 0 5px;
+  border-radius: 6px;
   background: var(--chip);
   color: var(--tx-2);
   font-size: 11.5px;
@@ -1057,8 +1057,8 @@
   align-items: center;
   gap: 4px;
   height: 24px;
-  padding: 0 10px 0 7px;
-  border-radius: 999px;
+  padding: 0 8px 0 6px;
+  border-radius: 6px;
   background: none;
   box-shadow: inset 0 0 0 1px var(--hair-2);
   color: var(--tx-3);
@@ -1097,18 +1097,18 @@
   gap: 2px;
 }
 .agent-panel .composer-tool {
-  border-radius: 50%;
+  border-radius: 6px;
 }
 .agent-panel .composer-tool:hover:not(:disabled) {
   background: var(--chip);
   color: var(--tx);
 }
-/* The skill and the person's lines are pills; the selects keep their native menus. */
+/* The skill and the person's lines are compact tags; the selects keep their native menus. */
 .composer-selects select,
 .composer-pill {
-  height: 28px;
+  height: 26px;
   max-width: 100%;
-  border-radius: 999px;
+  border-radius: 6px;
   font-size: 12px;
   font-weight: 500;
   color: var(--tx-2);
@@ -1227,9 +1227,9 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 30px;
-  padding: 0 8px 0 11px;
-  border-radius: 999px;
+  height: 28px;
+  padding: 0 7px 0 9px;
+  border-radius: 6px;
   background: none;
   box-shadow: none;
   color: var(--tx-2);
@@ -1293,24 +1293,24 @@
   color: var(--tx-3);
 }
 .agent-panel .stop {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
   box-shadow: inset 0 0 0 1px var(--hair-2);
   color: var(--tx-2);
 }
 .stop-mark {
-  width: 12px;
-  height: 12px;
-  border-radius: 2.5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
   background: currentColor;
 }
 .agent-panel .send-button {
   flex: none;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  border-radius: 50%;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1318,16 +1318,12 @@
   color: var(--on-solid);
   box-shadow: none;
   transition:
-    transform var(--quick) var(--ease),
     filter var(--quick) ease,
     background-color var(--quick) ease;
 }
 .agent-panel .send-button:hover:not(:disabled) {
   background: var(--solid);
   filter: brightness(0.92);
-}
-.agent-panel .send-button:active:not(:disabled) {
-  transform: scale(0.94);
 }
 /* Nothing to send yet: the button is an outline until there is. */
 .agent-panel .send-button:disabled {

@@ -35,6 +35,17 @@ jobs:
       - run: xvfb-run -a npm run test:ui
       - run: npm run build:website
       - run: xvfb-run -a npm run test:website
+      - if: github.event_name == 'pull_request'
+        run: xvfb-run -a npx tsx scripts/ui-screens.ts hearth-ja dark-en light-ja
+      - if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ui-screenshots-${{ github.sha }}
+          path: |
+            test-results/*.png
+            test-results/screens/*.png
+          if-no-files-found: warn
+          retention-days: 7
 
   # Packaging does not wait for verify. A release still needs the whole run to succeed, so
   # nothing is published from packages whose source failed verification.

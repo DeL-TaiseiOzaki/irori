@@ -125,15 +125,14 @@ try {
   const modeButton = rail.getByRole('button', { name: 'irori mode', exact: true });
   const routinesButton = rail.getByRole('button', { name: 'ルーティン', exact: true });
   const productButton = rail.getByRole('button', { name: /^Product・AI/ });
-  // Home, irori mode, routines, then the vaults; the new icon loads at its bundled size.
+  // Home, irori mode, routines, then the vaults; mode and routines use crisp vector icons.
   expect(
     await rail
       .locator('.rail-home, .rail-overview, .rail-routines, .rail-brain')
       .evaluateAll((buttons) => buttons.map((button) => button.className)),
   ).toEqual(['rail-home', 'rail-button rail-overview', 'rail-button rail-routines', 'rail-brain']);
-  await expect
-    .poll(() => routinesButton.locator('img').evaluate((img: HTMLImageElement) => img.naturalWidth))
-    .toBe(256);
+  await expect(modeButton.locator('svg.ui-icon')).toBeVisible();
+  await expect(routinesButton.locator('svg.ui-icon')).toBeVisible();
   // The routines page opens directly from a vault, with its own heading and selection.
   await routinesButton.click();
   await expect(page.getByRole('heading', { name: 'ルーティン', exact: true })).toBeVisible();

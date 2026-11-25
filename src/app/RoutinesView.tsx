@@ -559,7 +559,12 @@ export function RoutinesView({
       )}
       {list.loading && <p className="routines-note">{t('読み込み中…', 'Loading…')}</p>}
       {list.data && !routines.length && (
-        <p className="routines-empty">{t('ルーティンがありません', 'No routines')}</p>
+        <p className="routines-empty">
+          {t(
+            'ルーティンはまだありません。右上の「新しいルーティン」から定期処理や自動化を作成できます。',
+            'No routines yet. Use “New routine” above to set up recurring steps.',
+          )}
+        </p>
       )}
       {groups.map((group) => (
         <section

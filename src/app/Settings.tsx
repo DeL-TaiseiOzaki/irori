@@ -8,6 +8,7 @@ import { IroriAgentFolderSection } from './IroriAgentFolder';
 import { RemoteHostsSettings, sshHostsLead, useRemoteHosts } from './RemoteHosts';
 import { appVersion } from './branding';
 import { ErrorMessage } from './ErrorMessage';
+import { shortcut } from './shortcuts';
 import { useAction } from './useAction';
 import { useChoice } from './useChoice';
 import { useLanguage } from './useLanguage';
@@ -670,6 +671,25 @@ export function Settings({
     setOpen(true);
   };
   const close = () => setOpen(false);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.key !== ',' ||
+        !(event.metaKey || event.ctrlKey) ||
+        event.altKey ||
+        event.shiftKey ||
+        (event.target instanceof Element && event.target.closest('.terminal-panel'))
+      )
+        return;
+      const modal = document.querySelector('dialog[open]');
+      if (modal && !modal.classList.contains('settings-dialog')) return;
+      event.preventDefault();
+      if (open) close();
+      else show();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open, shownParts]);
   const choosePart = (id: PartId) => {
     lastPart = id;
     setPart(id);
@@ -1203,7 +1223,7 @@ export function Settings({
         className={start ? 'start-settings' : 'rail-button settings-trigger'}
         aria-label={label}
         aria-haspopup="dialog"
-        title={label}
+        title={`${label} · ${shortcut(',')}`}
         onClick={show}
       >
         <Icon name="sliders" size={start ? 14 : 18} />
@@ -1223,6 +1243,7 @@ export function Settings({
             parts={shownParts}
             current={current.id}
             summary={summary}
+            leads={leads}
             onChoose={choosePart}
             onClose={close}
           >
@@ -1239,15 +1260,28 @@ export function Settings({
   );
 }
 
+const partKeywords: Record<PartId, string> = {
+  general: 'language theme dark light hearth 言語 テーマ 外観 いろり ライト ダーク',
+  notes: 'markdown font size line spacing margin フォント 文字サイズ 行間 余白 明朝 ゴシック 等幅',
+  window: 'toolbar terminal status column 表示 ターミナル 画面 ツールバー',
+  agents: 'cli claude codex gemini opencode access permission 権限 フルアクセス 確認',
+  'irori-agent': 'workspace shared schema ワークスペース 全体 共有',
+  'vault-agent': 'schema skills instructions スキル 指示',
+  routines: 'javascript python node uv automation 自動化 定期実行 スクリプト',
+  'ssh-hosts': 'remote server ssh リモート サーバー 接続',
+  account: 'github sync backup restore 同期 バックアップ 復元 環境',
+  updates: 'version release upgrade バージョン アップデート 更新',
+};
+
 /**
- * The settings as a sheet of their own over the blurred window, as an editor's
- * preferences are: the parts listed at the side in framed groups, each with its
- * current value, and the part chosen beside them.
+ * The settings as a sheet of their own over the window, organized like an IDE's
+ * preferences: a searchable flat section list on the left and the chosen page beside it.
  */
 function SettingsSheet({
   parts: shown,
   current,
   summary,
+  leads,
   onChoose,
   onClose,
   children,
@@ -1255,12 +1289,30 @@ function SettingsSheet({
   parts: readonly Part[];
   current: PartId;
   summary: (id: PartId) => Summary;
+  leads: Record<PartId, () => string>;
   onChoose: (id: PartId) => void;
   onClose: () => void;
   children: ReactNode;
 }) {
   const id = useId();
   const body = useRef<HTMLDivElement>(null);
+  const [query, setQuery] = useState('');
+  const needle = query.trim().toLowerCase();
+  const filtered = needle
+    ? shown.filter((part) => {
+        const group = groups.find((item) => item.id === part.group);
+        const haystack = [
+          part.label(),
+          group?.label() ?? '',
+          summary(part.id).text,
+          leads[part.id](),
+          partKeywords[part.id],
+        ]
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(needle);
+      })
+    : shown;
   // Each part starts at its top. Newer scroll methods return a promise, which an
   // effect must not hand back to React as its cleanup.
   useEffect(() => {
@@ -1269,10 +1321,47 @@ function SettingsSheet({
   return (
     <div className="settings-sheet chrome">
       <aside className="settings-side">
-        <h2>{t('設定', 'Settings')}</h2>
+        <div className="settings-side-head">
+          <h2>{t('設定', 'Settings')}</h2>
+        </div>
+        <label className="settings-filter">
+          <Icon name="search" size={14} />
+          <input
+            type="search"
+            value={query}
+            placeholder={t('設定を検索…', 'Filter settings…')}
+            aria-label={t('設定を検索', 'Filter settings')}
+            spellCheck={false}
+            onChange={(event) => {
+              const next = event.target.value;
+              setQuery(next);
+              const trimmed = next.trim().toLowerCase();
+              if (!trimmed) return;
+              const match = shown.find((part) => {
+                const group = groups.find((item) => item.id === part.group);
+                return [
+                  part.label(),
+                  group?.label() ?? '',
+                  summary(part.id).text,
+                  leads[part.id](),
+                  partKeywords[part.id],
+                ]
+                  .join(' ')
+                  .toLowerCase()
+                  .includes(trimmed);
+              });
+              if (match && match.id !== current) onChoose(match.id);
+            }}
+          />
+        </label>
         <nav aria-label={t('設定の項目', 'Settings sections')}>
+          {filtered.length === 0 && (
+            <p className="settings-empty">
+              {t('一致する設定項目はありません。', 'No matching settings.')}
+            </p>
+          )}
           {groups.map((group) => {
-            const items = shown.filter((part) => part.group === group.id);
+            const items = filtered.filter((part) => part.group === group.id);
             if (items.length === 0) return null;
             return (
               <div
@@ -1284,7 +1373,7 @@ function SettingsSheet({
                 <span id={`${id}group-${group.id}`} className="settings-nav-label">
                   {group.label()}
                 </span>
-                <div className="settings-nav-frame">
+                <div className="settings-nav-items">
                   {items.map((part) => {
                     const value = summary(part.id);
                     return (
@@ -1296,7 +1385,7 @@ function SettingsSheet({
                         aria-describedby={`${id}${part.id}-value`}
                         onClick={() => onChoose(part.id)}
                       >
-                        <Icon name={part.icon} size={16} />
+                        <Icon name={part.icon} size={15} />
                         <span id={`${id}${part.id}`} className="settings-nav-name">
                           {part.label()}
                         </span>

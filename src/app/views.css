@@ -751,17 +751,19 @@ button.home-row:hover {
 
 /* Search: a palette over the workspace. */
 .search-palette {
-  width: min(700px, calc(100vw - 48px));
+  width: min(680px, calc(100vw - 48px));
   max-height: calc(100vh - 120px);
-  margin-top: 84px;
-  border-radius: 20px;
+  margin-top: 76px;
+  border-radius: 12px;
   overflow: hidden;
   color: var(--tx);
   color-scheme: var(--chrome-scheme);
-  box-shadow: var(--pop);
+  box-shadow:
+    0 0 0 1px var(--hair-2),
+    var(--pop);
 }
 .search-palette[open] {
-  animation: irori-rise 0.32s var(--ease) both;
+  animation: irori-rise 0.2s var(--ease) both;
 }
 .search-palette::backdrop {
   background: var(--scrim);
@@ -776,19 +778,19 @@ button.home-row:hover {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 12px;
-  height: 62px;
-  padding: 0 16px 0 20px;
+  gap: 10px;
+  height: 52px;
+  padding: 0 14px 0 16px;
   color: var(--tx-2);
 }
 .palette-query input {
   flex: 1;
   min-width: 0;
-  height: 40px;
+  height: 36px;
   padding: 0;
   border: 0;
   background: transparent;
-  font-size: 17px;
+  font-size: 15px;
   color: var(--tx);
   outline: none;
 }
@@ -1025,9 +1027,9 @@ button.home-row:hover {
 
 /* Brain settings: a paper sheet. */
 .brain-sheet-dialog {
-  width: min(840px, calc(100vw - 48px));
+  width: min(820px, calc(100vw - 48px));
   max-height: calc(100vh - 48px);
-  border-radius: 22px;
+  border-radius: 12px;
   overflow: hidden;
   box-shadow: var(--pop);
 }
@@ -1459,10 +1461,11 @@ button.home-row:hover {
   gap: 8px;
 }
 .home-edit {
-  opacity: 0;
+  opacity: 0.6;
   transition: opacity var(--quick) ease;
 }
 .home-header:hover .home-edit,
+.home-edit:hover,
 .home-edit:focus-visible {
   opacity: 1;
 }
