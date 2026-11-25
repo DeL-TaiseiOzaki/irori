@@ -181,6 +181,15 @@ try {
     await expect(page.getByRole('radio', { name, exact: true })).toBeAttached();
   await page.screenshot({ path: 'test-results/irori-settings.png', fullPage: true });
   await page.getByRole('radio', { name: '教科書体', exact: true }).check();
+  const settingsFilter = page.getByRole('searchbox', { name: '設定を検索' });
+  await settingsFilter.fill('python');
+  await expect(page.getByRole('heading', { name: 'ルーティン', exact: true })).toBeVisible();
+  await settingsFilter.fill('');
+  // Cmd/Ctrl+, toggles preferences open and closed.
+  await page.keyboard.press('ControlOrMeta+,');
+  await expect(page.getByRole('dialog', { name: '設定' })).toHaveCount(0);
+  await page.keyboard.press('ControlOrMeta+,');
+  await expect(page.getByRole('dialog', { name: '設定' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect
     .poll(() => page.evaluate(() => document.documentElement.dataset.markdownFont))
