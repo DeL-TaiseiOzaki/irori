@@ -214,6 +214,47 @@ try {
   await page.keyboard.press('Escape');
   await expect(card(page, '最初の話題')).toHaveCount(1);
 
+  // A card's × closes its conversation: the card goes, and the column shows another.
+  // `has` matches inside each row, so its locator starts from the row, not the board.
+  const row = (title: string) =>
+    board(page)
+      .locator('.session-card-row')
+      .filter({ has: page.locator('.session-card:not(.sub-agent)', { hasText: title }) });
+  const userMessage = (text: string) =>
+    panel(page).locator('.message.user').filter({ hasText: text });
+  await row('三つ目 dialog').hover();
+  await expect(row('三つ目 dialog').locator('.session-close')).toHaveCSS('opacity', '1');
+  await row('三つ目 dialog')
+    .getByRole('button', { name: /^閉じる: / })
+    .click();
+  await expect(card(page, '三つ目 dialog')).toHaveCount(0);
+  await expect(userMessage('三つ目 dialog')).toHaveCount(0);
+  // On a run in progress it stops the run too, and the run's end does not bring it back.
+  await panel(page).getByRole('button', { name: '新しい会話', exact: true }).click();
+  await send(page, '四つ目 hold');
+  await expect(
+    lane(page, '実行中').locator('.session-card').filter({ hasText: '四つ目 hold' }),
+  ).toHaveCount(1);
+  await row('四つ目 hold').hover();
+  await row('四つ目 hold')
+    .getByRole('button', { name: /^停止して閉じる: / })
+    .click();
+  await expect(card(page, '四つ目 hold')).toHaveCount(0);
+  await expect(userMessage('四つ目 hold')).toHaveCount(0);
+  await page.waitForTimeout(1500);
+  await expect(card(page, '四つ目 hold')).toHaveCount(0);
+  await expect(board(page).getByRole('img', { name: '実行中' })).toHaveCount(0);
+  // Closing the column's last conversation leaves it an empty one, not that one again.
+  const cards = board(page).locator('.session-card-row');
+  for (let left = 8; left > 0 && (await cards.count()) > 0; left--) {
+    await cards.first().hover();
+    await cards.first().locator('.session-close').click();
+  }
+  await expect(panel(page).locator('.message.user')).toHaveCount(0);
+  await page.waitForTimeout(1500);
+  await expect(cards).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/irori-session-board-closed.png' });
+
   if (errors.length) throw Error(`Renderer errors:\n${errors.join('\n')}`);
 } catch (error) {
   // A run may still hold the app open; the failure is what matters.

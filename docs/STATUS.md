@@ -1,5 +1,20 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Close a session from the session board, 2026-11-25 (**0.3.1**,
+[ADR 069](decisions/069-session-board.md), amendment of 2026-11-25): the owner
+asked to end sessions from the board with a ×. `SessionBoard` puts a
+`.session-close` button beside each card (not a sub-agent's), shown in the
+state dot's place on hover or focus. `closeSession` in `main.tsx` calls
+`host.cancel` for a running or waiting card, closes the conversation in every
+column's tabs (a column it would leave empty gets `newConversation` instead of
+the host's pick), and `useSessionBoard` keeps it in `closed` until it is opened
+again or a new run begins; `sessionBoard` leaves closed conversations out, and
+a hand-off whose maker is closed stands on its own.
+- Verified by `tests/session-board.test.ts` and `scripts/session-board-ui-smoke.ts`
+  (an idle card, a running Pi fixture card that stays gone after its run ends,
+  then every card, leaving the column an empty conversation).
+- Not covered: a real CLI agent's process ending on close.
+
 Desktop UI redesign, 2026-11-25 (**0.3.0**,
 [#384](https://github.com/DeL-TaiseiOzaki/irori/pull/384), published as
 `v0.3.0-preview.1`; direction in [UI-DESIGN](UI-DESIGN.md)): the owner asked

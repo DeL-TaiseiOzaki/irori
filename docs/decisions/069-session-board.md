@@ -109,6 +109,16 @@ rule. Its board is a separate drawer or window; the owner asked for a column.
 - 2026-11-22 (0.2.92): the board moved right of the agents' columns at the
   owner's request (decisions 1 and 7). It was already a window item the owner
   could turn off.
+- 2026-11-25 (0.3.1): at the owner's request, a card has a × that closes its
+  conversation. It takes the state dot's place while the card is pointed at or
+  focused, as a VS Code tab's close button does. It stops a run in progress or
+  waiting (its label then says 停止して閉じる), closes the conversation in every
+  column (a column it leaves empty starts an empty conversation, since the first
+  column would otherwise show the host's pick, most likely the same one) and
+  takes the card off. The conversation stays in the history; it shows again
+  when it is opened again or a new run of it begins. Which ones are closed is
+  not kept across restarts (decision 8). A CLI's sub-agent has no ×: it is a
+  step of its parent's run.
 
 ## Later
 

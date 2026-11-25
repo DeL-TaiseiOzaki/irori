@@ -1,5 +1,12 @@
 # irori continuation handoff
 
+**Close a session from the session board, 0.3.1**
+([ADR 069](decisions/069-session-board.md), amendment of 2026-11-25): a card's
+× stops its run, closes the conversation in every column and takes the card
+off; it shows again when opened again or run again. Next: with a real CLI
+agent, close a running card and check the CLI process ends and the history
+keeps the conversation.
+
 **Desktop UI redesign, 0.3.0**: calibrated slate-graphite chrome with a
 neutral paper stage in all three themes, a 52 px rail with vector icons for
 irori mode and Routines, explorer indentation guides, a vault settings button,

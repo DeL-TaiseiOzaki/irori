@@ -387,3 +387,36 @@ test('A hand-off that waits brings the conversation that made it, even when idle
   );
   assert.equal(lanes.open[0].children[0].state, 'queued');
 });
+
+test('A conversation closed on the board shows in no lane, whatever its state', () => {
+  const live: Record<string, SessionLive> = {
+    stopping: fold([event({ runId: 's', role: 'user', text: 'Long job' })]),
+    ended: fold([
+      event({ runId: 'e', role: 'user', text: 'x' }),
+      event({ runId: 'e', type: 'done', text: '', outcome: 'cancelled' }),
+    ]),
+  };
+  const lanes = sessionBoard({
+    rows: [
+      row('stopping', { running: true }),
+      row('ended'),
+      row('tab'),
+      row('maker', { scopeId: 'you' }),
+      row('handed', { running: true, origin: 'hand-off', handedBy: 'maker' }),
+      row('kept', { queued: 1 }),
+    ],
+    live,
+    open: new Set(['tab', 'maker']),
+    seen: {},
+    closed: new Set(['stopping', 'ended', 'tab', 'maker', 'kept']),
+  });
+  // A hand-off still at work stands on its own once the conversation that made it is closed.
+  assert.deepEqual(
+    boardCards(lanes).map((item) => item.id),
+    ['handed'],
+  );
+  assert.deepEqual(
+    lanes.working.map((item) => [item.id, item.children.length]),
+    [['handed', 0]],
+  );
+});

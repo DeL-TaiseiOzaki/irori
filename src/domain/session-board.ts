@@ -379,6 +379,11 @@ export interface BoardInput {
   open: ReadonlySet<string>;
   /** When the person last looked at each conversation: an ended run after that is news. */
   seen: Record<string, number>;
+  /**
+   * Conversations the person closed on the board: none shows, whatever its
+   * state, until it is opened again or a new run of it begins.
+   */
+  closed?: ReadonlySet<string>;
 }
 
 function stateOf(row: SessionRow, live: SessionLive | undefined, seen: number | undefined) {
@@ -429,7 +434,8 @@ function card(row: SessionRow, input: BoardInput): SessionCard {
  * The board's lanes: each card once, a hand-off under the conversation that
  * made it, newest change first. A conversation shows while it runs, waits, has
  * a queue, ended since the person last looked at it, or is open in a column; a
- * hand-off that shows brings the conversation that made it.
+ * hand-off that shows brings the conversation that made it. One the person
+ * closed on the board does not show.
  */
 export function sessionBoard(input: BoardInput): Record<SessionLane, SessionCard[]> {
   const cards = new Map(input.rows.map((row) => [row.id, card(row, input)]));
@@ -437,13 +443,15 @@ export function sessionBoard(input: BoardInput): Record<SessionLane, SessionCard
   for (const row of input.rows)
     if (row.handedBy && row.handedBy !== row.id && cards.has(row.handedBy))
       parentOf.set(row.id, row.handedBy);
-  const shows = (item: SessionCard) => item.state !== 'idle' || input.open.has(item.id);
+  const closed = (id: string) => !!input.closed?.has(id);
+  const shows = (item: SessionCard) =>
+    !closed(item.id) && (item.state !== 'idle' || input.open.has(item.id));
   const shown = new Set<string>();
   for (const item of cards.values()) {
     if (!shows(item)) continue;
     shown.add(item.id);
     const parent = parentOf.get(item.id);
-    if (parent) shown.add(parent);
+    if (parent && !closed(parent)) shown.add(parent);
   }
   const lanes = Object.fromEntries(sessionLanes.map((lane) => [lane, []])) as unknown as Record<
     SessionLane,
@@ -452,8 +460,9 @@ export function sessionBoard(input: BoardInput): Record<SessionLane, SessionCard
   const newest = (a: SessionCard, b: SessionCard) => b.changedAt - a.changedAt;
   for (const id of shown) {
     const item = cards.get(id)!;
+    // A hand-off whose maker was closed stands in its own lane.
     const parent = parentOf.get(id);
-    if (parent) cards.get(parent)!.children.push(item);
+    if (parent && shown.has(parent)) cards.get(parent)!.children.push(item);
     else lanes[item.lane].push(item);
   }
   for (const item of cards.values()) item.children.sort(newest);
