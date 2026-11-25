@@ -2410,6 +2410,7 @@ function App() {
   const act = useStableFunctions({
     report,
     openSession,
+    closeSession,
     joinVault: (space: Space) => void joinVault(space).catch(report),
     remoteVaultRemoved: (scopeId: string) =>
       void vaultRemoved(
@@ -2897,6 +2898,28 @@ function App() {
       openDock(vaultAgent ? 'vault' : 'irori');
     else void enterBrain(space, { ai: true }).catch(report);
   }
+  /**
+   * Closes a card's conversation, as its × on the board asks: stops its run, closes
+   * it in every column and takes its card off the board. It stays in the history,
+   * and shows again when it is opened again or sent another instruction.
+   */
+  function closeSession(card: SessionCard) {
+    board.close(card.id);
+    if (card.state === 'running' || card.state === 'waiting')
+      void host.cancel(card.scopeId, card.id).catch((error) => {
+        board.reopen(card.id);
+        report(error);
+      });
+    for (const key of new Set([...Object.keys(tabs), ...Object.keys(shown)])) {
+      const open = tabsOf(key);
+      if (!open.some((tab) => tab.id === card.id)) continue;
+      // A column left with nothing would show the host's pick, most likely this
+      // conversation again; an empty one takes its place instead.
+      if (shown[key]?.id === card.id && open.length === 1)
+        void newConversation(card.scopeId, key, card.agent, true).catch(report);
+      else closeTab(key, card.id, () => {});
+    }
+  }
   const sessionPane = boardShown && (
     <Pane
       key="sessions"
@@ -2914,6 +2937,7 @@ function App() {
         youId={you?.id}
         current={onScreen}
         onOpen={act.openSession}
+        onClose={act.closeSession}
       />
     </Pane>
   );

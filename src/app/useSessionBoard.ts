@@ -12,6 +12,14 @@ import { hostEvents } from './host-events';
 
 const host = window.irori;
 
+/** The set less one id; the same set when it lacks it. */
+const without = (id: string) => (all: ReadonlySet<string>) => {
+  if (!all.has(id)) return all;
+  const next = new Set(all);
+  next.delete(id);
+  return next;
+};
+
 /** An owner whose conversations the board lists: a vault, or the irori agent of the workspace. */
 export interface BoardOwner {
   scopeId: string;
@@ -42,6 +50,8 @@ export function useSessionBoard({
   const [rows, setRows] = useState<Record<string, SessionRow[]>>({});
   const [live, setLive] = useState<Record<string, SessionLive>>({});
   const [seen, setSeen] = useState<Record<string, number>>({});
+  // Conversations closed on the board, until they are opened again or run again.
+  const [closed, setClosed] = useState<ReadonlySet<string>>(() => new Set());
   const ownerKey = owners.map((owner) => `${owner.scopeId}:${owner.irori ? 1 : 0}`).join(',');
   const ownersRef = useRef(owners);
   ownersRef.current = owners;
@@ -123,6 +133,8 @@ export function useSessionBoard({
       if (!incoming.conversationId || !incoming.scopeId) return;
       if (!ownersRef.current.some((owner) => owner.scopeId === incoming.scopeId)) return;
       pending.push(incoming);
+      // A new run brings a conversation closed on the board back.
+      if (incoming.role === 'user') setClosed(without(incoming.conversationId));
       // A run that begins or ends changes the owner's list: a new title, a queue, a hand-off.
       if (incoming.role === 'user' || incoming.type === 'done') read(incoming.scopeId, 250);
       if (frame === undefined && timer === undefined) {
@@ -177,6 +189,24 @@ export function useSessionBoard({
     (id: string) => setSeen((all) => ({ ...all, [id]: Date.now() })),
     [],
   );
+  /** Takes a conversation off the board; `reopen` puts it back. */
+  const close = useCallback(
+    (id: string) => setClosed((all) => (all.has(id) ? all : new Set(all).add(id))),
+    [],
+  );
+  const reopen = useCallback((id: string) => setClosed(without(id)), []);
+  // One opened again as a tab or in a column shows again. Only an opening counts:
+  // a column may still show it for a moment while it is closed.
+  const wasOpen = useRef(open);
+  useEffect(() => {
+    const before = wasOpen.current;
+    wasOpen.current = open;
+    setClosed((all) => {
+      let next = all;
+      for (const id of all) if (open.has(id) && !before.has(id)) next = without(id)(next);
+      return next;
+    });
+  }, [open]);
 
   const lanes = useMemo(
     () =>
@@ -185,8 +215,9 @@ export function useSessionBoard({
         live,
         open,
         seen,
+        closed,
       }),
-    [rows, live, open, seen, ownerKey],
+    [rows, live, open, seen, closed, ownerKey],
   );
-  return { lanes, acknowledge };
+  return { lanes, acknowledge, close, reopen };
 }

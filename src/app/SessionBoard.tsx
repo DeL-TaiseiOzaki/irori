@@ -83,6 +83,7 @@ export const SessionBoard = memo(function SessionBoard({
   youId,
   current,
   onOpen,
+  onClose,
 }: {
   lanes: Record<SessionLane, SessionCard[]>;
   spaces: Space[];
@@ -91,6 +92,8 @@ export const SessionBoard = memo(function SessionBoard({
   current: readonly string[];
   /** Shows a conversation in a column; a sub-agent opens the conversation it works for. */
   onOpen: (card: SessionCard) => void;
+  /** Closes a conversation: stops its run, closes it in every column and takes its card off. */
+  onClose: (card: SessionCard) => void;
 }) {
   // The idle lane folds away on request, as Orca keeps its idle lane out of the way.
   const [openLane, setOpenLane] = useState(true);
@@ -126,31 +129,49 @@ export const SessionBoard = memo(function SessionBoard({
       working || item.state === 'done' || item.state === 'stopped' || item.state === 'failed'
         ? item.subAgents
         : [];
+    // The run stops with it; a queue waits, kept, for the conversation's next opening.
+    const closeWords =
+      item.state === 'running' || item.state === 'waiting'
+        ? t('停止して閉じる', 'Stop and close')
+        : t('閉じる', 'Close');
     return (
       <li key={item.id}>
-        <button
-          className={`session-card ${item.state} ${sub ? 'sub hand-off' : ''} ${current.includes(item.id) ? 'current' : ''}`}
-          aria-label={`${item.request} · ${space?.name ?? 'irori agent'} · ${agentNames[item.agent]} · ${sessionStateWords(item.state, item.queued)}`}
-          aria-describedby={detail?.id === item.id ? 'session-detail' : undefined}
-          onClick={() => onOpen(item)}
-          onMouseEnter={showDetail(item.id)}
-          onMouseLeave={hideDetail}
-          onFocus={showDetail(item.id)}
-          onBlur={hideDetail}
-        >
-          <span className="session-card-head">
-            {space ? (
-              <BrainTile space={space} size={16} radius={5} />
-            ) : (
-              <span className="session-owner-mark" aria-hidden="true">
-                <Icon name="agent" size={10} strokeWidth={2.2} />
-              </span>
-            )}
-            <span className="session-card-title">{item.request}</span>
-            <Dot state={item.state} queued={item.queued} />
-          </span>
-          <span className="session-card-foot">{agentNames[item.agent]}</span>
-        </button>
+        <div className="session-card-row">
+          <button
+            className={`session-card ${item.state} ${sub ? 'sub hand-off' : ''} ${current.includes(item.id) ? 'current' : ''}`}
+            aria-label={`${item.request} · ${space?.name ?? 'irori agent'} · ${agentNames[item.agent]} · ${sessionStateWords(item.state, item.queued)}`}
+            aria-describedby={detail?.id === item.id ? 'session-detail' : undefined}
+            onClick={() => onOpen(item)}
+            onMouseEnter={showDetail(item.id)}
+            onMouseLeave={hideDetail}
+            onFocus={showDetail(item.id)}
+            onBlur={hideDetail}
+          >
+            <span className="session-card-head">
+              {space ? (
+                <BrainTile space={space} size={16} radius={5} />
+              ) : (
+                <span className="session-owner-mark" aria-hidden="true">
+                  <Icon name="agent" size={10} strokeWidth={2.2} />
+                </span>
+              )}
+              <span className="session-card-title">{item.request}</span>
+              <Dot state={item.state} queued={item.queued} />
+            </span>
+            <span className="session-card-foot">{agentNames[item.agent]}</span>
+          </button>
+          <button
+            className="session-close"
+            aria-label={`${closeWords}: ${item.title}`}
+            title={closeWords}
+            onClick={() => {
+              hideDetail();
+              onClose(item);
+            }}
+          >
+            <Icon name="close" size={11} strokeWidth={2.2} />
+          </button>
+        </div>
         {(item.children.length > 0 || subAgents.length > 0) && (
           <ul
             className="session-subs"
