@@ -1,5 +1,15 @@
 # irori continuation handoff
 
+**Desktop UI redesign, 0.3.0**: calibrated slate-graphite chrome with a
+neutral paper stage in all three themes, a 52 px rail with vector icons for
+irori mode and Routines, explorer indentation guides, a vault settings button,
+and a flat, filterable Settings sheet that `⌘,` / `Ctrl+,` opens and closes
+(direction in [UI-DESIGN](UI-DESIGN.md)). Merged in
+[#384](https://github.com/DeL-TaiseiOzaki/irori/pull/384) and published as
+`v0.3.0-preview.1`. Next: review the packaged app's screens with Japanese
+fonts present (CI's screen renders lack CJK fonts, so Japanese copy shows as
+boxes there).
+
 **The `irori` command has what the window has, 0.2.99**
 ([ADR 075](decisions/075-the-irori-command-has-what-the-window-has.md)):
 `copy`, `stop`, `connection`, `strays`, `skills`, `install python`, `move`
