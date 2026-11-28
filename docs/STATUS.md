@@ -1,7 +1,8 @@
 # Implementation status — notes, native agents and connection onboarding
 
 Astryx design system, stage 2: buttons, 2026-11-28 (**0.3.4**,
-[ADR 076](decisions/076-astryx-design-system.md) "Stage 2"): the owner asked to
+[ADR 076](decisions/076-astryx-design-system.md) "Stage 2",
+[#391](https://github.com/DeL-TaiseiOzaki/irori/pull/391), open): the owner asked to
 continue with stage 2 after stage 1 merged.
 - **What changed.** 149 buttons in 33 renderer files are Astryx's, through
   `src/app/controls.tsx` (`Button`, `IconButton`): 101 `Button` and 48

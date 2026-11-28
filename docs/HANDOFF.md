@@ -5,7 +5,8 @@
 - **What changed.** Every styled button is Astryx's `Button` or `IconButton`
   through `src/app/controls.tsx`. irori's element defaults sit in an
   `irori-defaults` layer under Astryx's. Function is unchanged.
-- **State.** Open as a pull request, not merged.
+- **State.** Open in [#391](https://github.com/DeL-TaiseiOzaki/irori/pull/391),
+  not merged.
 - **Next: stage 2b.** Turn text fields, switches, checkboxes, segmented
   controls, badges, keys, spinners and empty states into Astryx components the
   same way: adapters in `controls.tsx`, accessible names kept, then the old
