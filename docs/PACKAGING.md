@@ -194,9 +194,27 @@ The ignored `test-results/package-smoke.json` contains platform/runtime versions
 
 ## CI
 
-`.github/workflows/app.yml` runs on main pushes, pull requests and explicit dispatch. Linux verification covers build, behavior tests, all seven Electron UI suites and website tests. Only after verification passes do Linux x64, Windows x64 and macOS arm64 jobs build packages and run the relocated-app smoke. The Mac job uses an arm64 runner; Intel Mac has no advertised support. Standard hosted runner architectures are documented by [GitHub](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+[The desktop workflow](../.github/workflows/app.yml) runs on pushes to `main`,
+pull requests and manual dispatches. A verified diff limited to regular edits of
+`STATUS.md` or `HANDOFF.md` takes a lightweight Git diff check. Pushes to
+`main` take that route only when no preview is due. An unclassified diff or
+manual dispatch runs the full workflow.
 
-The workflow has read-only repository permissions and uploads unsigned engineering artifacts for seven days. It has no release publisher, signing credentials, deployment environment or manifest update. Anyone accessing these artifacts must treat them as test candidates. Successful hosted CI is not Windows 11/Ryzen 9 or MacBook M5 Pro installed-device acceptance. Optional native controls in `npm test` remain skipped in CI, since those tools/accounts are not installed there.
+The full workflow runs Linux build, behavior and website checks, three groups of
+the complete Electron UI suite, and native package jobs in parallel. The native
+jobs build and launch Linux x64, Windows x64 and macOS arm64 packages. Windows
+also runs focused SSH and filesystem behavior tests. Windows and macOS test
+applying an update with their platform tools. Local `npm run test:ui` still runs
+the entire suite. Pass a group number after `--` to reproduce one CI group.
+
+The **Desktop CI** check succeeds only when the plan and every applicable job
+succeed. The separate **pull-request** check in the release policy workflow
+validates the version and preview notes. Both checks can be required on
+`main`. The desktop workflow uses read-only repository permissions and stores
+unsigned engineering artifacts for seven days. The release workflow checks the
+source tree and file digests again before publishing. Hosted CI covers the
+packaged app and automated update mechanics. Installed-device acceptance and
+opt-in real provider tests are separate.
 
 ## Local evidence
 
