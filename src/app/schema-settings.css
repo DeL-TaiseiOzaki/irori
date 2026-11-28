@@ -101,13 +101,6 @@
   justify-content: flex-end;
   gap: 8px;
 }
-.schema-actions .solid-button {
-  height: 32px;
-  padding: 0 14px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
 .schema-actions .danger {
   margin-right: auto;
   color: var(--danger);
@@ -143,7 +136,4 @@
   height: 28px;
   opacity: 0;
   cursor: pointer;
-}
-.schema-import:focus-within .stage-text-button {
-  outline: 2px solid var(--focus-ring);
 }

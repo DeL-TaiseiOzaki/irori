@@ -163,49 +163,6 @@ button.save-state > i {
   border-radius: 50%;
   background: var(--ink-3);
 }
-.stage-button {
-  height: 30px;
-  min-width: 30px;
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 0 7px;
-  border-radius: var(--radius-element);
-  background: none;
-  box-shadow: none;
-  color: var(--ink-3);
-  font-size: 12px;
-}
-.stage-button:hover:not(:disabled),
-.stage-button[data-popup-open] {
-  background: var(--stage-2);
-  color: var(--ink);
-}
-.stage-text-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  height: 32px;
-  padding: 0 12px;
-  border-radius: var(--radius-element);
-  background: none;
-  box-shadow: none;
-  color: var(--ink-2);
-  font-size: 13px;
-  white-space: nowrap;
-}
-.stage-text-button.framed {
-  background: var(--card);
-  color: var(--ink);
-  box-shadow: var(--card-shadow);
-}
-.stage-text-button:hover:not(:disabled) {
-  background: var(--stage-2);
-  color: var(--ink);
-}
 /* Opens the agent beside the note. A control like the others in the bar: the
    agent is a tool here, not the subject. */
 .ai-toggle {
@@ -285,8 +242,8 @@ button.save-state > i {
   margin: 0;
   padding: 8px 24px;
 }
-.hint button,
-.error button {
+.hint button:not(:where(.astryx-button)),
+.error button:not(:where(.astryx-button)) {
   margin-left: 8px;
   padding: 3px 10px;
   font-size: 12px;
@@ -410,15 +367,6 @@ button.save-state > i {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.find-bar .icon-button {
-  width: 28px;
-  height: 28px;
-  color: var(--ink-3);
-}
-.find-bar .icon-button:hover:not(:disabled) {
-  background: var(--stage-2);
-  color: var(--ink);
-}
 /* Where the words are, and the one the bar is on: the focus role, as a selection. */
 .find-hit {
   border-radius: 2px;
@@ -517,19 +465,19 @@ button.save-state > i {
 .stage-tabs.focused .stage-tab.current::after {
   background: var(--act-ink);
 }
-.stage-tab > button {
+.stage-tab > button:not(:where(.astryx-button)) {
   border: 0;
   background: none;
   box-shadow: none;
   color: inherit;
   cursor: pointer;
 }
-.stage-tab > button:hover,
-.stage-tab > button:active {
+.stage-tab > button:not(:where(.astryx-button)):hover,
+.stage-tab > button:not(:where(.astryx-button)):active {
   background: none;
   transform: none;
 }
-.stage-tab > button[role='tab'] {
+.stage-tab > button:not(:where(.astryx-button))[role='tab'] {
   flex: 1;
   min-width: 0;
   display: flex;
@@ -554,10 +502,10 @@ button.save-state > i {
   font-size: 11px;
   font-weight: 400;
 }
-.stage-tab.current > button[role='tab'] {
+.stage-tab.current > button:not(:where(.astryx-button))[role='tab'] {
   font-weight: 550;
 }
-.stage-tab > button[role='tab'] > span {
+.stage-tab > button:not(:where(.astryx-button))[role='tab'] > span {
   display: block;
   min-width: 0;
   overflow: hidden;
@@ -589,10 +537,7 @@ button.save-state > i {
   color: var(--ink);
 }
 .stage-tabs > .stage-column-close {
-  width: 26px;
-  height: 26px;
   margin: 0 4px 3px;
-  color: var(--ink-3);
 }
 .document-editor {
   max-width: var(--page-width);
@@ -797,7 +742,7 @@ button.save-state > i {
   font-weight: 600;
 }
 .terminal-toolbar select,
-.terminal-toolbar button {
+.terminal-toolbar button:not(:where(.astryx-button)) {
   height: 26px;
   padding: 0 9px;
   border-radius: var(--radius-element);
@@ -819,10 +764,10 @@ button.save-state > i {
   font-size: 12px;
   opacity: 0.85;
 }
-.terminal-toolbar button:hover:not(:disabled) {
+.terminal-toolbar button:not(:where(.astryx-button)):hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.12);
 }
-.terminal-toolbar button:last-child {
+.terminal-toolbar button:not(:where(.astryx-button)):last-child {
   width: 26px;
   padding: 0;
   display: inline-flex;
@@ -881,7 +826,7 @@ button.save-state > i {
   font: inherit;
   font-size: 13px;
 }
-.comment-composer button[type='submit'] {
+.comment-composer button:not(:where(.astryx-button))[type='submit'] {
   align-self: flex-end;
 }
 .comment-quote {
@@ -984,7 +929,7 @@ button.comment-quote:hover {
   flex-direction: column;
   gap: 2px;
 }
-.backlinks-hits button {
+.backlinks-hits button:not(:where(.astryx-button)) {
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -996,7 +941,7 @@ button.comment-quote:hover {
   text-align: left;
   font-weight: 400;
 }
-.backlinks-hits button:hover {
+.backlinks-hits button:not(:where(.astryx-button)):hover {
   background: var(--stage-2);
 }
 .backlink-location {

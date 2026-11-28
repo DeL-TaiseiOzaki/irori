@@ -34,6 +34,7 @@ import { Crumbs } from './NoteBar';
 import { StageView } from './StageView';
 import { useAction } from './useAction';
 import { useResource } from './useResource';
+import { Button } from './controls';
 import './schema-settings.css';
 
 const host = window.irori;
@@ -317,9 +318,7 @@ function ConfirmDelete({
           <button type="button" disabled={busy} onClick={onClose}>
             {t('キャンセル', 'Cancel')}
           </button>
-          <button className="primary" disabled={busy}>
-            {t('削除する', 'Delete')}
-          </button>
+          <Button type="submit" variant="primary" label={t('削除する', 'Delete')} disabled={busy} />
         </div>
       </form>
     </Dialog>
@@ -549,15 +548,16 @@ function Actions({ children }: { children: ReactNode }) {
 
 function DeleteButton({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
   return (
-    <button
+    <Button
       type="button"
-      className="stage-text-button danger"
+      className="danger"
+      variant="ghost"
+      size="md"
+      label={t('削除', 'Delete')}
+      icon={<Icon name="trash" size={14} />}
       disabled={disabled}
       onClick={onClick}
-    >
-      <Icon name="trash" size={14} />
-      {t('削除', 'Delete')}
-    </button>
+    />
   );
 }
 
@@ -643,15 +643,16 @@ function InstructionsForm({
             }
           />
         )}
-        <button
-          className="solid-button"
+        <Button
+          type="submit"
+          variant="primary"
+          size="md"
+          label={target.key ? t('保存', 'Save') : t('作成', 'Create')}
+          icon={<Icon name="check" size={14} />}
           disabled={
             disabled || (!!target.key && text === undefined) || (!target.key && !choices.length)
           }
-        >
-          <Icon name="check" size={14} />
-          {target.key ? t('保存', 'Save') : t('作成', 'Create')}
-        </button>
+        />
       </Actions>
     </form>
   );
@@ -714,13 +715,14 @@ function RuleForm({ scopeId, target, disabled, run, onSelect, onDelete }: FormPr
             }
           />
         )}
-        <button
-          className="solid-button"
+        <Button
+          type="submit"
+          variant="primary"
+          size="md"
+          label={target.key ? t('保存', 'Save') : t('作成', 'Create')}
+          icon={<Icon name="check" size={14} />}
           disabled={disabled || !valid || (!!target.key && text === undefined && !renamed)}
-        >
-          <Icon name="check" size={14} />
-          {target.key ? t('保存', 'Save') : t('作成', 'Create')}
-        </button>
+        />
       </Actions>
     </form>
   );
@@ -837,10 +839,14 @@ function HookForm({ scopeId, target, data, disabled, run, onSelect, onDelete }: 
             }
           />
         )}
-        <button className="solid-button" disabled={disabled || !editable || !command.trim()}>
-          <Icon name="check" size={14} />
-          {index === undefined ? t('作成', 'Create') : t('保存', 'Save')}
-        </button>
+        <Button
+          type="submit"
+          variant="primary"
+          size="md"
+          label={index === undefined ? t('作成', 'Create') : t('保存', 'Save')}
+          icon={<Icon name="check" size={14} />}
+          disabled={disabled || !editable || !command.trim()}
+        />
       </Actions>
     </form>
   );
@@ -946,10 +952,14 @@ function SkillForm({ scopeId, target, data, disabled, run, onSelect, onDelete }:
               }
             />
           )}
-          <button className="solid-button" disabled={disabled || !valid}>
-            <Icon name="check" size={14} />
-            {target.key ? t('保存', 'Save') : t('作成', 'Create')}
-          </button>
+          <Button
+            type="submit"
+            variant="primary"
+            size="md"
+            label={target.key ? t('保存', 'Save') : t('作成', 'Create')}
+            icon={<Icon name="check" size={14} />}
+            disabled={disabled || !valid}
+          />
         </Actions>
       </form>
       {target.key ? (
@@ -1025,33 +1035,32 @@ function Attachments({
     <section className="schema-card" aria-label={t('添付ファイル', 'Attached files')}>
       <div className="schema-card-heading">
         <h3>{t('添付ファイル', 'Attached files')}</h3>
-        <button
+        <Button
           type="button"
-          className="stage-text-button small framed"
+          label={t('ファイルを追加', 'Add a file')}
+          icon={<Icon name="plus" size={13} />}
           disabled={disabled}
           onClick={() => {
             setOpen('');
             setName('');
             setText('');
           }}
-        >
-          <Icon name="plus" size={13} />
-          {t('ファイルを追加', 'Add a file')}
-        </button>
+        />
       </div>
       {files.length ? (
         <ul className="schema-files">
           {files.map((file) => (
             <li key={file}>
-              <button
+              <Button
                 type="button"
-                className={`stage-text-button small ${open === file ? 'framed' : ''}`}
+                variant={open === file ? 'secondary' : 'ghost'}
+                label={file}
+                icon={<Icon name="file" size={13} />}
                 aria-current={open === file ? 'true' : undefined}
                 onClick={() => setOpen(file)}
               >
-                <Icon name="file" size={13} />
                 <span className="mono">{file}</span>
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
@@ -1085,7 +1094,7 @@ function Attachments({
             />
           </label>
           <label className="schema-import">
-            <span className="stage-text-button small framed">
+            <span className="file-button small">
               <Icon name="folderOpen" size={13} />
               {t('ディスクから読み込む', 'Import from disk')}
             </span>
@@ -1114,13 +1123,21 @@ function Attachments({
             </p>
           )}
           <Actions>
-            <button type="button" className="stage-text-button" onClick={() => setOpen(undefined)}>
-              {t('キャンセル', 'Cancel')}
-            </button>
-            <button className="solid-button" disabled={disabled || !valid}>
-              <Icon name="plus" size={14} />
-              {t('追加', 'Add')}
-            </button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="md"
+              label={t('キャンセル', 'Cancel')}
+              onClick={() => setOpen(undefined)}
+            />
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              label={t('追加', 'Add')}
+              icon={<Icon name="plus" size={14} />}
+              disabled={disabled || !valid}
+            />
           </Actions>
         </form>
       )}
@@ -1159,10 +1176,14 @@ function Attachments({
                     })
                   }
                 />
-                <button className="solid-button" disabled={disabled || text === doc.text}>
-                  <Icon name="check" size={14} />
-                  {t('保存', 'Save')}
-                </button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  label={t('保存', 'Save')}
+                  icon={<Icon name="check" size={14} />}
+                  disabled={disabled || text === doc.text}
+                />
               </Actions>
             </>
           )}

@@ -25,6 +25,7 @@ import { Dialog } from './Dialog';
 import { errorText } from './ErrorMessage';
 import { hostEvents } from './host-events';
 import { Icon } from './Icon';
+import { Button, IconButton } from './controls';
 import { chooseRoutineRuntimes, currentRoutineRuntimes } from './device-settings';
 import { openRequest, useBrainAi } from './useBrainAi';
 import { useAction } from './useAction';
@@ -325,13 +326,12 @@ function ReviewDialog({
           <button disabled={busy} onClick={onCancel}>
             {t('キャンセル', 'Cancel')}
           </button>
-          <button
-            className="primary"
+          <Button
+            variant="primary"
+            label={t('確認して実行', 'Confirm and run')}
             disabled={busy || !data || !!data.problem}
             onClick={() => void run(() => onConfirm(data!.digest))}
-          >
-            {t('確認して実行', 'Confirm and run')}
-          </button>
+          />
         </div>
       </div>
     </Dialog>,
@@ -392,29 +392,27 @@ function RoutineCard({
           </span>
         )}
         <span className="routine-space" />
-        <button
-          className="icon-button"
-          aria-label={t(`${routine.name} を編集`, `Edit ${routine.name}`)}
+        <IconButton
+          label={t(`${routine.name} を編集`, `Edit ${routine.name}`)}
           title={t('編集', 'Edit')}
+          icon={<Icon name="penLine" size={14} />}
           disabled={running}
           onClick={onEdit}
-        >
-          <Icon name="penLine" size={14} />
-        </button>
+        />
         {running ? (
-          <button className="panel-button" onClick={onStop}>
-            <Icon name="close" size={13} />
-            {t('停止', 'Stop')}
-          </button>
+          <Button
+            label={t('停止', 'Stop')}
+            icon={<Icon name="close" size={13} />}
+            onClick={onStop}
+          />
         ) : (
-          <button
-            className="solid-button"
+          <Button
+            variant="primary"
+            label={t('実行', 'Run')}
+            icon={<Icon name="play" size={13} />}
             disabled={!!routine.problem || !!routine.needs}
             onClick={onRun}
-          >
-            <Icon name="play" size={13} />
-            {t('実行', 'Run')}
-          </button>
+          />
         )}
       </header>
       {routine.problem && (
@@ -426,24 +424,26 @@ function RoutineCard({
         <p className="routine-needs">
           {routine.needs.text}
           {routine.needs.runtime && (
-            <button
-              className="panel-button"
+            <Button
+              label={
+                routine.needs.runtime === 'python'
+                  ? adding.busy
+                    ? t('Python を追加中…', 'Adding Python…')
+                    : t('Python を追加', 'Add Python')
+                  : t('JavaScript を追加', 'Add JavaScript')
+              }
+              icon={<Icon name="plus" size={13} />}
               disabled={adding.busy}
               onClick={() => void adding.run(() => onAddRuntime(routine.needs!.runtime!))}
-            >
-              <Icon name="plus" size={13} />
-              {routine.needs.runtime === 'python'
-                ? adding.busy
-                  ? t('Python を追加中…', 'Adding Python…')
-                  : t('Python を追加', 'Add Python')
-                : t('JavaScript を追加', 'Add JavaScript')}
-            </button>
+            />
           )}
           {routine.needs.secrets?.map((name) => (
-            <button key={name} className="panel-button" onClick={() => onEnterSecret(name)}>
-              <Icon name="lock" size={13} />
-              {t(`${name} を入力`, `Enter ${name}`)}
-            </button>
+            <Button
+              key={name}
+              label={t(`${name} を入力`, `Enter ${name}`)}
+              icon={<Icon name="lock" size={13} />}
+              onClick={() => onEnterSecret(name)}
+            />
           ))}
         </p>
       )}

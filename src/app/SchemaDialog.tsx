@@ -5,6 +5,7 @@ import { t } from '../domain/i18n';
 import { BrainTile } from './BrainTile';
 import { Dialog } from './Dialog';
 import { Icon } from './Icon';
+import { IconButton } from './controls';
 import { SchemaEditor, SchemaList, type SchemaTarget } from './SchemaSettings';
 import './schema-dialog.css';
 
@@ -67,14 +68,11 @@ export function SchemaDialog({
         <nav className="schema-owners" aria-label={label}>
           <header>
             <h2>Schema</h2>
-            <button
-              className="icon-button"
-              aria-label={t('閉じる', 'Close')}
-              title={t('閉じる', 'Close')}
+            <IconButton
+              label={t('閉じる', 'Close')}
+              icon={<Icon name="close" size={16} />}
               onClick={onClose}
-            >
-              <Icon name="close" size={16} />
-            </button>
+            />
           </header>
           {ready && (
             <>

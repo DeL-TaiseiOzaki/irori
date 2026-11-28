@@ -7,6 +7,7 @@ import { BrainTile } from './BrainTile';
 import { RemoteVaultPlace } from './RemoteHosts';
 import { SchemaEditor, SchemaList, type SchemaTarget } from './SchemaSettings';
 import { Icon } from './Icon';
+import { IconButton } from './controls';
 import { IroriAgentFolderSection } from './IroriAgentFolder';
 import { useResource } from './useResource';
 import './you.css';
@@ -240,14 +241,11 @@ export function YourAiScreen({
       >
         <header className="you-head">
           <div className="you-identity">
-            <button
-              className="icon-button"
-              aria-label={t('irori mode に戻る', 'Back to irori mode')}
-              title={t('irori mode に戻る', 'Back to irori mode')}
+            <IconButton
+              label={t('irori mode に戻る', 'Back to irori mode')}
+              icon={<Icon name="back" size={16} />}
               onClick={onBack}
-            >
-              <Icon name="back" size={16} />
-            </button>
+            />
             <span className="you-orb" aria-hidden="true">
               <Icon name="agent" size={16} strokeWidth={2.1} />
             </span>

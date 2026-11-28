@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { t } from '../domain/i18n';
 import { Icon } from './Icon';
+import { IconButton } from './controls';
 
 /**
  * A brain's view that takes the stage in place of the note — the graph, or the
@@ -49,15 +50,12 @@ export function StageView({
         {crumbs}
         <div className="stage-actions">
           {actions}
-          <button
-            className="stage-button"
-            aria-label={t('閉じる', 'Close')}
-            title={t('閉じる', 'Close')}
+          <IconButton
+            label={t('閉じる', 'Close')}
+            icon={<Icon name="close" size={16} />}
             disabled={busy}
             onClick={onClose}
-          >
-            <Icon name="close" size={16} />
-          </button>
+          />
         </div>
       </header>
       <div className="stage-view-body">{children}</div>

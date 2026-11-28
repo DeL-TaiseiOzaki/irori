@@ -13,7 +13,7 @@ Two kinds of package ship. The packages the host process loads at run time trave
 | Motion (`motion`, `framer-motion`, `motion-dom`, `motion-utils`) | MIT, bundled; used for ObsidianUI tab indicators |
 | ObsidianUI Magnet Tabs and Arrow Fill Button | Adapted source in `src/app/obsidian/`; full MIT notice below |
 | Geist and Geist Mono variable fonts 1.7.2 (from the `geist` npm package) | SIL Open Font License 1.1; the woff2 files and `OFL.txt` are in `src/app/fonts/`. Geist Mono is bundled into the renderer's `dist/assets/`; Geist is used by the download website only; full notice below |
-| Astryx (`@astryxdesign/core`, `@astryxdesign/theme-neutral`) 0.7.17 | MIT. Its token values are copied into `src/app/astryx-tokens.css` by `scripts/astryx-tokens.ts`; the neutral theme's `fonts.css` is bundled; full notice below |
+| Astryx (`@astryxdesign/core`, `@astryxdesign/theme-neutral`) 0.7.17, with StyleX's runtime (`@stylexjs/stylex`) and `intl-messageformat` | MIT, bundled: core's components and `astryx.css`, the neutral theme's `fonts.css`. Its token values are also copied into `src/app/astryx-tokens.css` by `scripts/astryx-tokens.ts`; full Astryx notice below |
 | Figtree (from `@astryxdesign/theme-neutral`) | SIL Open Font License 1.1; the neutral theme's eight latin and latin-ext woff2 files are bundled into `dist/assets/`; full notice below |
 | Electron | MIT, node_modules/electron/LICENSE; binary distribution LICENSE and LICENSES.chromium.html |
 | Milkdown Crepe and Milkdown packages, with their ProseMirror, remark and Vue runtime dependencies | MIT, bundled; DOMPurify (`MPL-2.0 OR Apache-2.0`) and d3-ease (`BSD-3-Clause`) are the only non-MIT/ISC entries in the notices |
@@ -95,9 +95,10 @@ SOFTWARE.
 
 ## Astryx MIT notice (design tokens and theme fonts stylesheet)
 
-irori copies the design tokens of `@astryxdesign/core` 0.7.17 with the values
-of `@astryxdesign/theme-neutral` 0.7.17 into `src/app/astryx-tokens.css`, and
-bundles the neutral theme's `fonts.css`. See
+irori bundles the components and stylesheet of `@astryxdesign/core` 0.7.17 and
+the neutral theme's `fonts.css` from `@astryxdesign/theme-neutral` 0.7.17, and
+copies the design tokens with the neutral theme's values into
+`src/app/astryx-tokens.css`. See
 [ADR 076](decisions/076-astryx-design-system.md).
 
 ```text

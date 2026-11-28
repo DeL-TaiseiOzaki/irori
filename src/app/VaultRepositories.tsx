@@ -5,6 +5,7 @@ import type { CloudConnection, Space } from '../domain/types';
 import { t } from '../domain/i18n';
 import { errorText } from './ErrorMessage';
 import { Icon } from './Icon';
+import { IconButton } from './controls';
 import { useResource } from './useResource';
 import './vault-repositories.css';
 
@@ -28,15 +29,17 @@ export function VaultRepositories({
 }: {
   space: Space;
   connections: CloudConnection[];
-  className: string;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const label = t('GitHub リポジトリとブランチ', 'GitHub repositories and branches');
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger className={className} aria-label={label} title={label}>
-        <Icon name="branch" size={14} />
-      </Popover.Trigger>
+      <Popover.Trigger
+        render={
+          <IconButton className={className} label={label} icon={<Icon name="branch" size={14} />} />
+        }
+      />
       <Popover.Portal>
         <Popover.Positioner side="bottom" align="end" sideOffset={6}>
           <Popover.Popup
@@ -45,9 +48,9 @@ export function VaultRepositories({
           >
             <div className="vault-repositories-heading">
               <Popover.Title render={<strong />}>{label}</Popover.Title>
-              <Popover.Close className="icon-button" aria-label={t('閉じる', 'Close')}>
-                <Icon name="close" />
-              </Popover.Close>
+              <Popover.Close
+                render={<IconButton label={t('閉じる', 'Close')} icon={<Icon name="close" />} />}
+              />
             </div>
             {open && <RepositoryList space={space} connections={connections} />}
           </Popover.Popup>

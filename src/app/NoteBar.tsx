@@ -6,6 +6,7 @@ import { t } from '../domain/i18n';
 import { BrainTile } from './BrainTile';
 import { knowledgeFolder, layerLabel } from '../domain/layers';
 import { Icon, type IconName } from './Icon';
+import { IconButton } from './controls';
 
 const layerIcons: Record<Layer, IconName> = {
   schema: 'schema',
@@ -84,9 +85,9 @@ export function Crumbs({
 export function NoteInfo({ label, children }: { label: string; children: ReactNode }) {
   return (
     <Popover.Root>
-      <Popover.Trigger className="stage-button" aria-label={label} title={label}>
-        <Icon name="info" size={16} />
-      </Popover.Trigger>
+      <Popover.Trigger
+        render={<IconButton label={label} icon={<Icon name="info" size={16} />} />}
+      />
       <Popover.Portal>
         <Popover.Positioner side="bottom" align="end" sideOffset={6}>
           <Popover.Popup className="stage-popover note-info">{children}</Popover.Popup>
@@ -101,9 +102,7 @@ export function NoteMenu({ children }: { children: ReactNode }) {
   const label = t('その他', 'More');
   return (
     <Menu.Root modal={false}>
-      <Menu.Trigger className="stage-button" aria-label={label} title={label}>
-        <Icon name="more" size={16} />
-      </Menu.Trigger>
+      <Menu.Trigger render={<IconButton label={label} icon={<Icon name="more" size={16} />} />} />
       <Menu.Portal>
         <Menu.Positioner side="bottom" align="end" sideOffset={6}>
           <Menu.Popup className="menu on-stage">{children}</Menu.Popup>

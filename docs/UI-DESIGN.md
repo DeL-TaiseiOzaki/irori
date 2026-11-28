@@ -26,8 +26,13 @@ hold, but their values are Astryx's.
 - **Focus.** `--focus` is Astryx's accent resolved where it is drawn: no hue,
   dark on paper and light on graphite. A chosen option takes the accent with
   `--act-soft` (Astryx's muted accent) behind it.
-- **Next stages.** Controls, then overlays, become Astryx components; irori's
-  own IDE parts are redrawn after Astryx's anatomy (ADR 076, Stages).
+- **Buttons** (0.3.4). Use `Button` and `IconButton` from `src/app/controls.tsx`,
+  never a styled `<button>`. Variants are Astryx's: `primary` for a place's one
+  action, `secondary`, `ghost` for quiet ones, and `destructive`. The size is
+  `sm` on the chrome and `md` for a page's or a sheet's main actions. A rule for
+  irori's own buttons inside a part selects `button:not(:where(.astryx-button))`.
+- **Next stages.** The other controls, then overlays, become Astryx components;
+  irori's own IDE parts are redrawn after Astryx's anatomy (ADR 076, Stages).
 
 ## 0.3.0 — Desktop IDE discipline and subtractive polish (2026-11-25)
 

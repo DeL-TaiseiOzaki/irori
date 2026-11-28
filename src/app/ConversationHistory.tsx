@@ -6,6 +6,7 @@ import { t } from '../domain/i18n';
 import { baseName } from '../domain/paths';
 import { shortWhen as when } from './display';
 import { Icon } from './Icon';
+import { Button, IconButton } from './controls';
 import { useAction } from './useAction';
 import { useResource } from './useResource';
 
@@ -92,9 +93,7 @@ export function ConversationHistory({
           <span className="history-title">{t('読み込めない会話', 'Unreadable conversation')}</span>
           <small>{row.damaged}</small>
         </span>
-        <button className="panel-button" disabled={busy} onClick={() => setDeleting(row.id)}>
-          {t('削除', 'Delete')}
-        </button>
+        <Button label={t('削除', 'Delete')} disabled={busy} onClick={() => setDeleting(row.id)} />
         {deleting === row.id && confirmation(row.id)}
       </li>
     ) : (
@@ -122,13 +121,11 @@ export function ConversationHistory({
                 if (event.key === 'Escape') setRenaming(undefined);
               }}
             />
-            <button
+            <Button
               type="submit"
-              className="panel-button"
+              label={t('保存', 'Save')}
               disabled={busy || !renaming.title.trim()}
-            >
-              {t('保存', 'Save')}
-            </button>
+            />
           </form>
         ) : (
           <button className="history-open" onClick={() => onOpen(row)}>
@@ -153,12 +150,14 @@ export function ConversationHistory({
         )}
         <Menu.Root modal={false}>
           <Menu.Trigger
-            className="icon-button"
-            aria-label={t(`${row.title} の操作`, `Actions for ${row.title}`)}
             disabled={busy}
-          >
-            <Icon name="more" size={15} />
-          </Menu.Trigger>
+            render={
+              <IconButton
+                label={t(`${row.title} の操作`, `Actions for ${row.title}`)}
+                icon={<Icon name="more" size={15} />}
+              />
+            }
+          />
           <Menu.Portal>
             <Menu.Positioner side="bottom" align="end" sideOffset={4}>
               <Menu.Popup className="menu">
@@ -197,12 +196,14 @@ export function ConversationHistory({
           "Delete? The CLI's own history stays, as do the copies of notes and materials its runs used in irori's data folder.",
         )}
       </span>
-      <button className="panel-button danger" disabled={busy} onClick={() => void remove(id)}>
-        {t('削除する', 'Delete')}
-      </button>
-      <button className="panel-button" disabled={busy} onClick={() => setDeleting(undefined)}>
-        {t('戻る', 'Back')}
-      </button>
+      <Button
+        className="danger"
+        variant="ghost"
+        label={t('削除する', 'Delete')}
+        disabled={busy}
+        onClick={() => void remove(id)}
+      />
+      <Button label={t('戻る', 'Back')} disabled={busy} onClick={() => setDeleting(undefined)} />
     </div>
   );
   return (

@@ -19,6 +19,7 @@ import type { PreviewTarget } from './StagePreview';
 import { layoutStorage } from './device-settings';
 import { useResource } from './useResource';
 import { useLanguage } from './useLanguage';
+import { Button, IconButton } from './controls';
 
 const StagePreview = lazy(() =>
   import('./StagePreview').then((module) => ({ default: module.StagePreview })),
@@ -173,18 +174,19 @@ export function VaultFiles({
                     <Icon name="file" size={13} />
                     {t('閲覧のみ', 'Read only')}
                   </span>
-                  <button className="stage-text-button" onClick={() => onEdit(file)}>
-                    <Icon name="penLine" size={14} />
-                    {t('vault で編集', 'Edit in vault')}
-                  </button>
-                  <button
-                    className="stage-button"
-                    aria-label={t('ファイルを閉じる', 'Close the file')}
+                  <Button
+                    variant="ghost"
+                    size="md"
+                    label={t('vault で編集', 'Edit in vault')}
+                    icon={<Icon name="penLine" size={14} />}
+                    onClick={() => onEdit(file)}
+                  />
+                  <IconButton
+                    label={t('ファイルを閉じる', 'Close the file')}
                     title={t('閉じる', 'Close')}
+                    icon={<Icon name="close" size={16} />}
                     onClick={onClose}
-                  >
-                    <Icon name="close" size={16} />
-                  </button>
+                  />
                 </div>
               </header>
               <Suspense fallback={<p className="hint">{t('開いています…', 'Opening…')}</p>}>

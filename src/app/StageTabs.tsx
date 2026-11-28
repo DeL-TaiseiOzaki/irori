@@ -1,6 +1,7 @@
 import { t } from '../domain/i18n';
 import { tabLabels } from '../domain/tab-labels';
 import { Icon } from './Icon';
+import { IconButton } from './controls';
 
 /**
  * A stage column's open files (ADR 052), in the agent columns' tab style. The
@@ -61,15 +62,13 @@ export function StageTabs({
         })}
       </div>
       {onCloseColumn && (
-        <button
-          className="icon-button stage-column-close"
-          aria-label={t('この列を閉じる', 'Close this column')}
-          title={t('この列を閉じる', 'Close this column')}
+        <IconButton
+          className="stage-column-close"
+          label={t('この列を閉じる', 'Close this column')}
+          icon={<Icon name="close" size={14} />}
           disabled={disabled}
           onClick={onCloseColumn}
-        >
-          <Icon name="close" size={14} />
-        </button>
+        />
       )}
     </div>
   );

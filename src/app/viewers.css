@@ -33,15 +33,6 @@
   align-items: center;
   gap: 2px;
 }
-.viewer-zoom .icon-button {
-  width: 26px;
-  height: 26px;
-  color: var(--ink-2);
-}
-.viewer-zoom .icon-button:hover:not(:disabled) {
-  background: var(--stage-2);
-  color: var(--ink);
-}
 .viewer-zoom .zoom-level {
   min-width: 52px;
   padding: 3px 6px;
@@ -68,7 +59,7 @@
   color: var(--ink-2);
   overflow-wrap: anywhere;
 }
-.viewer-failure button {
+.viewer-failure button:not(:where(.astryx-button)) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -195,7 +186,7 @@
   padding: 0 0 10px;
   scrollbar-width: thin;
 }
-.sheet-tabs button {
+.sheet-tabs button:not(:where(.astryx-button)) {
   flex: none;
   max-width: 240px;
   overflow: hidden;
@@ -210,17 +201,17 @@
   color: var(--ink-2);
   font-size: 12.5px;
 }
-.sheet-tabs button:hover {
+.sheet-tabs button:not(:where(.astryx-button)):hover {
   background: var(--stage-3);
   color: var(--ink);
 }
-.sheet-tabs button.on {
+.sheet-tabs button:not(:where(.astryx-button)).on {
   background: var(--card);
   color: var(--ink);
   font-weight: 600;
   box-shadow: inset 0 -2px 0 var(--act-ink);
 }
-.sheet-tabs button:focus-visible {
+.sheet-tabs button:not(:where(.astryx-button)):focus-visible {
   outline-offset: -2px;
 }
 .sheet-scroll table {

@@ -36,6 +36,7 @@ import { Icon } from './Icon';
 import { ErrorMessage, errorText } from './ErrorMessage';
 import { useAction } from './useAction';
 import { useResource } from './useResource';
+import { Button, IconButton } from './controls';
 
 const host = window.irori;
 type IconKind = 'glyph' | 'text' | 'image';
@@ -195,9 +196,12 @@ export function RemoveVault({
           <button type="button" disabled={busy} onClick={onClose}>
             {t('キャンセル', 'Cancel')}
           </button>
-          <button className="primary" disabled={busy}>
-            {remote ? t('一覧から外す', 'Take off the list') : t('削除', 'Remove')}
-          </button>
+          <Button
+            type="submit"
+            variant="primary"
+            label={remote ? t('一覧から外す', 'Take off the list') : t('削除', 'Remove')}
+            disabled={busy}
+          />
         </div>
       </form>
     </Dialog>
@@ -425,15 +429,13 @@ export function BrainSettings({
         <header className="brain-sheet-header">
           <BrainTile space={draft} image={image} size={26} radius={8} ring="stage" />
           <h2>{t('vault の設定', 'vault settings')}</h2>
-          <button
+          <IconButton
             type="button"
-            className="stage-button"
-            aria-label={t('閉じる', 'Close')}
+            label={t('閉じる', 'Close')}
+            icon={<Icon name="close" size={16} />}
             disabled={saving}
             onClick={onClose}
-          >
-            <Icon name="close" size={16} />
-          </button>
+          />
         </header>
         <div className="brain-sheet-body">
           <section className="brain-sheet-identity">
@@ -636,7 +638,7 @@ export function BrainSettings({
             )}
             {kind === 'image' && (
               <label className="brain-sheet-image">
-                <span className="stage-text-button framed">
+                <span className="file-button">
                   <Icon name="folder" size={15} />
                   {t('画像を選ぶ', 'Choose an image')}
                 </span>
@@ -687,27 +689,34 @@ export function BrainSettings({
         </div>
         <footer className="brain-sheet-footer">
           {onRemoved && (
-            <button
+            <Button
               type="button"
-              className="stage-text-button danger"
+              className="danger"
+              variant="ghost"
+              size="md"
+              label={t('vault を削除', 'Remove vault')}
+              icon={<Icon name="trash" size={14} />}
               disabled={saving || running}
               onClick={() => setRemoving(true)}
-            >
-              <Icon name="trash" size={14} />
-              {t('vault を削除', 'Remove vault')}
-            </button>
+            />
           )}
           <span className="brain-sheet-space" />
-          <button type="button" className="stage-text-button" disabled={saving} onClick={onClose}>
-            {t('キャンセル', 'Cancel')}
-          </button>
-          <button
-            className="solid-button"
+          <Button
+            type="button"
+            variant="ghost"
+            size="md"
+            label={t('キャンセル', 'Cancel')}
+            disabled={saving}
+            onClick={onClose}
+          />
+          <Button
+            type="submit"
+            variant="primary"
+            size="md"
+            label={saving ? t('保存中…', 'Saving…') : t('保存', 'Save')}
+            icon={<Icon name="check" size={14} />}
             disabled={saving || !!textProblem || imageMissing || folderProblem || !name.trim()}
-          >
-            <Icon name="check" size={14} />
-            {saving ? t('保存中…', 'Saving…') : t('保存', 'Save')}
-          </button>
+          />
         </footer>
       </form>
     </Dialog>
@@ -748,18 +757,20 @@ function WorkFolderSection({ space }: { space: Space }) {
         </small>
       )}
       <div className="brain-sheet-work-actions">
-        <button
+        <Button
           type="button"
-          className="stage-text-button framed"
+          variant="secondary"
+          size="md"
+          label={t('開く', 'Open')}
+          icon={<Icon name="folder" size={15} />}
           disabled={busy || !current}
           onClick={() => void run(() => host.openWorkFolder(space.scopeId))}
-        >
-          <Icon name="folder" size={15} />
-          {t('開く', 'Open')}
-        </button>
-        <button
+        />
+        <Button
           type="button"
-          className="stage-text-button framed"
+          variant="secondary"
+          size="md"
+          label={t('フォルダを選ぶ', 'Choose a folder')}
           disabled={busy}
           onClick={() =>
             void change(async () => {
@@ -767,18 +778,16 @@ function WorkFolderSection({ space }: { space: Space }) {
               if (chosen) await host.setWorkFolder(space.scopeId, chosen);
             })
           }
-        >
-          {t('フォルダを選ぶ', 'Choose a folder')}
-        </button>
+        />
         {current?.chosen && (
-          <button
+          <Button
             type="button"
-            className="stage-text-button framed"
+            variant="secondary"
+            size="md"
+            label={t('既定に戻す', 'Use the default')}
             disabled={busy}
             onClick={() => void change(() => host.setWorkFolder(space.scopeId, null))}
-          >
-            {t('既定に戻す', 'Use the default')}
-          </button>
+          />
         )}
       </div>
       {(error || folder.error) && <ErrorMessage text={error || folder.error!} />}

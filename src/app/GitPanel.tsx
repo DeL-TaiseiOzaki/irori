@@ -18,6 +18,7 @@ import type {
 import { Menu } from '@base-ui/react/menu';
 import { MagnetTabs } from './obsidian/MagnetTabs';
 import { Icon } from './Icon';
+import { Button, IconButton } from './controls';
 import { useDraft } from './useDraft';
 import { displayLocale, t } from '../domain/i18n';
 import { ErrorMessage, errorText } from './ErrorMessage';
@@ -584,15 +585,14 @@ function RepositoryPanel({
       <div className="git-empty">
         <h2>{t('Git 未設定', 'Not in Git')}</h2>
         {error && <ErrorMessage className="git-notice error" text={error} />}
-        <button
-          className="solid-button"
+        <Button
+          variant="primary"
+          label={t('Git を始める', 'Start Git')}
           disabled={busy}
           onClick={() =>
             void perform(() => host.gitInit(space.scopeId), t('Git を始めました。', 'Git started.'))
           }
-        >
-          {t('Git を始める', 'Start Git')}
-        </button>
+        />
       </div>
     ) : (
       <div className="git-empty">
@@ -670,14 +670,13 @@ function RepositoryPanel({
           !repository &&
           !shownOnly &&
           (status.head && status.branch ? (
-            <button
-              className="panel-button git-publish"
+            <Button
+              className="git-publish"
+              label={t('GitHub に公開…', 'Publish to GitHub…')}
+              icon={<Icon name="up" size={14} />}
               disabled={busy || conflictDirty || draftBlocked || status.operation !== 'none'}
               onClick={() => setPublishing(true)}
-            >
-              <Icon name="up" size={14} />
-              {t('GitHub に公開…', 'Publish to GitHub…')}
-            </button>
+            />
           ) : null)}
         <small className="git-sr-only">
           {status.ahead === undefined
@@ -689,10 +688,10 @@ function RepositoryPanel({
         </small>
       </div>
       <div className="git-toolbar" ref={menuHost}>
-        <button
-          className="icon-button framed"
-          aria-label={t('更新', 'Refresh')}
-          title={t('更新', 'Refresh')}
+        <IconButton
+          variant="secondary"
+          label={t('更新', 'Refresh')}
+          icon={<Icon name="refresh" size={14} />}
           disabled={busy || conflictDirty || draftBlocked}
           onClick={() =>
             void perform(async () => {
@@ -700,20 +699,21 @@ function RepositoryPanel({
               return host.gitStatus(target);
             })
           }
-        >
-          <Icon name="refresh" size={14} />
-        </button>
+        />
         {!shownOnly && (
           <>
             {/* A panel menu, not a modal surface: the rest of the panel stays usable. */}
             <Menu.Root modal={false}>
               <Menu.Trigger
-                className="icon-button framed git-more-actions"
-                aria-label={t('その他の Git 操作', 'More Git actions')}
-                title={t('その他の Git 操作', 'More Git actions')}
-              >
-                <Icon name="more" size={15} />
-              </Menu.Trigger>
+                render={
+                  <IconButton
+                    variant="secondary"
+                    className="git-more-actions"
+                    label={t('その他の Git 操作', 'More Git actions')}
+                    icon={<Icon name="more" size={15} />}
+                  />
+                }
+              />
               {/* The menu stays inside the Changes view so it is grouped with what it acts on. */}
               <Menu.Portal container={menuHost}>
                 <Menu.Positioner side="bottom" align="start" sideOffset={6}>
@@ -766,8 +766,10 @@ function RepositoryPanel({
                 </Menu.Positioner>
               </Menu.Portal>
             </Menu.Root>
-            <button
-              className="panel-button git-pull"
+            <Button
+              className="git-pull"
+              label="Pull"
+              icon={<Icon name="down" size={14} />}
               disabled={
                 busy ||
                 held ||
@@ -778,20 +780,17 @@ function RepositoryPanel({
               }
               title={heldNote}
               onClick={() => confirm('pull')}
-            >
-              <Icon name="down" size={14} />
-              Pull
-            </button>
-            <button
-              className="solid-button git-push"
+            />
+            <Button
+              variant="primary"
+              className="git-push"
+              label="Push"
+              icon={<Icon name="up" size={14} />}
               disabled={
                 busy || conflictDirty || draftBlocked || !canSync || status.operation !== 'none'
               }
               onClick={() => confirm('push')}
-            >
-              <Icon name="up" size={14} />
-              Push
-            </button>
+            />
           </>
         )}
       </div>
@@ -832,15 +831,17 @@ function RepositoryPanel({
             disabled={busy || !messageDraft.ready}
             required
           />
-          <button
-            aria-label={t('コミット', 'Commit')}
-            className="solid-button"
+          <Button
+            type="submit"
+            variant="primary"
+            size="md"
+            label={t('コミット', 'Commit')}
+            icon={<Icon name="check" size={14} />}
             disabled={busy || !canCommit || !message.trim()}
           >
-            <Icon name="check" size={14} />
             {t('コミット', 'Commit')}
             {staged.length ? ` (${staged.length})` : ''}
-          </button>
+          </Button>
         </form>
       )}
       {(messageDraft.error || storedResolution.error) && (
@@ -1104,8 +1105,13 @@ function RepositoryPanel({
                   </span>
                 )}
                 {selection && diff && !chosen?.conflict && !shownOnly && (
-                  <button
-                    className="stage-text-button framed"
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    label={
+                      selection.staged ? t('ステージから外す', 'Unstage') : t('ステージ', 'Stage')
+                    }
+                    icon={<Icon name={selection.staged ? 'minus' : 'plus'} size={14} />}
                     disabled={
                       busy ||
                       status.operation === 'other' ||
@@ -1120,13 +1126,13 @@ function RepositoryPanel({
                           : t('ステージに追加しました。', 'Staged.'),
                       )
                     }
-                  >
-                    <Icon name={selection.staged ? 'minus' : 'plus'} size={14} />
-                    {selection.staged ? t('ステージから外す', 'Unstage') : t('ステージ', 'Stage')}
-                  </button>
+                  />
                 )}
-                <button
-                  className="stage-text-button"
+                <Button
+                  variant="ghost"
+                  size="md"
+                  label={t('ノートに戻る', 'Back to the note')}
+                  icon={<Icon name="back" size={14} />}
                   disabled={busy || conflictDirty || draftBlocked}
                   onClick={() => {
                     reads.current++;
@@ -1134,10 +1140,7 @@ function RepositoryPanel({
                     setSelection(undefined);
                     setCommit(undefined);
                   }}
-                >
-                  <Icon name="back" size={14} />
-                  {t('ノートに戻る', 'Back to the note')}
-                </button>
+                />
               </div>
             </header>
             <div className="git-detail-body">
@@ -1269,8 +1272,9 @@ function RepositoryPanel({
                             {t('削除として解決', 'Resolve as deleted')}
                           </button>
                         )}
-                        <button
-                          className="primary"
+                        <Button
+                          variant="primary"
+                          label={t('統合内容を保存して解決', 'Save and resolve')}
                           disabled={busy || !conflictShown || draftBlocked}
                           onClick={() =>
                             void perform(
@@ -1278,9 +1282,7 @@ function RepositoryPanel({
                               t('保存しました。', 'Saved.'),
                             )
                           }
-                        >
-                          {t('統合内容を保存して解決', 'Save and resolve')}
-                        </button>
+                        />
                       </div>
                     </div>
                   ) : (
@@ -1360,8 +1362,9 @@ function RepositoryPanel({
             <button disabled={busy} onClick={() => setConfirmation(undefined)}>
               {t('戻る', 'Back')}
             </button>
-            <button
-              className="primary"
+            <Button
+              variant="primary"
+              label={confirmLabels[confirmation]}
               disabled={busy}
               onClick={() =>
                 void perform(
@@ -1371,9 +1374,7 @@ function RepositoryPanel({
                     : t('受信しました。', 'Fetched.'),
                 )
               }
-            >
-              {confirmLabels[confirmation]}
-            </button>
+            />
           </div>
         </div>
       )}

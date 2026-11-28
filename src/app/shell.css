@@ -33,7 +33,7 @@
   user-select: none;
   -webkit-app-region: drag;
 }
-.titlebar button {
+.titlebar button:not(:where(.astryx-button)) {
   -webkit-app-region: no-drag;
 }
 /* The menu sits over the rail, so the tabs begin where the vault panel does. */
@@ -43,7 +43,7 @@
   display: grid;
   place-items: center;
 }
-.titlebar button.titlebar-menu {
+.titlebar button:not(:where(.astryx-button)).titlebar-menu {
   width: 30px;
   height: 26px;
   display: grid;
@@ -57,7 +57,7 @@
     background-color 140ms ease,
     color 140ms ease;
 }
-.titlebar button.titlebar-menu:hover {
+.titlebar button:not(:where(.astryx-button)).titlebar-menu:hover {
   background: var(--raised-2);
   color: var(--tx);
 }
@@ -109,7 +109,7 @@
   box-shadow: inset 0 0 0 1px var(--hair);
   color: var(--tx);
 }
-.workspace-tabs button.workspace-tab-name {
+.workspace-tabs button:not(:where(.astryx-button)).workspace-tab-name {
   min-width: 0;
   height: 100%;
   display: flex;
@@ -136,8 +136,8 @@
 .workspace-tab-ai[data-ai='waiting'] {
   background: var(--attn);
 }
-.workspace-tabs button.workspace-tab-close,
-.workspace-tabs button.workspace-tab-add {
+.workspace-tabs button:not(:where(.astryx-button)).workspace-tab-close,
+.workspace-tabs button:not(:where(.astryx-button)).workspace-tab-add {
   width: 20px;
   height: 20px;
   flex: none;
@@ -150,23 +150,23 @@
   box-shadow: none;
   color: var(--tx-3);
 }
-.workspace-tabs button.workspace-tab-close {
+.workspace-tabs button:not(:where(.astryx-button)).workspace-tab-close {
   opacity: 0;
 }
 .workspace-tab:hover .workspace-tab-close,
 .workspace-tab[data-current] .workspace-tab-close,
-.workspace-tabs button.workspace-tab-close:focus-visible {
+.workspace-tabs button:not(:where(.astryx-button)).workspace-tab-close:focus-visible {
   opacity: 1;
 }
-.workspace-tabs button.workspace-tab-add {
+.workspace-tabs button:not(:where(.astryx-button)).workspace-tab-add {
   width: 26px;
   height: 26px;
   margin: 0 0 0 2px;
   border-radius: var(--radius-element);
 }
-.workspace-tabs button.workspace-tab-close:hover:not(:disabled),
-.workspace-tabs button.workspace-tab-add:hover:not(:disabled),
-.workspace-tabs button.workspace-tab-add[aria-pressed='true'] {
+.workspace-tabs button:not(:where(.astryx-button)).workspace-tab-close:hover:not(:disabled),
+.workspace-tabs button:not(:where(.astryx-button)).workspace-tab-add:hover:not(:disabled),
+.workspace-tabs button:not(:where(.astryx-button)).workspace-tab-add[aria-pressed='true'] {
   background: var(--raised-2);
   color: var(--tx);
 }
@@ -385,7 +385,7 @@
   padding: 10px 0;
   border-right: 1px solid var(--hair);
 }
-.rail button {
+.rail button:not(:where(.astryx-button)) {
   background: none;
   box-shadow: none;
   padding: 0;
@@ -672,13 +672,13 @@
   border-radius: var(--radius-element);
   color: var(--tx-2);
 }
-.status-bar button.status-item {
+.status-bar button:not(:where(.astryx-button)).status-item {
   background: none;
   box-shadow: none;
   font-weight: 400;
 }
-.status-bar button.status-item:hover:not(:disabled),
-.status-bar button.status-item[aria-pressed='true'] {
+.status-bar button:not(:where(.astryx-button)).status-item:hover:not(:disabled),
+.status-bar button:not(:where(.astryx-button)).status-item[aria-pressed='true'] {
   background: var(--raised);
   color: var(--tx);
 }
@@ -739,63 +739,46 @@
   letter-spacing: 0;
 }
 
-/* Controls on the chrome. */
-.icon-button {
-  width: 28px;
-  height: 28px;
-  flex: none;
+/* Controls on the chrome are Astryx's (src/app/controls.tsx, ADR 076). A few states
+   it has no part for are drawn here with its tokens. */
+.astryx-button.danger {
+  color: var(--color-text-error);
+}
+.astryx-button[aria-pressed='true'] {
+  background-color: var(--color-overlay-pressed);
+}
+/* Each Astryx button carries a live region that announces its loading state. irori
+   never puts a button in that state, and a page of empty status regions would hide
+   the notices that are irori's, so the region is left out until a button needs it. */
+.astryx-button [role='status'] {
+  display: none;
+}
+/* A file input's face: a label's visible part, drawn as Astryx's secondary button
+   since the input itself stays hidden under it. */
+.file-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
+  gap: var(--spacing-2);
+  height: var(--size-element-md);
+  padding: 0 var(--spacing-3);
   border-radius: var(--radius-element);
-  color: var(--tx-3);
-  background: none;
-  box-shadow: none;
-}
-:where(.chrome) .icon-button {
-  background: none;
-  box-shadow: none;
-}
-:where(.chrome) .icon-button:hover:not(:disabled) {
-  background: var(--raised);
-  color: var(--tx);
-}
-:where(.chrome) .icon-button.framed {
-  box-shadow: inset 0 0 0 1px var(--hair-2);
-}
-:where(.chrome) .icon-button[aria-pressed='true'] {
-  background: var(--raised-2);
-  color: var(--tx);
-}
-.panel-button,
-.primary-button,
-.solid-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: var(--radius-element);
-  font-size: 12.5px;
+  background: var(--color-neutral);
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-medium);
   white-space: nowrap;
+  cursor: pointer;
 }
-/* A place's one primary action: solid, no hue. */
-.primary-button {
-  background: var(--solid);
-  color: var(--on-solid);
-  box-shadow: none;
-  font-weight: 600;
+.file-button.small {
+  height: var(--size-element-sm);
+  padding: 0 var(--spacing-2);
 }
-.primary-button:hover:not(:disabled) {
-  background: var(--solid);
-  filter: brightness(0.92);
+label:hover > .file-button {
+  background-image: linear-gradient(var(--color-overlay-hover), var(--color-overlay-hover));
 }
-.on-stage .primary-button,
-.stage .primary-button {
-  background: var(--ink-solid);
-  color: var(--on-ink-solid);
+label:focus-within > .file-button {
+  outline: var(--focus-outline-width) var(--focus-outline-style) var(--focus);
+  outline-offset: 2px;
 }
 
 /* Menus and popovers opened from the chrome. */
@@ -1009,7 +992,7 @@
   flex-direction: column;
   gap: 1px;
 }
-.settings-side nav button {
+.settings-side nav button:not(:where(.astryx-button)) {
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr) auto;
   column-gap: 9px;
@@ -1026,7 +1009,7 @@
     background-color var(--quick) ease,
     color var(--quick) ease;
 }
-.settings-side nav button > svg {
+.settings-side nav button:not(:where(.astryx-button)) > svg {
   grid-row: 1 / 3;
   color: var(--tx-3);
 }
@@ -1061,21 +1044,24 @@
   border-radius: 50%;
   background: var(--tx);
 }
-.settings-side nav button:hover {
+.settings-side nav button:not(:where(.astryx-button)):hover {
   background: var(--raised);
 }
 /* The part on show is where the person is: the focus colour marks its icon. */
-.settings-side nav button[aria-current='page'] {
+.settings-side nav button:not(:where(.astryx-button))[aria-current='page'] {
   background: var(--raised-2);
   color: var(--tx);
 }
-.settings-side nav button[aria-current='page'] > svg {
+.settings-side nav button:not(:where(.astryx-button))[aria-current='page'] > svg {
   color: var(--act);
 }
-.settings-side nav button[aria-current='page'] .settings-nav-name {
+.settings-side nav button:not(:where(.astryx-button))[aria-current='page'] .settings-nav-name {
   font-weight: 600;
 }
-.settings-side nav button[aria-current='page'] .settings-nav-value:not(.attention) {
+.settings-side
+  nav
+  button:not(:where(.astryx-button))[aria-current='page']
+  .settings-nav-value:not(.attention) {
   color: var(--tx-2);
 }
 .settings-nav-empty {
@@ -1468,7 +1454,7 @@
 }
 
 /* The settings' buttons, the account's and the updates' among them. */
-.settings-body button {
+.settings-body button:not(:where(.astryx-button)) {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -1481,15 +1467,15 @@
   font-size: 12.5px;
   white-space: nowrap;
 }
-.settings-body button:hover:not(:disabled) {
+.settings-body button:not(:where(.astryx-button)):hover:not(:disabled) {
   box-shadow: inset 0 0 0 1px var(--hair-3);
 }
-.settings-body button.settings-open {
+.settings-body button:not(:where(.astryx-button)).settings-open {
   flex: none;
   gap: 4px;
   padding: 0 8px 0 12px;
 }
-.settings-body button.settings-open > svg {
+.settings-body button:not(:where(.astryx-button)).settings-open > svg {
   color: var(--tx-3);
 }
 /* Buttons that act on the part on show, side by side at a row's end. */
@@ -1498,7 +1484,7 @@
   display: flex;
   gap: 8px;
 }
-.settings-body button.settings-action {
+.settings-body button:not(:where(.astryx-button)).settings-action {
   flex: none;
   padding: 0 12px;
 }
@@ -1517,17 +1503,6 @@
 .settings-folder .agent-folder-path {
   font-size: 12px;
   color: var(--tx-2);
-}
-.settings-body .settings-folder .stage-text-button.framed {
-  height: auto;
-  min-height: 30px;
-  border-radius: var(--radius-element);
-  background: var(--raised-2);
-  color: var(--tx);
-  box-shadow: inset 0 0 0 1px var(--hair-2);
-}
-.settings-body .settings-folder .stage-text-button.framed:hover:not(:disabled) {
-  box-shadow: inset 0 0 0 1px var(--hair-3);
 }
 .settings-updates .update-notice {
   color: var(--tx-2);
@@ -1584,14 +1559,14 @@
   display: grid;
   place-items: center;
 }
-.settings-sheet button.settings-close {
+.settings-sheet button:not(:where(.astryx-button)).settings-close {
   padding: 0;
   border-radius: var(--radius-element);
   background: none;
   box-shadow: none;
   color: var(--tx-3);
 }
-.settings-sheet button.settings-close:hover {
+.settings-sheet button:not(:where(.astryx-button)).settings-close:hover {
   background: var(--raised-2);
   color: var(--tx);
 }

@@ -4,6 +4,7 @@ import { Popover } from '@base-ui/react/popover';
 import type { KnowledgeSearch, SearchHit } from '../domain/search';
 import { t } from '../domain/i18n';
 import { Icon } from './Icon';
+import { Button, IconButton } from './controls';
 import { useResource } from './useResource';
 import { errorText } from './ErrorMessage';
 
@@ -113,18 +114,36 @@ export function Backlinks({
       : t(`リンク元 ${count} 件`, `${count} backlinks`);
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
-      <Popover.Trigger className="stage-button backlinks-trigger" aria-label={label} title={label}>
-        <Icon name="link" size={16} />
-        {!!count && <span className="backlinks-count">{countLabel(count)}</span>}
-      </Popover.Trigger>
+      <Popover.Trigger
+        render={
+          count ? (
+            <Button
+              className="backlinks-trigger"
+              variant="ghost"
+              label={label}
+              icon={<Icon name="link" size={16} />}
+            >
+              <span className="backlinks-count">{countLabel(count)}</span>
+            </Button>
+          ) : (
+            <IconButton
+              className="backlinks-trigger"
+              label={label}
+              icon={<Icon name="link" size={16} />}
+            />
+          )
+        }
+      />
       <Popover.Portal>
         <Popover.Positioner side="bottom" align="end" sideOffset={6}>
           <Popover.Popup className="stage-popover backlinks-popover">
             <div className="backlinks-heading">
               <Popover.Title render={<h3 />}>{t('リンク元', 'Backlinks')}</Popover.Title>
-              <Popover.Close className="stage-button" aria-label={t('閉じる', 'Close')}>
-                <Icon name="close" size={15} />
-              </Popover.Close>
+              <Popover.Close
+                render={
+                  <IconButton label={t('閉じる', 'Close')} icon={<Icon name="close" size={15} />} />
+                }
+              />
             </div>
             <BacklinksList
               result={read.data}

@@ -1,8 +1,38 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Astryx design system, stage 2: buttons, 2026-11-28 (**0.3.4**,
+[ADR 076](decisions/076-astryx-design-system.md) "Stage 2"): the owner asked to
+continue with stage 2 after stage 1 merged.
+- **What changed.** 149 buttons in 33 renderer files are Astryx's, through
+  `src/app/controls.tsx` (`Button`, `IconButton`): 101 `Button` and 48
+  `IconButton`. Base UI menu and popover triggers render the adapter
+  through `render`.
+- **Cascade.** `src/app/layers.css` puts irori's element defaults in an
+  `irori-defaults` layer under Astryx's. irori's 106 descendant-button rules
+  now skip `.astryx-button`, and the old button families' CSS is gone.
+- **Live region.** Each Astryx button's unused loading live region is hidden.
+  It had made `getByRole('status')` ambiguous in 11 smokes and stalled
+  `git-ui-smoke`.
+- **Dependencies.** `@astryxdesign/core` and `@stylexjs/stylex` are runtime
+  dependencies now that Astryx's component CSS and JavaScript are bundled.
+- **Verification** (Linux, before the pull request).
+  - `npm run build` passes.
+  - `npm test`: 851 tests, 838 passed, 7 skipped, 5 failed. One is the
+    known `ssh -G` permission failure. The other four are Git and remote-host
+    tests that timed out under load; their files pass when run alone.
+  - UI smokes: 42 of 43 pass. `explorer-ui-smoke` fails at moving a Schema
+    folder to the system trash, which that host lacks; the 0.3.3 tree fails
+    there the same way.
+  - The screen renders were reviewed in hearth, light and dark.
+  - Pull request CI runs the full set.
+- **Not covered.** Fields, switches, checkboxes, segmented controls, badges,
+  keys, spinners and empty states (stage 2b); overlays (stage 3); irori's own
+  parts (stage 4).
+
 Astryx design system, stage 1, 2026-11-28 (**0.3.3**,
 [ADR 076](decisions/076-astryx-design-system.md),
-[#388](https://github.com/DeL-TaiseiOzaki/irori/pull/388), open): the owner
+[#388](https://github.com/DeL-TaiseiOzaki/irori/pull/388), published as
+`v0.3.3-preview.1`): the owner
 asked to bring in the UI design of Astryx, Meta's open-source design system,
 throughout irori without changing its functions, and chose Figtree, keeping
 Hearth, Astryx's shapes and its monochrome focus ring.
@@ -26,8 +56,12 @@ Hearth, Astryx's shapes and its monochrome focus ring.
   - Pull request run `46119190188` passed `verify` (UI smokes). Its screen
     renders were reviewed in hearth, light and dark.
   - That run's packaging failed because core was a runtime dependency that
-    nothing bundles yet. Core is now a development dependency, and packaging
-    is checked on the pull request's latest run.
+    nothing bundles yet. Core became a development dependency, and the merged
+    head's run `46122576150` passed `verify` and packaging on all three
+    systems.
+  - Published by run `46123415064` (packages of run `46122576150`). The
+    Windows, Mac and `full.nupkg` assets downloaded anonymously match
+    `SHA256SUMS.txt`, and the live download page carries 0.3.3.
 - **Not covered.**
   - Astryx components (stages 2–4).
   - The download website, which keeps the earlier palette.

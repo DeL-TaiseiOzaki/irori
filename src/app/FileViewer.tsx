@@ -5,6 +5,7 @@ import type { ViewerKind } from '../domain/viewers';
 import { t } from '../domain/i18n';
 import { errorText } from './ErrorMessage';
 import { Icon } from './Icon';
+import { IconButton } from './controls';
 import type { ViewProps } from './viewers/common';
 import './viewers.css';
 
@@ -98,25 +99,21 @@ export function FileViewer({
           {info}
         </span>
         <span className="viewer-zoom">
-          <button
-            className="icon-button"
-            aria-label={t('縮小', 'Zoom out')}
+          <IconButton
+            label={t('縮小', 'Zoom out')}
+            icon={<Icon name="minus" size={14} />}
             disabled={zoom <= steps[0]}
             onClick={() => step(-1)}
-          >
-            <Icon name="minus" size={14} />
-          </button>
+          />
           <button className="zoom-level" onClick={() => setZoom(1)}>
             {Math.round(zoom * 100)}%
           </button>
-          <button
-            className="icon-button"
-            aria-label={t('拡大', 'Zoom in')}
+          <IconButton
+            label={t('拡大', 'Zoom in')}
+            icon={<Icon name="plus" size={14} />}
             disabled={zoom >= steps.at(-1)!}
             onClick={() => step(1)}
-          >
-            <Icon name="plus" size={14} />
-          </button>
+          />
         </span>
         <button className="viewer-external" onClick={onExternal}>
           {t('外部アプリで開く', 'Open in an external app')}
