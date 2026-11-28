@@ -35,7 +35,8 @@ Hearth, Astryx's shapes and its monochrome focus ring.
 
 The contents folder as a folder in Contents, 2026-11-28 (**0.3.2**,
 [ADR 071](decisions/071-a-vaults-own-files-in-contents.md) D3, amendment of
-2026-11-28): the owner found the `contents` heading below a Contents-only
+2026-11-28, [#389](https://github.com/DeL-TaiseiOzaki/irori/pull/389),
+published as `v0.3.2-preview.1`): the owner found the `contents` heading below a Contents-only
 vault's own files read as an extra layer holding only `work`. `ContentsTrees`
 in `BrainPanel.tsx` now renders one `Tree` when `ownLayer` is Contents, keeping
 the declared contents folders in its root listing (a nested one shows inside
@@ -45,7 +46,15 @@ without `writable`, so it is neither renamed, moved nor deleted, and takes no
 new entries at its top. An empty contents folder still says it has no
 connected folders.
 - Verified by `scripts/vault-layers-ui-smoke.ts` (the `contents` row in the
-  Contents tree, no `.contents-root-name` heading).
+  Contents tree, no `.contents-root-name` heading); pull request run
+  `46120293178` passed `verify` (UI smokes) on a rerun, after the first attempt
+  failed in `remote-hosts.test.ts` on a generated host key ssh2 could not parse,
+  and passed packaging.
+- Published from `8f22bd2` (publish run `46122437953`): Windows 179,445,248
+  bytes, Mac 145,710,004 bytes, `irori-0.3.2-full.nupkg` 178,615,158 bytes, with
+  `SHA256SUMS.txt`; the three downloaded anonymously match it. The live download
+  page links the 0.3.2 installers.
+- Not covered: the packaged app with a real connection and work folder.
 
 Close a session from the session board, 2026-11-25 (**0.3.1**,
 [ADR 069](decisions/069-session-board.md), amendment of 2026-11-25,
