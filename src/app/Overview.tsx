@@ -1,3 +1,6 @@
+import { EmptyState } from '@astryxdesign/core/EmptyState';
+import { Spinner } from '@astryxdesign/core/Spinner';
+import { Kbd } from '@astryxdesign/core/Kbd';
 import {
   useEffect,
   useId,
@@ -31,10 +34,9 @@ import { BrainTile } from './BrainTile';
 import { RemoteVaultPlace } from './RemoteHosts';
 import { layoutStorage } from './device-settings';
 import { Icon } from './Icon';
-import { Button, IconButton } from './controls';
+import { Button, IconButton, Segmented } from './controls';
 import { aiStateWords, sendOnEnter, type AiState } from './display';
 import { useAction } from './useAction';
-import { MagnetTabs } from './obsidian/MagnetTabs';
 import { shortcut } from './shortcuts';
 import { useResource } from './useResource';
 import {
@@ -70,7 +72,7 @@ function StateWords({ ai }: { ai: BrainAi }) {
   return (
     <span className={`ai-state ${state}`}>
       {state === 'running' ? (
-        <Icon name="loader" size={12} className="spin" />
+        <Spinner size="md" shade="inherit" aria-hidden className="spin" />
       ) : state === 'queued' ? (
         <Icon name="clock" size={12} />
       ) : (
@@ -907,7 +909,7 @@ export function Overview({
               )}
             </span>
             {!routines && (
-              <MagnetTabs
+              <Segmented
                 className="overview-views"
                 label={t('irori mode の表示', 'irori mode layout')}
                 value={view}
@@ -915,30 +917,18 @@ export function Overview({
                 options={[
                   {
                     value: 'map',
-                    label: (
-                      <>
-                        <Icon name="map" size={14} />
-                        <span className="overview-label">{t('マッピング', 'Mapping')}</span>
-                      </>
-                    ),
+                    label: t('マッピング', 'Mapping'),
+                    icon: <Icon name="map" size={14} />,
                   },
                   {
                     value: 'columns',
-                    label: (
-                      <>
-                        <Icon name="columns" size={14} />
-                        <span className="overview-label">{t('並列', 'Columns')}</span>
-                      </>
-                    ),
+                    label: t('並列', 'Columns'),
+                    icon: <Icon name="columns" size={14} />,
                   },
                   {
                     value: 'files',
-                    label: (
-                      <>
-                        <Icon name="folderOpen" size={14} />
-                        <span className="overview-label">{t('ファイル', 'Files')}</span>
-                      </>
-                    ),
+                    label: t('ファイル', 'Files'),
+                    icon: <Icon name="folderOpen" size={14} />,
                   },
                 ]}
               />
@@ -989,7 +979,7 @@ export function Overview({
                 >
                   <Icon name="search" size={15} />
                   <span className="overview-label">{t('vault を検索', 'Search vaults')}</span>
-                  <kbd>{shortcut('K')}</kbd>
+                  <Kbd className="overview-search-keys" keys="mod+k" />
                 </button>
                 <Button
                   className="overview-add"
@@ -1027,9 +1017,13 @@ export function Overview({
             />
           ) : !spaces.length ? (
             <div className="overview-empty">
-              <p>
-                {t('このワークスペースに vault がありません。', 'This workspace has no vault yet.')}
-              </p>
+              <EmptyState
+                headingLevel={2}
+                title={t(
+                  'このワークスペースに vault がありません。',
+                  'This workspace has no vault yet.',
+                )}
+              />
             </div>
           ) : view === 'files' ? (
             files
@@ -1072,8 +1066,9 @@ export function Overview({
                 // Each column is the irori agent's own landmark; this one holds them.
                 <div className="overview-ai your-columns chrome">
                   {vaultAgent && (
-                    <MagnetTabs
+                    <Segmented
                       className="overview-island-tabs"
+                      layout="fill"
                       label={
                         routines
                           ? t('ルーティンの AI', 'Routine agents')
@@ -1092,8 +1087,9 @@ export function Overview({
               ) : (
                 <aside className="overview-ai chrome" aria-label={t('vault agent', 'vault agents')}>
                   {vaultAgent && (
-                    <MagnetTabs
+                    <Segmented
                       className="overview-island-tabs"
+                      layout="fill"
                       label={
                         routines
                           ? t('ルーティンの AI', 'Routine agents')

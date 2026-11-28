@@ -78,8 +78,8 @@ try {
   await page.getByRole('checkbox', { name: /サブモジュールのKB/ }).check();
   await page.getByRole('button', { name: '選択したスペースを開く', exact: true }).click();
   await page
-    .getByRole('group', { name: 'vault の表示' })
-    .getByRole('button', { name: /^変更/ })
+    .getByRole('radiogroup', { name: 'vault の表示' })
+    .getByRole('radio', { name: /^変更/ })
     .click();
   const panel = page.getByRole('region', { name: 'ソース管理' });
   const picker = panel.getByRole('combobox', { name: 'リポジトリ' });

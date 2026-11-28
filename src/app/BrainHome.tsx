@@ -1,3 +1,4 @@
+import { Badge } from '@astryxdesign/core/Badge';
 import { useState, type ReactNode } from 'react';
 import { hasLayer, knowledgeFolder, layerLabel } from '../domain/layers';
 import type { CloudConnection, Entry, Layer, Space } from '../domain/types';
@@ -65,7 +66,7 @@ function Card({
       <header>
         <Icon name={layer ? layerIcons[layer] : icon!} size={16} strokeWidth={1.9} />
         <h2>{title}</h2>
-        {!!count && <span className="home-count">{countLabel(count)}</span>}
+        {!!count && <Badge variant="neutral" label={countLabel(count)} />}
         <span className="home-card-space" />
         {action}
       </header>

@@ -1,3 +1,4 @@
+import { Kbd } from '@astryxdesign/core/Kbd';
 import { countLabel } from './display';
 import {
   createContext,
@@ -32,11 +33,9 @@ import { errorText } from './ErrorMessage';
 import { parentPath } from '../domain/paths';
 import { readDropped } from './dropped';
 import { Icon, type IconName } from './Icon';
-import { IconButton } from './controls';
-import { MagnetTabs } from './obsidian/MagnetTabs';
+import { IconButton, Segmented } from './controls';
 import { VaultRepositories } from './VaultRepositories';
 import { layoutStorage } from './device-settings';
-import { shortcut } from './shortcuts';
 import { useResource } from './useResource';
 import { useLanguage } from './useLanguage';
 import { RemoteVaultPlace, RemoteVaultState } from './RemoteHosts';
@@ -1234,31 +1233,27 @@ export const BrainPanel = memo(function BrainPanel({
         <button className="brain-search" onClick={onSearch}>
           <Icon name="search" size={15} />
           <span>{t('検索', 'Search')}</span>
-          <kbd>{shortcut('K')}</kbd>
+          <Kbd keys="mod+k" />
         </button>
-        <MagnetTabs
+        <Segmented
           className="brain-modes"
+          layout="fill"
           label={t('vault の表示', 'vault view')}
           value={mode}
           onValueChange={onModeChange}
           options={[
             {
               value: 'files',
-              label: (
-                <>
-                  <Icon name="layers" size={14} /> {t('ファイル', 'Files')}
-                </>
-              ),
+              label: t('ファイル', 'Files'),
+              icon: <Icon name="layers" size={14} />,
               disabled: filesDisabled,
             },
             {
               value: 'changes',
-              label: (
-                <>
-                  <Icon name="branch" size={14} /> {t('変更', 'Changes')}
-                  {!!changes && <span className="count">{countLabel(changes)}</span>}
-                </>
-              ),
+              label: changes
+                ? `${t('変更', 'Changes')} ${countLabel(changes)}`
+                : t('変更', 'Changes'),
+              icon: <Icon name="branch" size={14} />,
               disabled: changesDisabled,
             },
           ]}

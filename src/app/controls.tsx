@@ -1,4 +1,5 @@
 import { Button as AstryxButton, type ButtonVariant } from '@astryxdesign/core/Button';
+import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl';
 import type { ComponentPropsWithRef, ReactNode } from 'react';
 
 // irori's controls are Astryx's (ADR 076). These adapters keep irori's habits at the call
@@ -69,5 +70,60 @@ export function IconButton({
       size={size}
       isDisabled={disabled}
     />
+  );
+}
+
+/**
+ * A choice of one view among a few, shown side by side: Astryx's segmented control, a
+ * radio group named by `label`. An option's `label` is its name; with `labelHidden` only
+ * its icon shows.
+ */
+export function Segmented<T extends string>({
+  label,
+  value,
+  onValueChange,
+  options,
+  size = 'sm',
+  layout = 'hug',
+  className,
+}: {
+  label: string;
+  value: T;
+  onValueChange: (value: T) => void;
+  options: readonly {
+    value: T;
+    label: string;
+    icon?: ReactNode;
+    disabled?: boolean;
+    labelHidden?: boolean;
+  }[];
+  size?: 'sm' | 'md' | 'lg';
+  /** `fill` shares the width out among the options. */
+  layout?: 'hug' | 'fill';
+  className?: string;
+}) {
+  return (
+    <SegmentedControl
+      className={className}
+      label={label}
+      value={value}
+      size={size}
+      layout={layout}
+      onChange={(next) => {
+        const option = options.find((option) => option.value === next && !option.disabled);
+        if (option && option.value !== value) onValueChange(option.value);
+      }}
+    >
+      {options.map((option) => (
+        <SegmentedControlItem
+          key={option.value}
+          value={option.value}
+          label={option.label}
+          icon={option.icon}
+          isDisabled={option.disabled}
+          isLabelHidden={option.labelHidden}
+        />
+      ))}
+    </SegmentedControl>
   );
 }

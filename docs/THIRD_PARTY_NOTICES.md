@@ -10,8 +10,7 @@ Two kinds of package ship. The packages the host process loads at run time trave
 | xterm.js and FitAddon | MIT, bundled |
 | fflate | MIT, development-only ZIP extraction; package LICENSE |
 | React / React DOM, Base UI, lucide-react, react-error-boundary, react-resizable-panels, react-markdown and remark-gfm with their remark, micromark, mdast and hast dependencies | MIT, bundled |
-| Motion (`motion`, `framer-motion`, `motion-dom`, `motion-utils`) | MIT, bundled; used for ObsidianUI tab indicators |
-| ObsidianUI Magnet Tabs and Arrow Fill Button | Adapted source in `src/app/obsidian/`; full MIT notice below |
+| ObsidianUI Arrow Fill Button | Adapted source in `src/app/obsidian/`; full MIT notice below |
 | Geist and Geist Mono variable fonts 1.7.2 (from the `geist` npm package) | SIL Open Font License 1.1; the woff2 files and `OFL.txt` are in `src/app/fonts/`. Geist Mono is bundled into the renderer's `dist/assets/`; Geist is used by the download website only; full notice below |
 | Astryx (`@astryxdesign/core`, `@astryxdesign/theme-neutral`) 0.7.17, with StyleX's runtime (`@stylexjs/stylex`) and `intl-messageformat` | MIT, bundled: core's components and `astryx.css`, the neutral theme's `fonts.css`. Its token values are also copied into `src/app/astryx-tokens.css` by `scripts/astryx-tokens.ts`; full Astryx notice below |
 | Figtree (from `@astryxdesign/theme-neutral`) | SIL Open Font License 1.1; the neutral theme's eight latin and latin-ext woff2 files are bundled into `dist/assets/`; full notice below |
@@ -62,10 +61,11 @@ irori is MIT licensed; see [LICENSE](../LICENSE). Electron Forge and its makers 
 
 ## ObsidianUI MIT notice (adapted renderer components)
 
-Magnet Tabs and Arrow Fill Button were retrieved from the official
-[Magnet Tabs registry](https://www.obsidianui.dev/r/magnet-tabs.json) and
+Arrow Fill Button was retrieved from the official
 [Arrow Fill Button registry](https://www.obsidianui.dev/r/arrow-fill-button.json)
-on 2026-09-22. Upstream repository:
+on 2026-09-22. Magnet Tabs, retrieved then from its
+[registry](https://www.obsidianui.dev/r/magnet-tabs.json), was replaced by
+Astryx's segmented control in 0.3.6 ([ADR 076](decisions/076-astryx-design-system.md)). Upstream repository:
 [ObsidianUI at 21d9198](https://gitlab.com/Atharvsinh-codez/ObsidianUI/-/tree/21d9198d14fd663f809cbea9fe124efc9576c003).
 The adaptations preserve the visual mechanisms and use irori's tokens,
 Base UI keyboard behavior and native button semantics. See

@@ -1,3 +1,5 @@
+import { Spinner } from '@astryxdesign/core/Spinner';
+import { CheckboxInput } from '@astryxdesign/core/CheckboxInput';
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { Space } from '../domain/types';
@@ -117,7 +119,7 @@ function HostStateLine({ remote }: { remote: RemoteHost }) {
   return (
     <span className={`remote-state ${remote.state}`} role="status">
       {remote.state === 'connecting' ? (
-        <Icon name="loader" size={12} className="remote-spin" />
+        <Spinner size="md" shade="inherit" aria-hidden className="remote-spin" />
       ) : (
         <i aria-hidden="true" />
       )}
@@ -488,15 +490,12 @@ function SshQuestion({
               disabled={stopped}
               onChange={(event) => setValue(event.target.value)}
             />
-            <label>
-              <input
-                type="checkbox"
-                checked={visible}
-                disabled={stopped}
-                onChange={(event) => setVisible(event.target.checked)}
-              />
-              {t('入力を表示', 'Show what I type')}
-            </label>
+            <CheckboxInput
+              label={t('入力を表示', 'Show what I type')}
+              value={visible}
+              isDisabled={stopped}
+              onChange={setVisible}
+            />
           </div>
         )}
         {over && (

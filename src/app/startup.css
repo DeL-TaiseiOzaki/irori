@@ -533,12 +533,6 @@
   background: var(--ink-solid);
   filter: brightness(1.12);
 }
-.modal .checkbox-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-}
 .modal .github-publish {
   border: 0;
   padding: 0 0 0 16px;

@@ -1,3 +1,4 @@
+import { Badge } from '@astryxdesign/core/Badge';
 import { memo, useEffect, useState, type SyntheticEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { agentNames, type Space } from '../domain/types';
@@ -213,7 +214,7 @@ export const SessionBoard = memo(function SessionBoard({
     <aside className="session-board" aria-label={t('セッションボード', 'Session board')}>
       <header className="session-board-head">
         <span>{t('セッション', 'Sessions')}</span>
-        {total > 0 && <span className="session-count">{countLabel(total)}</span>}
+        {total > 0 && <Badge variant="neutral" label={countLabel(total)} />}
       </header>
       <div className="session-lanes">
         {!shown.length && (
@@ -237,7 +238,7 @@ export const SessionBoard = memo(function SessionBoard({
                 ) : (
                   <span>{laneNames[lane]()}</span>
                 )}
-                <span className="session-count">{countLabel(lanes[lane].length)}</span>
+                <Badge variant="neutral" label={countLabel(lanes[lane].length)} />
               </h3>
               {!folded && <ul>{lanes[lane].map((item) => renderCard(item))}</ul>}
             </section>

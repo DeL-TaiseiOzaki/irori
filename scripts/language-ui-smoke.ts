@@ -125,11 +125,11 @@ try {
   await page.getByRole('button', { name: 'Close vault agent' }).first().click();
   visited.push('vault agent');
 
-  const modes = page.getByRole('group', { name: 'vault view' });
-  await modes.getByRole('button', { name: /^Changes/ }).click();
+  const modes = page.getByRole('radiogroup', { name: 'vault view' });
+  await modes.getByRole('radio', { name: /^Changes/ }).click();
   await expect(page.locator('.git-sidebar')).toBeVisible();
   await japaneseLeft(page, 'source control');
-  await modes.getByRole('button', { name: 'Files', exact: true }).click();
+  await modes.getByRole('radio', { name: 'Files', exact: true }).click();
   visited.push('source control');
 
   await page.getByRole('button', { name: 'vault menu', exact: true }).click();
@@ -145,13 +145,13 @@ try {
   await expect(page.getByRole('region', { name: 'Vault mapping' })).toBeVisible();
   await expect(page.getByRole('complementary', { name: 'irori agent' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Set up the irori agent' })).toBeVisible();
-  await page.getByRole('button', { name: 'vault agents', exact: true }).click();
+  await page.getByRole('radio', { name: 'vault agents', exact: true }).click();
   await expect(page.getByRole('complementary', { name: 'vault agents' })).toBeVisible();
   await japaneseLeft(page, 'the Overview map');
-  await page.getByRole('button', { name: 'Columns', exact: true }).click();
+  await page.getByRole('radio', { name: 'Columns', exact: true }).click();
   await expect(page.getByRole('region', { name: 'vaults side by side' })).toBeVisible();
   await japaneseLeft(page, 'the Overview columns');
-  await page.getByRole('button', { name: 'Mapping', exact: true }).click();
+  await page.getByRole('radio', { name: 'Mapping', exact: true }).click();
   await page.getByRole('button', { name: /^Search vaults/ }).click();
   await expect(page.getByRole('radio', { name: 'All vaults', exact: true })).toBeChecked();
   await page.keyboard.press('Escape');

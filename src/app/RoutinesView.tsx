@@ -1,3 +1,4 @@
+import { Spinner } from '@astryxdesign/core/Spinner';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Space } from '../domain/types';
@@ -114,7 +115,7 @@ function Step({
         {state && (
           <span className={`routine-state ${state}`}>
             {(state === 'running' || state === 'waiting') && (
-              <Icon name="loader" size={12} className="spin" />
+              <Spinner size="md" shade="inherit" aria-hidden className="spin" />
             )}
             {stepWords[state]()}
           </span>
@@ -386,7 +387,9 @@ function RoutineCard({
         ) : null}
         {last && (
           <span className={`routine-state ${last.state}`}>
-            {last.state === 'running' && <Icon name="loader" size={12} className="spin" />}
+            {last.state === 'running' && (
+              <Spinner size="md" shade="inherit" aria-hidden className="spin" />
+            )}
             {runWords[last.state]()}
             <time dateTime={last.startedAt}>{when(last.startedAt)}</time>
           </span>

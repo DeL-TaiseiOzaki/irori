@@ -256,8 +256,8 @@ try {
   await expect(page.locator('.stage .ProseMirror')).toContainText('From your AI');
   await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
   await page
-    .getByRole('group', { name: 'irori mode の表示' })
-    .getByRole('button', { name: 'マッピング', exact: true })
+    .getByRole('radiogroup', { name: 'irori mode の表示' })
+    .getByRole('radio', { name: 'マッピング', exact: true })
     .click();
   await expect(map.locator('.map-pill.hand-off')).toHaveCount(0);
 

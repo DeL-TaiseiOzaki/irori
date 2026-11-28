@@ -108,30 +108,9 @@
   background: var(--attn-soft);
   color: var(--attn-tx);
 }
-/* Changes | History: an underlined pair. */
+/* Changes | History: Astryx's segmented control. */
 .git-tabs {
-  --magnet-highlight: transparent;
-  --magnet-marker: var(--tx);
-  gap: 14px !important;
-  padding: 0 14px;
-  box-shadow: inset 0 -1px 0 var(--hair);
-}
-.git-tabs .obsidian-magnet-tab {
-  flex: none;
-  height: 38px;
-  border-radius: 0;
-}
-.git-tabs .obsidian-magnet-tab[aria-pressed='true'] {
-  color: var(--tx);
-  font-weight: 600;
-}
-.git-tabs .obsidian-magnet-marker {
-  top: auto;
-  bottom: 0;
-}
-.git-tab-count {
-  color: var(--tx-3);
-  font-weight: 500;
+  margin: 8px 12px 4px;
 }
 .git-list {
   flex: 1 0 auto;
@@ -296,9 +275,8 @@
   text-align: center;
   color: var(--tx-3);
 }
-.git-empty h2 {
-  font-size: 15px;
-  color: var(--tx);
+.git-empty-state {
+  padding: 16px 12px;
 }
 .git-sr-only {
   position: absolute;

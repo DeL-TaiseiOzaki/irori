@@ -31,8 +31,16 @@ hold, but their values are Astryx's.
   action, `secondary`, `ghost` for quiet ones, and `destructive`. The size is
   `sm` on the chrome and `md` for a page's or a sheet's main actions. A rule for
   irori's own buttons inside a part selects `button:not(:where(.astryx-button))`.
-- **Next stages.** The other controls, then overlays, become Astryx components;
-  irori's own IDE parts are redrawn after Astryx's anatomy (ADR 076, Stages).
+- **Other controls** (0.3.6).
+  - Checkboxes are `CheckboxInput` and switches are `Switch`.
+  - A choice of views is `Segmented`, a radio group.
+  - Shortcut hints are `Kbd` (`mod+…`) and counts are a neutral `Badge`.
+  - A running mark is an `aria-hidden` `Spinner` beside its words, and an
+    empty page is `EmptyState`.
+  - Native fields take Astryx's input look from `style.css`; do not style a
+    field's border, radius or focus ring in a component.
+- **Next stages.** Overlays become Astryx components; irori's own IDE parts are
+  redrawn after Astryx's anatomy (ADR 076, Stages).
 
 ## 0.3.0 — Desktop IDE discipline and subtractive polish (2026-11-25)
 

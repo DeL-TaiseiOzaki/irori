@@ -1,3 +1,4 @@
+import { Switch } from '@astryxdesign/core/Switch';
 import { Dialog } from './Dialog';
 import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Menu } from '@base-ui/react/menu';
@@ -417,17 +418,14 @@ export function Connections({
                       {invalidName}
                     </p>
                   )}
-                  <label className="connect-switch">
-                    <input
-                      type="checkbox"
-                      role="switch"
-                      checked={editable}
-                      disabled={busy}
-                      onChange={(e) => setEditable(e.target.checked)}
-                    />
-                    <span className="switch-track" aria-hidden="true" />
-                    {t('編集を許可', 'Allow editing')}
-                  </label>
+                  <Switch
+                    className="connect-switch"
+                    label={t('編集を許可', 'Allow editing')}
+                    value={editable}
+                    isDisabled={busy}
+                    size="sm"
+                    onChange={(on) => setEditable(on)}
+                  />
                   <p className="connect-hint">
                     {accessNote(editable ? 'read-write' : 'read-only')}
                   </p>

@@ -139,7 +139,7 @@ try {
   await expect(routinesButton).toHaveAttribute('aria-current', 'page');
   await expect(modeButton).not.toHaveAttribute('aria-current');
   await expect(productButton).not.toHaveAttribute('aria-current');
-  await expect(page.getByRole('group', { name: 'irori mode の表示' })).toHaveCount(0);
+  await expect(page.getByRole('radiogroup', { name: 'irori mode の表示' })).toHaveCount(0);
   const view = page.getByRole('region', { name: 'ルーティン', exact: true });
   const card = (name: string) => view.getByRole('article', { name, exact: true });
   /** The state of a routine's latest run, as its row shows it. */
@@ -152,17 +152,14 @@ try {
   // The irori mode layout survives a visit to routines; routines is no longer a layout tab.
   await modeButton.click();
   await expect(view).toHaveCount(0);
-  const layouts = page.getByRole('group', { name: 'irori mode の表示' });
-  await expect(layouts.getByRole('button', { name: 'ルーティン', exact: true })).toHaveCount(0);
-  await layouts.getByRole('button', { name: '並列', exact: true }).click();
+  const layouts = page.getByRole('radiogroup', { name: 'irori mode の表示' });
+  await expect(layouts.getByRole('radio', { name: 'ルーティン', exact: true })).toHaveCount(0);
+  await layouts.getByRole('radio', { name: '並列', exact: true }).click();
   await routinesButton.click();
   await expect(view).toBeVisible();
   await expect(page.getByRole('complementary', { name: 'irori agent' })).toBeVisible();
   await modeButton.click();
-  await expect(layouts.getByRole('button', { name: '並列', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  await expect(layouts.getByRole('radio', { name: '並列', exact: true })).toBeChecked();
   await routinesButton.click();
   // Routines keeps the shared agent's resizable pane across the columns layout.
   const agentPanel = page.getByRole('complementary', { name: 'irori agent' });
@@ -224,12 +221,12 @@ try {
   await expect(create).not.toContainText('がありません');
   await page.screenshot({ path: 'test-results/routines-new.png' });
   // The same routine as text, and back to the form.
-  const views = create.getByRole('group', { name: '編集の表示' });
-  await views.getByRole('button', { name: 'YAML', exact: true }).click();
+  const views = create.getByRole('radiogroup', { name: '編集の表示' });
+  await views.getByRole('radio', { name: 'YAML', exact: true }).click();
   await expect(create.getByRole('textbox', { name: 'routine.yaml' })).toHaveValue(
     'name: Daily mail\nsteps:\n  - run: [git, --version]\n  - agent: irori\n    access: default\n    prompt: Sort the mail.\n',
   );
-  await views.getByRole('button', { name: 'フォーム', exact: true }).click();
+  await views.getByRole('radio', { name: 'フォーム', exact: true }).click();
   await create.getByRole('button', { name: '作成', exact: true }).click();
   await expect(create).toHaveCount(0);
   const daily = card('Daily mail');
@@ -241,8 +238,8 @@ try {
   await daily.getByRole('button', { name: 'Daily mail を編集' }).click();
   const editor = page.getByRole('dialog', { name: 'Daily mail' });
   await editor
-    .getByRole('group', { name: '編集の表示' })
-    .getByRole('button', { name: 'YAML', exact: true })
+    .getByRole('radiogroup', { name: '編集の表示' })
+    .getByRole('radio', { name: 'YAML', exact: true })
     .click();
   const source = editor.getByRole('textbox', { name: 'routine.yaml' });
   await source.fill(
@@ -253,8 +250,8 @@ try {
   await expect(editor.getByRole('button', { name: '閉じる', exact: true })).toBeVisible();
   // The form shows the missing access as standard and keeps the comment.
   await editor
-    .getByRole('group', { name: '編集の表示' })
-    .getByRole('button', { name: 'フォーム', exact: true })
+    .getByRole('radiogroup', { name: '編集の表示' })
+    .getByRole('radio', { name: 'フォーム', exact: true })
     .click();
   await expect(editor.getByRole('combobox', { name: 'アクセス' })).toHaveValue('default');
   await editor.getByRole('button', { name: '保存', exact: true }).click();

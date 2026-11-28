@@ -132,7 +132,7 @@ try {
   await expect(map.locator('.map-group')).toHaveCount(0);
   // Beside the map, your AI comes first; each brain's own AI is the other tab.
   await expect(page.getByRole('complementary', { name: 'irori agent' })).toBeVisible();
-  await page.getByRole('button', { name: 'vault agent', exact: true }).click();
+  await page.getByRole('radio', { name: 'vault agent', exact: true }).click();
   const ais = page.getByRole('complementary', { name: 'vault agent' });
   const productAi = ais.getByRole('group', { name: 'Product agent' });
   await page.screenshot({ path: 'test-results/irori-overview-map.png' });
@@ -140,7 +140,7 @@ try {
   const header = page.locator('.overview-header');
   const fits = () =>
     header.evaluate((element) => {
-      const tall = [...element.querySelectorAll('h1, .obsidian-magnet-tab, button')].filter(
+      const tall = [...element.querySelectorAll('h1, [role="radio"], button')].filter(
         (item) => (item as HTMLElement).offsetHeight > 36,
       );
       return element.scrollWidth <= element.clientWidth + 1 && !tall.length;
@@ -183,7 +183,7 @@ try {
   await expect.poll(async () => (await conversation(research.scopeId)).queued.length).toBe(1);
 
   // Side by side: stop Research's run, then resume its queue.
-  await page.getByRole('button', { name: '並列', exact: true }).click();
+  await page.getByRole('radio', { name: '並列', exact: true }).click();
   const columns = page.getByRole('region', { name: 'vault を並べて表示' });
   const researchColumn = columns.getByRole('region', { name: 'Research', exact: true });
   await expect(researchColumn).toContainText('実行中');
@@ -222,7 +222,7 @@ try {
   expect(await turns(research.scopeId)).toEqual(['hold', 'queued from overview']);
 
   // A brain with nothing running takes an instruction from the Overview at once.
-  await page.getByRole('button', { name: 'マッピング', exact: true }).click();
+  await page.getByRole('radio', { name: 'マッピング', exact: true }).click();
   await ais.getByRole('radio', { name: 'Product', exact: true }).check();
   await ais.getByLabel('Product agent への指示').fill('from overview');
   await ais.getByRole('button', { name: '送信', exact: true }).click();
@@ -232,7 +232,7 @@ try {
   await expect.poll(async () => !!(await conversation(product.scopeId)).activeRunId).toBe(false);
 
   // Opening a note from a column shows that brain with the note.
-  await page.getByRole('button', { name: '並列', exact: true }).click();
+  await page.getByRole('radio', { name: '並列', exact: true }).click();
   await researchColumn.getByRole('button', { name: 'Research note', exact: true }).click();
   await expect(page.locator('.brain-names strong')).toHaveText('Research');
   await expect(page.locator('.ProseMirror')).toContainText('Research');
@@ -248,7 +248,7 @@ try {
   // The Overview comes back as it was left: side by side.
   await rail.getByRole('button', { name: 'irori mode', exact: true }).click();
   await expect(columns).toBeVisible();
-  await page.getByRole('button', { name: 'マッピング', exact: true }).click();
+  await page.getByRole('radio', { name: 'マッピング', exact: true }).click();
   await map.getByRole('button', { name: 'Product を開く' }).click();
   // The Overview zooms away around the brain while the brain settles in.
   await expect(page.locator('.islands.level-enter')).toHaveCount(1);
@@ -279,11 +279,8 @@ try {
   await found.getByRole('button').first().click();
   await expect(palette).toHaveCount(0);
   await expect(map).toHaveCount(0);
-  const views = page.getByRole('group', { name: 'irori mode の表示' });
-  await expect(views.getByRole('button', { name: 'ファイル', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  const views = page.getByRole('radiogroup', { name: 'irori mode の表示' });
+  await expect(views.getByRole('radio', { name: 'ファイル', exact: true })).toBeChecked();
   const reading = page.getByRole('region', { name: 'ファイル', exact: true });
   await expect(reading.locator('.ProseMirror')).toContainText('lantern');
   await expect(reading.locator('.crumbs')).toContainText('Research note');

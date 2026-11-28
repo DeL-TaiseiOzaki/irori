@@ -212,19 +212,6 @@
 .home-card-space {
   flex: 1;
 }
-.home-count {
-  flex: none;
-  min-width: 20px;
-  padding: 0 6px;
-  border-radius: var(--radius-element);
-  background: var(--stage-3);
-  color: var(--ink);
-  font-size: 11.5px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  line-height: 18px;
-  text-align: center;
-}
 .home-card-body {
   display: flex;
   flex-direction: column;
@@ -602,13 +589,7 @@ button.home-row:hover {
 .graph-empty {
   margin: auto;
   max-width: 480px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
   padding: 40px 24px;
-  text-align: center;
-  color: var(--ink-2);
 }
 
 /* Materials and outputs. */
@@ -1297,23 +1278,9 @@ button.home-row:hover {
   font-size: 12px;
   color: var(--ink-3);
 }
-.layer-choice label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-}
-.layer-choice input {
-  margin: 0;
-}
 /* In a form that makes a vault, the form's own label rule gives way. */
 .modal .layer-choice {
   margin: 15px 0;
-}
-.modal .layer-choice label {
-  display: inline-flex;
-  margin: 0;
-  font-size: 13px;
 }
 .layer-choice .layer-icon.schema {
   color: var(--schema);
@@ -1343,14 +1310,6 @@ button.home-row:hover {
 }
 .brain-sheet-layer-root {
   grid-column: 3;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--ink-3);
-}
-.brain-sheet-layer-root input {
-  margin: 0;
 }
 .brain-sheet-layer small[role='alert'] {
   grid-column: 2 / -1;

@@ -223,60 +223,7 @@
   margin: 0;
   padding: 0;
 }
-.connect-sheet .connect-switch {
-  position: relative;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
-  margin: 0;
-  font-size: 13px;
-  color: var(--ink);
-  cursor: pointer;
-}
 /* The real checkbox lies over the drawn track and takes the clicks. */
-.connect-sheet .connect-switch input {
-  position: absolute;
-  z-index: 1;
-  opacity: 0;
-  cursor: pointer;
-  width: 34px;
-  height: 20px;
-  margin: 0;
-}
-.connect-sheet .switch-track {
-  position: relative;
-  width: 34px;
-  height: 20px;
-  flex: none;
-  border-radius: var(--radius-element);
-  background: var(--rule-2);
-  transition: background-color 160ms ease;
-}
-.connect-sheet .switch-track::after {
-  content: '';
-  position: absolute;
-  left: 2px;
-  top: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--stage);
-  transition: transform var(--quick) var(--ease);
-}
-.connect-sheet .connect-switch input:checked + .switch-track {
-  background: var(--ink-solid);
-}
-.connect-sheet .connect-switch input:checked + .switch-track::after {
-  transform: translateX(14px);
-}
-.connect-sheet .connect-switch input:focus-visible + .switch-track {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.connect-sheet .connect-switch input:disabled + .switch-track {
-  opacity: 0.45;
-}
 .connect-sheet .mount-preview {
   display: flex;
   align-items: center;

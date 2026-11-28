@@ -1,3 +1,4 @@
+import { EmptyState } from '@astryxdesign/core/EmptyState';
 import { countLabel } from './display';
 import { createPortal } from 'react-dom';
 import { knowledgeFolder } from '../domain/layers';
@@ -16,9 +17,8 @@ import type {
   GitTarget,
 } from '../domain/git';
 import { Menu } from '@base-ui/react/menu';
-import { MagnetTabs } from './obsidian/MagnetTabs';
 import { Icon } from './Icon';
-import { Button, IconButton } from './controls';
+import { Button, IconButton, Segmented } from './controls';
 import { useDraft } from './useDraft';
 import { displayLocale, t } from '../domain/i18n';
 import { ErrorMessage, errorText } from './ErrorMessage';
@@ -582,22 +582,35 @@ function RepositoryPanel({
     );
   if (!status.available)
     return status.initializable && !shownOnly ? (
-      <div className="git-empty">
-        <h2>{t('Git 未設定', 'Not in Git')}</h2>
-        {error && <ErrorMessage className="git-notice error" text={error} />}
-        <Button
-          variant="primary"
-          label={t('Git を始める', 'Start Git')}
-          disabled={busy}
-          onClick={() =>
-            void perform(() => host.gitInit(space.scopeId), t('Git を始めました。', 'Git started.'))
+      <div className="git-empty-state">
+        <EmptyState
+          isCompact
+          headingLevel={2}
+          title={t('Git 未設定', 'Not in Git')}
+          actions={
+            <Button
+              variant="primary"
+              label={t('Git を始める', 'Start Git')}
+              disabled={busy}
+              onClick={() =>
+                void perform(
+                  () => host.gitInit(space.scopeId),
+                  t('Git を始めました。', 'Git started.'),
+                )
+              }
+            />
           }
         />
+        {error && <ErrorMessage className="git-notice error" text={error} />}
       </div>
     ) : (
-      <div className="git-empty">
-        <h2>{t('Git リポジトリがありません', 'No Git repository')}</h2>
-        <p>{status.detail}</p>
+      <div className="git-empty-state">
+        <EmptyState
+          isCompact
+          headingLevel={2}
+          title={t('Git リポジトリがありません', 'No Git repository')}
+          description={status.detail}
+        />
       </div>
     );
   const staged = status.changes.filter((c) => ![' ', '?'].includes(c.index) && !c.conflict);
@@ -860,7 +873,7 @@ function RepositoryPanel({
         </p>
       )}
       {/* One pressed view at a time, with the group's own roving focus. */}
-      <MagnetTabs
+      <Segmented
         className="git-tabs"
         label={t('Git の表示', 'Git view')}
         value={tab}
@@ -871,22 +884,13 @@ function RepositoryPanel({
         options={[
           {
             value: 'changes',
-            label: (
-              <>
-                {t('変更', 'Changes')}{' '}
-                <span className="git-tab-count">{countLabel(status.changes.length)}</span>
-              </>
-            ),
+            label: `${t('変更', 'Changes')} ${countLabel(status.changes.length)}`,
             disabled: busy || conflictDirty || draftBlocked,
           },
           {
             value: 'history',
-            label: (
-              <>
-                <Icon name="history" size={13} />
-                {t('履歴', 'History')}
-              </>
-            ),
+            label: t('履歴', 'History'),
+            icon: <Icon name="history" size={13} />,
             disabled: busy || conflictDirty || draftBlocked,
           },
         ]}

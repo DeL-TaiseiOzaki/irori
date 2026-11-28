@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { Switch } from '@astryxdesign/core/Switch';
 import { Dialog } from './Dialog';
 import { Icon, type IconName } from './Icon';
 import { BrainTile } from './BrainTile';
@@ -407,9 +408,15 @@ function SwitchRow({
   return (
     <div className="settings-item settings-row">
       <div className="settings-row-text">
-        <label className="settings-row-label" htmlFor={id}>
+        {/* The row's title names Astryx's switch; a press on it turns the switch, as a
+            label's would. */}
+        <span
+          className="settings-row-label"
+          id={`${id}-label`}
+          onClick={() => !busy && onChange(!checked)}
+        >
           {label}
-        </label>
+        </span>
         {description && (
           <p className="settings-description" id={`${id}-description`}>
             {description}
@@ -420,18 +427,17 @@ function SwitchRow({
       <span className="settings-switch-state" aria-hidden="true">
         {checked ? t('オン', 'On') : t('オフ', 'Off')}
       </span>
-      <span className="settings-switch">
-        <input
-          id={id}
-          type="checkbox"
-          role="switch"
-          checked={checked}
-          disabled={busy}
-          aria-describedby={description ? `${id}-description` : undefined}
-          onChange={(event) => onChange(event.target.checked)}
-        />
-        <span aria-hidden="true" />
-      </span>
+      <Switch
+        className="settings-switch"
+        size="sm"
+        label={label}
+        isLabelHidden
+        aria-labelledby={`${id}-label`}
+        aria-describedby={description ? `${id}-description` : undefined}
+        value={checked}
+        isDisabled={busy}
+        onChange={(on) => onChange(on)}
+      />
     </div>
   );
 }

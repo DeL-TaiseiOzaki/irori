@@ -1,3 +1,4 @@
+import { CheckboxInput } from '@astryxdesign/core/CheckboxInput';
 import { useEffect, useRef, useState } from 'react';
 import { Dialog } from './Dialog';
 import { ArrowFillButton } from './obsidian/ArrowFillButton';
@@ -470,80 +471,70 @@ export function RestoreEnvironment({
             <fieldset className="restore-list">
               <legend>vault</legend>
               {saved.vaults.map((item) => (
-                <label key={item.scopeId} data-here={item.here || undefined}>
-                  <input
-                    type="checkbox"
-                    disabled={busy || item.here}
-                    checked={item.here || chosen.includes(item.scopeId)}
-                    onChange={(e) =>
-                      setSelected(
-                        e.target.checked
-                          ? [...chosen, item.scopeId]
-                          : chosen.filter((id) => id !== item.scopeId),
-                      )
-                    }
-                  />
-                  <span>{item.name}</span>
-                  <small>
-                    {item.here ? t('この端末にあります', 'On this device') : item.repository}
-                  </small>
-                </label>
+                <CheckboxInput
+                  key={item.scopeId}
+                  label={item.name}
+                  description={
+                    item.here ? t('この端末にあります', 'On this device') : item.repository
+                  }
+                  isDisabled={busy || item.here}
+                  value={item.here || chosen.includes(item.scopeId)}
+                  onChange={(checked) =>
+                    setSelected(
+                      checked
+                        ? [...chosen, item.scopeId]
+                        : chosen.filter((id) => id !== item.scopeId),
+                    )
+                  }
+                />
               ))}
               {saved.agent && (
-                <label data-here={saved.agent.here || undefined}>
-                  <input
-                    type="checkbox"
-                    disabled={busy || saved.agent.here}
-                    checked={saved.agent.here || agent}
-                    onChange={(e) => setAgent(e.target.checked)}
-                  />
-                  <span>irori agent</span>
-                  <small>
-                    {saved.agent.here
+                <CheckboxInput
+                  label="irori agent"
+                  description={
+                    saved.agent.here
                       ? t('この端末にあります', 'On this device')
-                      : saved.agent.repository}
-                  </small>
-                </label>
+                      : saved.agent.repository
+                  }
+                  isDisabled={busy || saved.agent.here}
+                  value={saved.agent.here || agent}
+                  onChange={setAgent}
+                />
               )}
               {saved.agentFiles && (
-                <label data-here={!filesMissing || undefined}>
-                  <input
-                    type="checkbox"
-                    disabled={busy || !filesMissing}
-                    checked={!filesMissing || files}
-                    onChange={(e) => setFiles(e.target.checked)}
-                  />
-                  <span>{t('irori agent のファイル', 'irori agent files')}</span>
-                  <small>
-                    {filesMissing
+                <CheckboxInput
+                  label={t('irori agent のファイル', 'irori agent files')}
+                  description={
+                    filesMissing
                       ? t(`${saved.agentFiles.missing} 件`, count(saved.agentFiles.missing, 'file'))
-                      : t('この端末にあります', 'On this device')}
-                  </small>
-                </label>
+                      : t('この端末にあります', 'On this device')
+                  }
+                  isDisabled={busy || !filesMissing}
+                  value={!filesMissing || files}
+                  onChange={setFiles}
+                />
               )}
             </fieldset>
             {saved.routines.length > 0 && (
               <fieldset className="restore-list">
                 <legend>{t('ルーティン', 'Routines')}</legend>
                 {saved.routines.map((item) => (
-                  <label key={item.folder} data-here={item.here || undefined}>
-                    <input
-                      type="checkbox"
-                      disabled={busy || item.here}
-                      checked={item.here || chosenRoutines.includes(item.folder)}
-                      onChange={(e) =>
-                        setRoutines(
-                          e.target.checked
-                            ? [...chosenRoutines, item.folder]
-                            : chosenRoutines.filter((folder) => folder !== item.folder),
-                        )
-                      }
-                    />
-                    <span>{item.name}</span>
-                    <small>
-                      {item.here ? t('この端末にあります', 'On this device') : 'irori agent'}
-                    </small>
-                  </label>
+                  <CheckboxInput
+                    key={item.folder}
+                    label={item.name}
+                    description={
+                      item.here ? t('この端末にあります', 'On this device') : 'irori agent'
+                    }
+                    isDisabled={busy || item.here}
+                    value={item.here || chosenRoutines.includes(item.folder)}
+                    onChange={(checked) =>
+                      setRoutines(
+                        checked
+                          ? [...chosenRoutines, item.folder]
+                          : chosenRoutines.filter((folder) => folder !== item.folder),
+                      )
+                    }
+                  />
                 ))}
               </fieldset>
             )}
@@ -551,22 +542,20 @@ export function RestoreEnvironment({
               <fieldset className="restore-list">
                 <legend>{t('シークレット', 'Secrets')}</legend>
                 {saved.secrets.map((item) => (
-                  <label key={item.name} data-here={item.here || undefined}>
-                    <input
-                      type="checkbox"
-                      disabled={busy || item.here || !keysAvailable}
-                      checked={item.here || chosenKeys.includes(item.name)}
-                      onChange={(e) =>
-                        setKeys(
-                          e.target.checked
-                            ? [...chosenKeys, item.name]
-                            : chosenKeys.filter((name) => name !== item.name),
-                        )
-                      }
-                    />
-                    <span>{item.name}</span>
-                    {item.here && <small>{t('この端末にあります', 'On this device')}</small>}
-                  </label>
+                  <CheckboxInput
+                    key={item.name}
+                    label={item.name}
+                    description={item.here ? t('この端末にあります', 'On this device') : undefined}
+                    isDisabled={busy || item.here || !keysAvailable}
+                    value={item.here || chosenKeys.includes(item.name)}
+                    onChange={(checked) =>
+                      setKeys(
+                        checked
+                          ? [...chosenKeys, item.name]
+                          : chosenKeys.filter((name) => name !== item.name),
+                      )
+                    }
+                  />
                 ))}
                 {keysAvailable ? (
                   needsPassphrase && (

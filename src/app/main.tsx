@@ -1,3 +1,4 @@
+import { Kbd } from '@astryxdesign/core/Kbd';
 import { classify, isPropertyPage } from '../domain/scopes';
 import { hasLayer, layerFolder, movedPath, noLayer } from '../domain/layers';
 import { defaultNoteDirectoryOf } from '../domain/notes';
@@ -185,7 +186,6 @@ import './views.css';
 import { Startup, RegisterSpace } from './Startup';
 import { SshQuestions, useRemoteHosts } from './RemoteHosts';
 import { appIcon } from './branding';
-import { shortcut } from './shortcuts';
 import { Icon } from './Icon';
 import { Button, IconButton } from './controls';
 import { useResource } from './useResource';
@@ -3861,7 +3861,7 @@ function App() {
                           <Menu.Item onClick={() => findInFile.current?.open()}>
                             <Icon name="search" size={14} />
                             {t('ファイル内を検索', 'Find in file')}
-                            <kbd className="menu-key">{shortcut('F')}</kbd>
+                            <Kbd className="menu-key" keys="mod+f" />
                           </Menu.Item>
                         )}
                         <Menu.Item disabled={gitBusy} onClick={() => void reconcile()}>
