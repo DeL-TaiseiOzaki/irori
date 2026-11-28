@@ -84,6 +84,9 @@ try {
   await expect(contents.getByRole('button', { name: 'scripts', exact: true })).toBeVisible();
   await expect(contents.getByRole('button', { name: 'Knowledge_Base', exact: true })).toBeVisible();
   await expect(contents.getByRole('button', { name: 'AGENTS.md', exact: true })).toHaveCount(0);
+  // The contents folder is a folder row among them, with no heading of its own (ADR 071 D3, amended).
+  await expect(contents.getByRole('button', { name: 'contents', exact: true })).toBeVisible();
+  await expect(contents.locator('.contents-root-name')).toHaveCount(0);
   await expect(section('Schema').getByRole('group', { name: 'Schema の指示' })).toContainText(
     'AGENTS.md',
   );

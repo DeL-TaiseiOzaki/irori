@@ -1,5 +1,19 @@
 # Implementation status — notes, native agents and connection onboarding
 
+The contents folder as a folder in Contents, 2026-11-28 (**0.3.2**,
+[ADR 071](decisions/071-a-vaults-own-files-in-contents.md) D3, amendment of
+2026-11-28): the owner found the `contents` heading below a Contents-only
+vault's own files read as an extra layer holding only `work`. `ContentsTrees`
+in `BrainPanel.tsx` now renders one `Tree` when `ownLayer` is Contents, keeping
+the declared contents folders in its root listing (a nested one shows inside
+its parent folder); `Tree` marks a contents-folder row with the `link` icon,
+`muted` text and a tooltip. Its editing rules are unchanged: the host lists it
+without `writable`, so it is neither renamed, moved nor deleted, and takes no
+new entries at its top. An empty contents folder still says it has no
+connected folders.
+- Verified by `scripts/vault-layers-ui-smoke.ts` (the `contents` row in the
+  Contents tree, no `.contents-root-name` heading).
+
 Close a session from the session board, 2026-11-25 (**0.3.1**,
 [ADR 069](decisions/069-session-board.md), amendment of 2026-11-25,
 [#386](https://github.com/DeL-TaiseiOzaki/irori/pull/386), published as
