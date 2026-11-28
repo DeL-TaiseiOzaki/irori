@@ -1,6 +1,6 @@
 # irori continuation handoff
 
-**Astryx design system, stage 1, 0.3.2**
+**Astryx design system, stage 1, 0.3.3**
 ([ADR 076](decisions/076-astryx-design-system.md)).
 - **What changed.** Astryx's neutral theme now gives every colour role, the
   type (Figtree, with Geist Mono for code), the radii, the rounded elevated
@@ -16,6 +16,13 @@
 - **Then.** Stage 3 moves the overlays and stage 4 redraws irori's own parts
   and the website.
 - **Check.** Look at the packaged app with Japanese fonts present.
+
+**The contents folder as a folder in Contents, 0.3.2**
+([ADR 071](decisions/071-a-vaults-own-files-in-contents.md) D3, amendment of
+2026-11-28): in a vault whose own files are Contents, the contents folder is a
+folder row (link icon, muted) among them instead of a separate heading. Next:
+merge and publish, then check a real Contents-only vault with a connection and
+the work folder in the packaged app.
 
 **Close a session from the session board, 0.3.1**
 ([ADR 069](decisions/069-session-board.md), amendment of 2026-11-25): a card's

@@ -1,7 +1,7 @@
 # 076 — Astryx is irori's design system
 
 Date: 2026-11-28. Status: owner request and decisions; the foundation is
-implemented for 0.3.2, and the rest follows in stages. Revises the visual
+implemented for 0.3.3, and the rest follows in stages. Revises the visual
 system of [ADR 053](053-priority-and-colour-roles.md) (decision 1's flat chrome
 without radius, and the hue of the focus role) and
 [ADR 014](014-ui-v5.md) decision 7 (Geist). The levels, the roles of ADR 053
@@ -102,7 +102,7 @@ The survey (Astryx 0.7.17, 2026-11-28) found:
 
 | Stage | What changes                                                                    |
 | ----- | ------------------------------------------------------------------------------- |
-| 1     | Tokens, Figtree, radii, the elevated stage, the focus ring (0.3.2)              |
+| 1     | Tokens, Figtree, radii, the elevated stage, the focus ring (0.3.3)              |
 | 2     | Controls become Astryx components (decision 7)                                  |
 | 3     | Overlays, the settings sheet and ⌘K move to Astryx; Base UI leaves (decision 8) |
 | 4     | irori's own parts redrawn after Astryx's anatomy (decision 9); the website      |
