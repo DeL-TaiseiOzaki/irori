@@ -32,6 +32,7 @@ import { errorText } from './ErrorMessage';
 import { parentPath } from '../domain/paths';
 import { readDropped } from './dropped';
 import { Icon, type IconName } from './Icon';
+import { IconButton } from './controls';
 import { MagnetTabs } from './obsidian/MagnetTabs';
 import { VaultRepositories } from './VaultRepositories';
 import { layoutStorage } from './device-settings';
@@ -918,14 +919,12 @@ export const SideBrainPanel = memo(function SideBrainPanel({
           ) : (
             <span className="brain-home-link">{identity}</span>
           )}
-          <button
-            className="icon-button"
-            aria-label={t('横の vault を閉じる', 'Close the vault beside')}
+          <IconButton
+            label={t('横の vault を閉じる', 'Close the vault beside')}
             title={t('閉じる', 'Close')}
+            icon={<Icon name="close" size={16} />}
             onClick={onClose}
-          >
-            <Icon name="close" size={16} />
-          </button>
+          />
         </div>
       </header>
       <VaultSections
@@ -1173,34 +1172,29 @@ export const BrainPanel = memo(function BrainPanel({
             </span>
           </button>
           {onSplit && (
-            <button
-              className="icon-button"
-              aria-label={t('横に vault を開く', 'Open a vault beside')}
-              title={t('横に vault を開く', 'Open a vault beside')}
+            <IconButton
+              label={t('横に vault を開く', 'Open a vault beside')}
+              icon={<Icon name="split" size={15} />}
               onClick={onSplit}
-            >
-              <Icon name="split" size={15} />
-            </button>
+            />
           )}
           {!remote && (
-            <button
-              className="icon-button"
-              aria-label={t(`${space.name} の設定`, `${space.name} settings`)}
-              title={t(`${space.name} の設定`, `${space.name} settings`)}
+            <IconButton
+              label={t(`${space.name} の設定`, `${space.name} settings`)}
+              icon={<Icon name="sliders" size={15} />}
               disabled={locked || held}
               onClick={onSettings}
-            >
-              <Icon name="sliders" size={15} />
-            </button>
+            />
           )}
           <Menu.Root modal={false}>
             <Menu.Trigger
-              className="icon-button"
-              aria-label={t('vault のメニュー', 'vault menu')}
-              title={t('vault のメニュー', 'vault menu')}
-            >
-              <Icon name="more" size={16} />
-            </Menu.Trigger>
+              render={
+                <IconButton
+                  label={t('vault のメニュー', 'vault menu')}
+                  icon={<Icon name="more" size={16} />}
+                />
+              }
+            />
             <Menu.Portal>
               <Menu.Positioner side="bottom" align="end" sideOffset={4}>
                 <Menu.Popup className="menu">

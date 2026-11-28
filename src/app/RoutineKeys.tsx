@@ -5,6 +5,7 @@ import { secretName, unavailableText, type Routine, type SecretList } from '../d
 import { Dialog } from './Dialog';
 import { errorText } from './ErrorMessage';
 import { Icon } from './Icon';
+import { Button } from './controls';
 
 // The routines' secrets (ADR 016 D5). The file name avoids the word, which the
 // workspace's agent settings keep from being read.
@@ -94,13 +95,12 @@ export function SecretDialog({
           <button type="button" disabled={busy} onClick={onClose}>
             {t('キャンセル', 'Cancel')}
           </button>
-          <button
+          <Button
             type="submit"
-            className="primary"
+            variant="primary"
+            label={t('保存', 'Save')}
             disabled={busy || value.trim().length < 8 || !validSecretName(name)}
-          >
-            {t('保存', 'Save')}
-          </button>
+          />
         </div>
       </form>
     </Dialog>,
@@ -167,22 +167,19 @@ export function SecretsDialog({
                     {!!used.length && <small>{used.join(', ')}</small>}
                   </span>
                   {!kept ? (
-                    <button
-                      className="panel-button"
+                    <Button
+                      label={t('入力', 'Enter')}
                       disabled={!available}
                       onClick={() => onEnter(name)}
-                    >
-                      {t('入力', 'Enter')}
-                    </button>
+                    />
                   ) : (
                     <>
                       {available && (
-                        <button className="panel-button" onClick={() => onEnter(name)}>
-                          {t('置き換え', 'Replace')}
-                        </button>
+                        <Button label={t('置き換え', 'Replace')} onClick={() => onEnter(name)} />
                       )}
-                      <button
-                        className="panel-button"
+                      <Button
+                        label={removing === name ? t('削除する', 'Delete it') : t('削除', 'Delete')}
+                        icon={<Icon name="trash" size={13} />}
                         onClick={() => {
                           if (removing !== name) return setRemoving(name);
                           setError('');
@@ -193,10 +190,7 @@ export function SecretsDialog({
                             .finally(() => setRemoving(undefined));
                         }}
                         onBlur={() => setRemoving((value) => (value === name ? undefined : value))}
-                      >
-                        <Icon name="trash" size={13} />
-                        {removing === name ? t('削除する', 'Delete it') : t('削除', 'Delete')}
-                      </button>
+                      />
                     </>
                   )}
                 </li>
@@ -205,10 +199,12 @@ export function SecretsDialog({
           </ul>
         )}
         <div className="actions">
-          <button className="panel-button" disabled={!available} onClick={() => onEnter()}>
-            <Icon name="plus" size={13} />
-            {t('追加', 'Add')}
-          </button>
+          <Button
+            label={t('追加', 'Add')}
+            icon={<Icon name="plus" size={13} />}
+            disabled={!available}
+            onClick={() => onEnter()}
+          />
           <span className="routine-space" />
           <button onClick={onClose}>{t('閉じる', 'Close')}</button>
         </div>

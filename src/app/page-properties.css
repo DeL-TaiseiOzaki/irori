@@ -162,7 +162,7 @@
   color: var(--ink);
   font-size: 12.5px;
 }
-.properties-chip button,
+.properties-chip button:not(:where(.astryx-button)),
 .properties-remove {
   border: 0;
   background: transparent;
@@ -172,7 +172,7 @@
   padding: 0 4px;
   line-height: 1.4;
 }
-.properties-chip button:hover,
+.properties-chip button:not(:where(.astryx-button)):hover,
 .properties-remove:hover {
   color: var(--ink);
   background: var(--stage-2);

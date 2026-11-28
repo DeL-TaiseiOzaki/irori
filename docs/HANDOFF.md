@@ -1,21 +1,26 @@
 # irori continuation handoff
 
-**Astryx design system, stage 1, 0.3.3**
-([ADR 076](decisions/076-astryx-design-system.md)).
-- **What changed.** Astryx's neutral theme now gives every colour role, the
-  type (Figtree, with Geist Mono for code), the radii, the rounded elevated
-  stage and the monochrome focus ring. Hearth stays. Function is unchanged.
-- **State.** Open in [#388](https://github.com/DeL-TaiseiOzaki/irori/pull/388),
+**Astryx design system, stage 2: buttons, 0.3.4**
+([ADR 076](decisions/076-astryx-design-system.md) "Stage 2").
+- **What changed.** Every styled button is Astryx's `Button` or `IconButton`
+  through `src/app/controls.tsx`. irori's element defaults sit in an
+  `irori-defaults` layer under Astryx's. Function is unchanged.
+- **State.** Open in [#391](https://github.com/DeL-TaiseiOzaki/irori/pull/391),
   not merged.
-- **Next: stage 2** (ADR 076 decision 7).
-  - Import `@astryxdesign/core/astryx.css`.
-  - Move core and `@stylexjs/stylex` to runtime dependencies.
-  - Replace buttons, icon buttons, switches, checkboxes, text fields,
-    segmented controls, badges, keys, spinners and empty states with Astryx
-    components.
+- **Next: stage 2b.** Turn text fields, switches, checkboxes, segmented
+  controls, badges, keys, spinners and empty states into Astryx components the
+  same way: adapters in `controls.tsx`, accessible names kept, then the old
+  CSS removed.
 - **Then.** Stage 3 moves the overlays and stage 4 redraws irori's own parts
   and the website.
 - **Check.** Look at the packaged app with Japanese fonts present.
+
+**Astryx design system, stage 1, 0.3.3**
+([ADR 076](decisions/076-astryx-design-system.md)): Astryx's neutral theme
+gives every colour role, the type (Figtree, Geist Mono for code), the radii,
+the rounded elevated stage and the monochrome focus ring; Hearth stays.
+Merged in [#388](https://github.com/DeL-TaiseiOzaki/irori/pull/388) and
+published as `v0.3.3-preview.1`.
 
 **The contents folder as a folder in Contents, 0.3.2**
 ([ADR 071](decisions/071-a-vaults-own-files-in-contents.md) D3, amendment of

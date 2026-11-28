@@ -1,5 +1,6 @@
 import { t } from '../domain/i18n';
 import { Icon } from './Icon';
+import { Button } from './controls';
 import { ErrorMessage } from './ErrorMessage';
 import { useAction } from './useAction';
 import { useResource } from './useResource';
@@ -54,18 +55,18 @@ export function IroriAgentFolderSection({
         </small>
       )}
       <div className="agent-folder-actions">
-        <button
+        <Button
           type="button"
-          className="stage-text-button framed"
+          size="md"
+          label={t('開く', 'Open')}
+          icon={<Icon name="folder" size={15} />}
           disabled={busy || !current}
           onClick={() => void run(() => host.openIroriAgentFolder(workspaceId))}
-        >
-          <Icon name="folder" size={15} />
-          {t('開く', 'Open')}
-        </button>
-        <button
+        />
+        <Button
           type="button"
-          className="stage-text-button framed"
+          size="md"
+          label={t('フォルダを選ぶ', 'Choose a folder')}
           disabled={busy}
           onClick={() =>
             void change(async () => {
@@ -73,18 +74,15 @@ export function IroriAgentFolderSection({
               if (chosen) await host.setIroriAgentFolder(workspaceId, chosen);
             })
           }
-        >
-          {t('フォルダを選ぶ', 'Choose a folder')}
-        </button>
+        />
         {current?.chosen && (
-          <button
+          <Button
             type="button"
-            className="stage-text-button framed"
+            size="md"
+            label={t('既定に戻す', 'Use the default')}
             disabled={busy}
             onClick={() => void change(() => host.setIroriAgentFolder(workspaceId, null))}
-          >
-            {t('既定に戻す', 'Use the default')}
-          </button>
+          />
         )}
       </div>
       {(error || folder.error) && <ErrorMessage text={error || folder.error!} />}

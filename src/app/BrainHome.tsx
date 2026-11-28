@@ -9,6 +9,7 @@ import { classify } from '../domain/scopes';
 import { t } from '../domain/i18n';
 import { BrainTile } from './BrainTile';
 import { Icon, type IconName } from './Icon';
+import { Button, IconButton } from './controls';
 import { SkillReach } from './SkillReach';
 import { RemoteVaultPlace } from './RemoteHosts';
 import { VaultRepositories } from './VaultRepositories';
@@ -190,15 +191,13 @@ export function BrainHome({
               {space.name}
             </span>
             {!remote && (
-              <button
-                className="stage-button home-edit"
-                aria-label={t('vault の設定', 'vault settings')}
-                title={t('vault の設定', 'vault settings')}
+              <IconButton
+                className="home-edit"
+                label={t('vault の設定', 'vault settings')}
+                icon={<Icon name="penLine" size={15} />}
                 disabled={locked || held}
                 onClick={onSettings}
-              >
-                <Icon name="penLine" size={15} />
-              </button>
+              />
             )}
           </h1>
           <div className="home-meta">
@@ -242,35 +241,36 @@ export function BrainHome({
             </span>
           )}
           {daily && notes && !remote && (
-            <button
-              className={
-                primary === 'daily' ? 'primary-button home-button' : 'stage-text-button framed'
-              }
+            <Button
+              className={primary === 'daily' ? 'home-button' : undefined}
+              variant={primary === 'daily' ? 'primary' : 'secondary'}
+              size="md"
+              label={t('今日のノート', "Today's note")}
+              icon={<Icon name="calendar" size={15} />}
               disabled={locked}
               onClick={onDaily}
-            >
-              <Icon name="calendar" size={15} />
-              {t('今日のノート', "Today's note")}
-            </button>
+            />
           )}
           {notes && !remote && (
-            <button
-              className={
-                primary === 'note' ? 'primary-button home-button' : 'stage-text-button framed'
-              }
+            <Button
+              className={primary === 'note' ? 'home-button' : undefined}
+              variant={primary === 'note' ? 'primary' : 'secondary'}
+              size="md"
+              label={t('ノートを作成', 'Create note')}
+              icon={<Icon name="plus" size={15} />}
               disabled={locked}
               onClick={onNewNote}
-            >
-              <Icon name="plus" size={15} />
-              {t('ノートを作成', 'Create note')}
-            </button>
+            />
           )}
           {/* On an SSH host the terminal is the host's, through ssh (ADR 061). */}
           {shown.terminal && (
-            <button className="stage-text-button" onClick={onTerminal}>
-              <Icon name="terminal" size={15} />
-              {t('ターミナル', 'Terminal')}
-            </button>
+            <Button
+              variant="ghost"
+              size="md"
+              label={t('ターミナル', 'Terminal')}
+              icon={<Icon name="terminal" size={15} />}
+              onClick={onTerminal}
+            />
           )}
         </div>
       </header>
@@ -283,11 +283,15 @@ export function BrainHome({
               count={changes.length}
               className="home-changes"
               action={
-                <button className="primary-button small" onClick={onChanges}>
-                  {remote
-                    ? t('変更を見る', 'View changes')
-                    : t('確認してコミット', 'Review and commit')}
-                </button>
+                <Button
+                  variant="primary"
+                  label={
+                    remote
+                      ? t('変更を見る', 'View changes')
+                      : t('確認してコミット', 'Review and commit')
+                  }
+                  onClick={onChanges}
+                />
               }
             >
               {changes.slice(0, 6).map((change) => {
@@ -325,19 +329,14 @@ export function BrainHome({
               title={layerLabel(space, 'Knowledge_Base')}
               action={
                 <>
-                  <VaultRepositories
-                    space={space}
-                    connections={connections}
-                    className="stage-button"
-                  />
-                  <button
-                    className="stage-text-button small"
+                  <VaultRepositories space={space} connections={connections} />
+                  <Button
+                    variant="ghost"
+                    label={t('オントロジー', 'Ontology')}
+                    icon={<Icon name="graph" size={14} />}
                     disabled={locked || held}
                     onClick={onGraph}
-                  >
-                    <Icon name="graph" size={14} />
-                    {t('オントロジー', 'Ontology')}
-                  </button>
+                  />
                 </>
               }
             >
@@ -366,10 +365,12 @@ export function BrainHome({
             icon="archive"
             title={t('実行の記録', 'Run records')}
             action={
-              <button className="stage-text-button small" onClick={onMaterials}>
-                {t('資料と成果物', 'Materials and outputs')}
-                <Icon name="arrow" size={13} />
-              </button>
+              <Button
+                variant="ghost"
+                label={t('資料と成果物', 'Materials and outputs')}
+                endIcon={<Icon name="arrow" size={13} />}
+                onClick={onMaterials}
+              />
             }
           >
             {runs.map((run) => (
@@ -399,14 +400,11 @@ export function BrainHome({
               layer="schema"
               title="Schema"
               action={
-                <button
-                  className="stage-button"
-                  aria-label={t('エクスプローラーを更新', 'Refresh explorer')}
-                  title={t('エクスプローラーを更新', 'Refresh explorer')}
+                <IconButton
+                  label={t('エクスプローラーを更新', 'Refresh explorer')}
+                  icon={<Icon name="refresh" size={15} />}
                   onClick={onRefresh}
-                >
-                  <Icon name="refresh" size={15} />
-                </button>
+                />
               }
             >
               {schema.shown.map((entry) => (
@@ -420,10 +418,12 @@ export function BrainHome({
               <div className="home-row home-skills-row">
                 <Icon name="skill" size={16} className="home-row-icon" />
                 <span className="home-row-name">{t('スキル', 'Skills')}</span>
-                <button className="stage-text-button small" onClick={() => setReach(true)}>
-                  <Icon name="checkCircle" size={13} />
-                  {t('到達確認', 'Check reach')}
-                </button>
+                <Button
+                  variant="ghost"
+                  label={t('到達確認', 'Check reach')}
+                  icon={<Icon name="checkCircle" size={13} />}
+                  onClick={() => setReach(true)}
+                />
               </div>
               <div className="home-skills">
                 {skills.length ? (
@@ -444,10 +444,13 @@ export function BrainHome({
               title={layerLabel(space, 'contents')}
               action={
                 !remote && (
-                  <button className="stage-text-button small" disabled={locked} onClick={onConnect}>
-                    <Icon name="cloudConnect" size={14} />
-                    {t('接続', 'Connect')}
-                  </button>
+                  <Button
+                    variant="ghost"
+                    label={t('接続', 'Connect')}
+                    icon={<Icon name="cloudConnect" size={14} />}
+                    disabled={locked}
+                    onClick={onConnect}
+                  />
                 )
               }
             >

@@ -28,6 +28,7 @@ import { propertyDeclarationFile } from '../domain/properties';
 import type { Space } from '../domain/types';
 import { t } from '../domain/i18n';
 import { useAction } from './useAction';
+import { Button, IconButton } from './controls';
 
 /** The stand-ins a relation's ends take when it names no type. */
 const anyFrom = '\0from';
@@ -479,8 +480,10 @@ export function OntologyPanel({
             </span>
           )}
           {indexes && (
-            <button
-              className="stage-text-button framed"
+            <Button
+              size="md"
+              label={updateLabel}
+              icon={<Icon name="refresh" size={14} />}
               disabled={busy || held}
               title={
                 held
@@ -491,24 +494,22 @@ export function OntologyPanel({
                   : undefined
               }
               onClick={updateIndexes}
-            >
-              <Icon name="refresh" size={14} />
-              {updateLabel}
-            </button>
+            />
           )}
-          <button
-            className="stage-button"
-            aria-label={t('再読み込み', 'Reload')}
-            title={t('再読み込み', 'Reload')}
+          <IconButton
+            label={t('再読み込み', 'Reload')}
+            icon={<Icon name="refresh" size={16} />}
             onClick={() => setRefresh((value) => value + 1)}
-          >
-            <Icon name="refresh" size={16} />
-          </button>
+          />
           {onConfigure && (
-            <button className="stage-text-button ask-ai" onClick={onConfigure}>
-              <Icon name="agent" size={14} />
-              {t('vault agent', 'vault agent')}
-            </button>
+            <Button
+              className="ask-ai"
+              variant="ghost"
+              size="md"
+              label={t('vault agent', 'vault agent')}
+              icon={<Icon name="agent" size={14} />}
+              onClick={onConfigure}
+            />
           )}
         </>
       }

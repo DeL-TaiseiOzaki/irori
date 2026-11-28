@@ -36,6 +36,7 @@ import { IroriAgentFolderSection } from './IroriAgentFolder';
 import { BrainTile } from './BrainTile';
 import { ConversationHistory } from './ConversationHistory';
 import { Icon } from './Icon';
+import { Button, IconButton } from './controls';
 import { RunSettings } from './RunSettings';
 import { SkillPicker } from './SkillPicker';
 import { errorText } from './ErrorMessage';
@@ -836,10 +837,9 @@ export function AgentColumn({
           </span>
         )}
         <span className="agent-header-space" />
-        <button
-          className="icon-button"
-          aria-label={t('新しい会話', 'New conversation')}
-          title={t('新しい会話', 'New conversation')}
+        <IconButton
+          label={t('新しい会話', 'New conversation')}
+          icon={<Icon name="squarePen" size={16} />}
           disabled={!ready || sending}
           onClick={() => {
             setHistoryOpen(false);
@@ -847,58 +847,45 @@ export function AgentColumn({
               .then(() => textarea.current?.focus())
               .catch(report);
           }}
-        >
-          <Icon name="squarePen" size={16} />
-        </button>
-        <button
-          className="icon-button"
-          aria-label={t('履歴', 'History')}
-          title={t('履歴', 'History')}
+        />
+        <IconButton
+          label={t('履歴', 'History')}
+          icon={<Icon name="history" size={16} />}
           aria-pressed={historyOpen}
           disabled={!ready}
           onClick={() => setHistoryOpen((value) => !value)}
-        >
-          <Icon name="history" size={16} />
-        </button>
+        />
         {shown.columns && (
-          <button
-            className="icon-button"
-            aria-label={t('列を追加', 'Add a column')}
-            title={t('列を追加', 'Add a column')}
+          <IconButton
+            label={t('列を追加', 'Add a column')}
+            icon={<Icon name="split" size={16} />}
             disabled={!canSplit}
             onClick={onSplit}
-          >
-            <Icon name="split" size={16} />
-          </button>
+          />
         )}
         {/* A hidden page keeps its button, so it can always be shown again. */}
         {stage && (shown.columns || stage.hidden) && (
-          <button
-            className="icon-button"
+          <IconButton
             aria-pressed={stage.hidden}
-            aria-label={stageLabel}
-            title={stageLabel}
+            label={stageLabel}
+            icon={<Icon name={stage.hidden ? 'stageShow' : 'stageHide'} size={16} />}
             onClick={stage.onToggle}
-          >
-            <Icon name={stage.hidden ? 'stageShow' : 'stageHide'} size={16} />
-          </button>
+          />
         )}
         {closable && (
-          <button
-            className="icon-button"
-            aria-label={
+          <IconButton
+            label={
               closesDock
                 ? t(`${kind} を閉じる`, `Close ${kind}`)
                 : t('この列を閉じる', 'Close this column')
             }
+            icon={<Icon name="close" size={16} />}
             onClick={() => {
               void composer.flush().then((saved) => {
                 if (saved) onClose();
               });
             }}
-          >
-            <Icon name="close" size={16} />
-          </button>
+          />
         )}
         {shownRunning && (
           <span className="agent-progress" aria-hidden="true">
@@ -981,8 +968,10 @@ export function AgentColumn({
           ) : (
             <p className="mono your-ai-path">{you.root}</p>
           )}
-          <button
-            className="primary-button"
+          <Button
+            variant="primary"
+            label={t('irori agent を用意する', 'Set up the irori agent')}
+            icon={<Icon name="agent" size={14} />}
             disabled={sending}
             onClick={() => {
               setSending(true);
@@ -991,10 +980,7 @@ export function AgentColumn({
                 .catch((error) => setSetupError(errorText(error)))
                 .finally(() => setSending(false));
             }}
-          >
-            <Icon name="agent" size={14} />
-            {t('irori agent を用意する', 'Set up the irori agent')}
-          </button>
+          />
           {setupError && (
             <p className="your-ai-setup-error" role="alert">
               {setupError}
@@ -1370,18 +1356,17 @@ export function AgentColumn({
                 onAccess={onAccess}
               />
               {shownRunning && (
-                <button
-                  className="icon-button stop"
-                  aria-label={t('停止', 'Stop')}
-                  title={t('停止', 'Stop')}
+                <IconButton
+                  className="stop"
+                  variant="secondary"
+                  label={t('停止', 'Stop')}
+                  icon={<span className="stop-mark" />}
                   onClick={() => {
                     setQueuePaused(true);
                     // This conversation's run alone; the owner's others go on.
                     void host.cancel(scopeId!, target?.id).catch(report);
                   }}
-                >
-                  <span className="stop-mark" />
-                </button>
+                />
               )}
               <button
                 className="send-button"

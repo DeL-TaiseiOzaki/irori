@@ -6,6 +6,7 @@ import { parentPath } from '../domain/paths';
 import { Dialog } from './Dialog';
 import { displayLocale, t } from '../domain/i18n';
 import { useAction } from './useAction';
+import { Button } from './controls';
 import { useResource } from './useResource';
 import { linkNotice } from './EntryActions';
 
@@ -145,9 +146,14 @@ export function NoteActionDialog({
           <button type="button" disabled={busy} onClick={close}>
             {t('キャンセル', 'Cancel')}
           </button>
-          <button className="primary" disabled={busy}>
-            {action === 'move' ? t('変更する', 'Change') : t('削除済みに移す', 'Move to deleted')}
-          </button>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={busy}
+            label={
+              action === 'move' ? t('変更する', 'Change') : t('削除済みに移す', 'Move to deleted')
+            }
+          />
         </div>
       </form>
     </Dialog>

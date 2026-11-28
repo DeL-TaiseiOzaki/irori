@@ -172,7 +172,9 @@ const KnowledgePanel = lazyView(() =>
 );
 import type { PageEditorHandle } from './PageEditor';
 import { FindScope, type FindScopeHandle } from './FindBar';
+import './layers.css';
 import '@astryxdesign/theme-neutral/fonts.css';
+import '@astryxdesign/core/astryx.css';
 import './astryx-tokens.css';
 import './tokens.css';
 import './style.css';
@@ -185,6 +187,7 @@ import { SshQuestions, useRemoteHosts } from './RemoteHosts';
 import { appIcon } from './branding';
 import { shortcut } from './shortcuts';
 import { Icon } from './Icon';
+import { Button, IconButton } from './controls';
 import { useResource } from './useResource';
 import { useStableFunctions } from './useStableFunctions';
 import { anyRevision, bumpRevision, noRevisions, scopeRevision } from '../domain/revisions';
@@ -3340,17 +3343,22 @@ function App() {
           <button type="button" disabled={goingHome} onClick={() => setLeaving(undefined)}>
             {t('キャンセル', 'Cancel')}
           </button>
-          <button className="primary" disabled={goingHome}>
-            {leaving.kind === 'close'
-              ? stopping
-                ? t('停止して閉じる', 'Stop and close')
-                : t('閉じる', 'Close')
-              : leaving.kind === 'move'
-                ? t('閉じて移す', 'Close and move')
-                : leaving.kind === 'switch'
-                  ? t('閉じて切り替える', 'Close and switch')
-                  : t('閉じて戻る', 'Close and go home')}
-          </button>
+          <Button
+            type="submit"
+            variant="primary"
+            label={
+              leaving.kind === 'close'
+                ? stopping
+                  ? t('停止して閉じる', 'Stop and close')
+                  : t('閉じる', 'Close')
+                : leaving.kind === 'move'
+                  ? t('閉じて移す', 'Close and move')
+                  : leaving.kind === 'switch'
+                    ? t('閉じて切り替える', 'Close and switch')
+                    : t('閉じて戻る', 'Close and go home')
+            }
+            disabled={goingHome}
+          />
         </div>
       </form>
     </Dialog>
@@ -3630,10 +3638,12 @@ function App() {
                     'This workspace has no vault yet.',
                   )}
                 </p>
-                <button className="solid-button" onClick={() => setAdd(true)}>
-                  <Icon name="plus" size={14} />
-                  {t('vault を追加', 'Add a vault')}
-                </button>
+                <Button
+                  variant="primary"
+                  label={t('vault を追加', 'Add a vault')}
+                  icon={<Icon name="plus" size={14} />}
+                  onClick={() => setAdd(true)}
+                />
               </section>
             )}
           </Pane>
@@ -3913,15 +3923,12 @@ function App() {
                       </NoteMenu>
                     )}
                     {onNote && doc && (
-                      <button
-                        className="icon-button"
-                        aria-label={t('横に並べて開く', 'Open beside')}
-                        title={t('横に並べて開く', 'Open beside')}
+                      <IconButton
+                        label={t('横に並べて開く', 'Open beside')}
+                        icon={<Icon name="split" size={16} />}
                         disabled={stageSet.columns.length >= stageColumnLimit || gitBusy}
                         onClick={() => void splitStage()}
-                      >
-                        <Icon name="split" size={16} />
-                      </button>
+                      />
                     )}
                     {onNote && <span className="stage-divider" aria-hidden="true" />}
                     <AiToggle
@@ -4228,22 +4235,22 @@ function App() {
                                   {t('新しいノートを作成', 'Create a new note')}
                                 </ArrowFillButton>
                                 {notesDeclared?.daily && (
-                                  <button
-                                    className="stage-text-button framed"
+                                  <Button
+                                    variant="secondary"
+                                    size="md"
+                                    label={t('今日のノート', "Today's note")}
+                                    icon={<Icon name="calendar" size={15} />}
                                     disabled={!active || connecting}
                                     onClick={openDaily}
-                                  >
-                                    <Icon name="calendar" size={15} />
-                                    {t('今日のノート', "Today's note")}
-                                  </button>
+                                  />
                                 )}
-                                <button
-                                  className="stage-text-button framed"
+                                <Button
+                                  variant="secondary"
+                                  size="md"
+                                  label={t('KBフォルダを開く', 'Open a KB folder')}
+                                  icon={<Icon name="folder" size={15} />}
                                   onClick={() => setAdd(true)}
-                                >
-                                  <Icon name="folder" size={15} />
-                                  {t('KBフォルダを開く', 'Open a KB folder')}
-                                </button>
+                                />
                               </div>
                             </div>
                           )
@@ -4415,7 +4422,7 @@ function App() {
               <button type="button" onClick={() => setVaultMove(undefined)}>
                 {t('キャンセル', 'Cancel')}
               </button>
-              <button className="primary">{t('移動', 'Move')}</button>
+              <Button type="submit" variant="primary" label={t('移動', 'Move')} />
             </div>
           </form>
         </Dialog>
@@ -4724,9 +4731,12 @@ function App() {
               <button type="button" disabled={creatingNote} onClick={closeNewNote}>
                 {t('キャンセル', 'Cancel')}
               </button>
-              <button className="primary" disabled={creatingNote}>
-                {t('作成', 'Create')}
-              </button>
+              <Button
+                type="submit"
+                variant="primary"
+                label={t('作成', 'Create')}
+                disabled={creatingNote}
+              />
             </div>
           </form>
         </Dialog>
@@ -4808,9 +4818,7 @@ function AppCrash({ error, resetErrorBoundary }: FallbackProps) {
     <div className="app-crash" role="alert">
       <h1>{t('画面の描画でエラーが発生しました', 'The screen failed to render')}</h1>
       <pre>{String(error)}</pre>
-      <button className="primary" onClick={resetErrorBoundary}>
-        {t('再表示', 'Show again')}
-      </button>
+      <Button variant="primary" label={t('再表示', 'Show again')} onClick={resetErrorBoundary} />
     </div>
   );
 }

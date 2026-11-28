@@ -65,105 +65,90 @@
   --page-width: none;
   --page-gutter: 36px;
 }
-/* Element defaults carry no specificity (:where), so every component class wins
-   over them. They are the stage's look; the chrome sets its own below. */
-:where(*, *::before, *::after) {
-  box-sizing: border-box;
-}
 body {
   margin: 0;
   background: var(--bg);
 }
-:where(button, input, textarea, select) {
-  font: inherit;
-  color: inherit;
-}
-:where(button) {
-  cursor: pointer;
-  background: var(--card);
-  color: var(--ink);
-  border: 0;
-  border-radius: var(--radius-element);
-  padding: 6px 12px;
-  box-shadow: var(--card-shadow);
-  font-weight: 500;
-  transition:
-    background-color 120ms ease,
-    color 120ms ease,
-    box-shadow 140ms ease;
-}
-:where(button:hover) {
-  background: var(--stage-2);
-}
-:where(button:disabled) {
-  cursor: default;
-  opacity: 0.45;
-}
-:where(button, input, textarea, select, a, summary, [tabindex]):focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-:where(input, select, textarea) {
-  background: var(--card);
-  color: var(--ink);
-  border: 1px solid var(--rule-2);
-  border-radius: var(--radius-element);
-  padding: 7px 10px;
-  max-width: 100%;
-}
-:where(input[type='checkbox'], input[type='radio']) {
-  accent-color: var(--ink-solid);
-}
-:where(textarea) {
-  resize: vertical;
-}
-::placeholder {
-  color: var(--ink-3);
-}
-/* The graphite chrome: the rail, the brain panel, the AI panel, the status bar
-   and the menus that open from them. */
-:where(.chrome) :where(button) {
-  background: var(--raised);
-  color: var(--tx);
-  box-shadow: inset 0 0 0 1px var(--hair-2);
-}
-:where(.chrome) :where(button:hover) {
-  background: var(--raised-2);
-}
-:where(.chrome) :where(input, select, textarea) {
-  background: var(--field);
-  color: var(--tx);
-  border-color: var(--hair-2);
-}
-:where(.chrome) ::placeholder {
-  color: var(--tx-3);
-}
-:where(.chrome) :where(input[type='checkbox'], input[type='radio']) {
-  accent-color: var(--solid);
+/* Element defaults sit in the irori-defaults layer (src/app/layers.css), under
+   Astryx's components (ADR 076): every component class, irori's or Astryx's, wins
+   over them. They are the stage's look; the chrome sets its own below. */
+@layer irori-defaults {
+  :where(*, *::before, *::after) {
+    box-sizing: border-box;
+  }
+  :where(button, input, textarea, select) {
+    font: inherit;
+    color: inherit;
+  }
+  :where(button) {
+    cursor: pointer;
+    background: var(--card);
+    color: var(--ink);
+    border: 0;
+    border-radius: var(--radius-element);
+    padding: 6px 12px;
+    box-shadow: var(--card-shadow);
+    font-weight: 500;
+    transition:
+      background-color 120ms ease,
+      color 120ms ease,
+      box-shadow 140ms ease;
+  }
+  :where(button:hover) {
+    background: var(--stage-2);
+  }
+  :where(button:disabled) {
+    cursor: default;
+    opacity: 0.45;
+  }
+  :where(button, input, textarea, select, a, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  :where(input, select, textarea) {
+    background: var(--card);
+    color: var(--ink);
+    border: 1px solid var(--rule-2);
+    border-radius: var(--radius-element);
+    padding: 7px 10px;
+    max-width: 100%;
+  }
+  :where(input[type='checkbox'], input[type='radio']) {
+    accent-color: var(--ink-solid);
+  }
+  :where(textarea) {
+    resize: vertical;
+  }
+  ::placeholder {
+    color: var(--ink-3);
+  }
+  /* The graphite chrome: the rail, the brain panel, the AI panel, the status bar
+     and the menus that open from them. */
+  :where(.chrome) :where(button) {
+    background: var(--raised);
+    color: var(--tx);
+    box-shadow: inset 0 0 0 1px var(--hair-2);
+  }
+  :where(.chrome) :where(button:hover) {
+    background: var(--raised-2);
+  }
+  :where(.chrome) :where(input, select, textarea) {
+    background: var(--field);
+    color: var(--tx);
+    border-color: var(--hair-2);
+  }
+  :where(.chrome) ::placeholder {
+    color: var(--tx-3);
+  }
+  :where(.chrome) :where(input[type='checkbox'], input[type='radio']) {
+    accent-color: var(--solid);
+  }
 }
 .ui-icon {
   flex-shrink: 0;
 }
 .ui-icon.rotated {
   transform: rotate(90deg);
-}
-/* A solid primary action: ink on paper, paper on graphite. */
-.primary,
-.solid-button {
-  background: var(--ink-solid);
-  color: var(--on-ink-solid);
-  box-shadow: none;
-  font-weight: 600;
-}
-.primary:hover,
-.solid-button:hover {
-  background: var(--ink-solid);
-  filter: brightness(1.12);
-}
-:where(.chrome) .primary,
-:where(.chrome) .solid-button {
-  background: var(--solid);
-  color: var(--on-solid);
 }
 .muted {
   color: var(--ink-2);
@@ -183,7 +168,7 @@ body {
   align-items: center;
   justify-content: flex-end;
 }
-.actions button {
+.actions button:not(:where(.astryx-button)) {
   white-space: nowrap;
 }
 /* Text for assistive technology only. */

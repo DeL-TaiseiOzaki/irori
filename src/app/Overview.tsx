@@ -31,6 +31,7 @@ import { BrainTile } from './BrainTile';
 import { RemoteVaultPlace } from './RemoteHosts';
 import { layoutStorage } from './device-settings';
 import { Icon } from './Icon';
+import { Button, IconButton } from './controls';
 import { aiStateWords, sendOnEnter, type AiState } from './display';
 import { useAction } from './useAction';
 import { MagnetTabs } from './obsidian/MagnetTabs';
@@ -162,14 +163,12 @@ function AiCard({
             )}
           </p>
           <div className="ai-card-actions">
-            <button
-              className="panel-button"
+            <Button
+              label={t('停止', 'Stop')}
+              icon={<Icon name="close" size={13} />}
               disabled={busy}
               onClick={() => act(() => onStop(space.scopeId, ai.id))}
-            >
-              <Icon name="close" size={13} />
-              {t('停止', 'Stop')}
-            </button>
+            />
           </div>
         </>
       ) : ai.queued.length ? (
@@ -179,13 +178,11 @@ function AiCard({
             {ai.queued[0].prompt}
           </p>
           <div className="ai-card-actions">
-            <button
-              className="panel-button"
+            <Button
+              label={t('送信を再開', 'Resume sending')}
               disabled={busy}
               onClick={() => act(() => onResume(space.scopeId))}
-            >
-              {t('送信を再開', 'Resume sending')}
-            </button>
+            />
           </div>
         </>
       ) : (
@@ -196,10 +193,11 @@ function AiCard({
               : t('まだ指示はありません。', 'No instructions yet.')}
           </p>
           <div className="ai-card-actions">
-            <button className="panel-button" onClick={() => onEnter(space, { ai: true })}>
-              <Icon name="agent" size={13} />
-              {t('vault agent', 'vault agent')}
-            </button>
+            <Button
+              label={t('vault agent', 'vault agent')}
+              icon={<Icon name="agent" size={13} />}
+              onClick={() => onEnter(space, { ai: true })}
+            />
           </div>
         </>
       )}
@@ -711,15 +709,13 @@ function OverviewComposer({
             ),
           )}
         </small>
-        <button
+        <IconButton
           type="submit"
-          className="primary-button"
+          variant="primary"
           disabled={!text.trim() || sending}
-          aria-label={behind ? t('送信待ちに追加', 'Add to queue') : t('送信', 'Send')}
-          title={behind ? t('送信待ちに追加', 'Add to queue') : t('送信', 'Send')}
-        >
-          <Icon name={behind ? 'clock' : 'up'} size={15} strokeWidth={2.2} />
-        </button>
+          label={behind ? t('送信待ちに追加', 'Add to queue') : t('送信', 'Send')}
+          icon={<Icon name={behind ? 'clock' : 'up'} size={15} strokeWidth={2.2} />}
+        />
       </footer>
     </form>
   );
@@ -950,30 +946,34 @@ export function Overview({
             <span className="overview-space" />
             {routines && (
               <>
-                <button
-                  className="panel-button"
+                <Button
+                  label={t('irori agent に頼む', 'Ask the irori agent')}
+                  icon={<Icon name="agent" size={14} />}
                   onClick={() => {
                     setIsland('you');
                     onAskYou(t('ルーティンを作って：', 'Write a routine: '));
                   }}
                 >
-                  <Icon name="agent" size={14} />
                   <span className="overview-label">
                     {t('irori agent に頼む', 'Ask the irori agent')}
                   </span>
-                </button>
-                <button className="panel-button" onClick={() => setRoutineSheet('secrets')}>
-                  <Icon name="lock" size={14} />
+                </Button>
+                <Button
+                  label={t('シークレット', 'Secrets')}
+                  icon={<Icon name="lock" size={14} />}
+                  onClick={() => setRoutineSheet('secrets')}
+                >
                   <span className="overview-label">{t('シークレット', 'Secrets')}</span>
-                </button>
-                <button
-                  className="panel-button overview-add"
+                </Button>
+                <Button
+                  className="overview-add"
+                  label={t('新しいルーティン', 'New routine')}
+                  icon={<Icon name="plus" size={14} />}
                   disabled={!routineOwners(you, spaces).length}
                   onClick={() => setRoutineSheet('create')}
                 >
-                  <Icon name="plus" size={14} />
                   <span className="overview-label">{t('新しいルーティン', 'New routine')}</span>
-                </button>
+                </Button>
               </>
             )}
             {!routines && (
@@ -991,14 +991,15 @@ export function Overview({
                   <span className="overview-label">{t('vault を検索', 'Search vaults')}</span>
                   <kbd>{shortcut('K')}</kbd>
                 </button>
-                <button
-                  className="panel-button overview-add"
+                <Button
+                  className="overview-add"
+                  label={t('vault を追加', 'Add a vault')}
+                  icon={<Icon name="plus" size={14} />}
                   disabled={addDisabled}
                   onClick={onAdd}
                 >
-                  <Icon name="plus" size={14} />
                   <span className="overview-label">{t('vault を追加', 'Add a vault')}</span>
-                </button>
+                </Button>
               </>
             )}
           </header>

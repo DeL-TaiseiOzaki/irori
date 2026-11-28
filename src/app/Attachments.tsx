@@ -16,6 +16,7 @@ import {
 } from '../domain/attachments';
 import { t } from '../domain/i18n';
 import { Icon } from './Icon';
+import { IconButton } from './controls';
 
 const host = window.irori;
 
@@ -157,16 +158,14 @@ export function AttachButton({
   const label = t('ファイルを添付', 'Attach files');
   return (
     <>
-      <button
+      <IconButton
         type="button"
-        className="icon-button composer-tool"
-        aria-label={label}
-        title={label}
+        className="composer-tool"
+        label={label}
+        icon={<Icon name="attach" size={15} />}
         disabled={disabled || attachments.items.length >= attachmentLimit}
         onClick={() => input.current?.click()}
-      >
-        <Icon name="attach" size={15} />
-      </button>
+      />
       <input
         ref={input}
         type="file"
@@ -203,10 +202,11 @@ export function DictateButton({
   if (!dictationOffered) return null;
   const label = t('音声入力', 'Dictate');
   return (
-    <button
+    <IconButton
       type="button"
-      className="icon-button composer-tool"
-      aria-label={label}
+      className="composer-tool"
+      label={label}
+      icon={<Icon name="mic" size={15} />}
       title={t('音声入力（OS の音声入力を使います）', "Dictate (uses the system's dictation)")}
       disabled={disabled}
       onClick={() => {
@@ -227,9 +227,7 @@ export function DictateButton({
           })
           .catch(onError);
       }}
-    >
-      <Icon name="mic" size={15} />
-    </button>
+    />
   );
 }
 

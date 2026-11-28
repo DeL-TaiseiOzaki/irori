@@ -100,16 +100,66 @@ The survey (Astryx 0.7.17, 2026-11-28) found:
 
 ## Stages
 
-| Stage | What changes                                                                    |
-| ----- | ------------------------------------------------------------------------------- |
-| 1     | Tokens, Figtree, radii, the elevated stage, the focus ring (0.3.3)              |
-| 2     | Controls become Astryx components (decision 7)                                  |
-| 3     | Overlays, the settings sheet and ⌘K move to Astryx; Base UI leaves (decision 8) |
-| 4     | irori's own parts redrawn after Astryx's anatomy (decision 9); the website      |
+| Stage | What changes                                                                                                |
+| ----- | ----------------------------------------------------------------------------------------------------------- |
+| 1     | Tokens, Figtree, radii, the elevated stage, the focus ring (0.3.3)                                          |
+| 2     | Buttons and icon buttons become Astryx's (0.3.4)                                                            |
+| 2b    | Switches, checkboxes, text fields, segmented controls, badges, keys, spinners and empty states (decision 7) |
+| 3     | Overlays, the settings sheet and ⌘K move to Astryx; Base UI leaves (decision 8)                             |
+| 4     | irori's own parts redrawn after Astryx's anatomy (decision 9); the website                                  |
 
 Each stage is its own pull request, released and checked on its own. UI smokes
 that select by the old structure are rewritten for the new one without
 weakening what they prove.
+
+## Stage 2: buttons (0.3.4)
+
+1. **The adapters** in `src/app/controls.tsx` are how irori uses Astryx's
+   `Button`.
+   - `Button` shows its `label` (or `children` beside it, such as a count)
+     and is named by the label.
+   - `IconButton` shows only its icon. Its label is its name and, unless a
+     `title` is given, its hint.
+   - Both keep irori's habits: `disabled`, a native `title` (ADR 004), and
+     any attribute a Base UI trigger hands its button, so
+     `Menu.Trigger render={<IconButton …/>}` works.
+   - The default size is Astryx's small (28 px), since the window is dense.
+2. **The old families map onto Astryx variants.**
+
+   | irori class                                  | Astryx variant |
+   | -------------------------------------------- | -------------- |
+   | `icon-button`, `stage-button`                | ghost          |
+   | `primary`, `primary-button`, `solid-button`  | primary        |
+   | `panel-button`, a framed `stage-text-button` | secondary      |
+   | `stage-text-button`                          | ghost          |
+
+   Their CSS is gone. A rule that only placed one of them (a commit button's
+   full width) now names `.astryx-button`.
+
+3. **Cascade layers.** `src/app/layers.css` orders the layers as
+   `irori-defaults, reset, astryx-base, astryx-theme`. irori's element
+   defaults (`:where(button)`, `:where(input)`, …) sit in `irori-defaults`,
+   under Astryx's components. irori's component rules stay unlayered.
+4. **Rules for irori's own buttons leave Astryx's alone.** A rule that styles
+   the buttons inside one of irori's parts (`.rail button`, …) selects
+   `button:not(:where(.astryx-button))`. This keeps its specificity, and
+   Astryx's buttons placed there keep their own look.
+5. **Three states Astryx has no part for** are drawn with its tokens in
+   `shell.css`.
+   - A `danger` button takes its error text.
+   - A pressed toggle takes its pressed overlay.
+   - A file input's face (`.file-button`) takes the look of its secondary
+     button.
+6. **The loading live region is hidden.** Each Astryx button carries a polite
+   live region for its loading state. irori never shows that state, so the
+   region is hidden (`display: none`) and the notices irori announces stay
+   the window's only status regions.
+7. **What changes in behaviour.**
+   - Astryx marks a disabled button `aria-disabled` and swallows its clicks,
+     instead of setting `disabled`.
+   - An icon button with no hint before now shows its name as one.
+   - Astryx's `Button` defaults to `type="button"`, so every button that
+     submitted a form says `type="submit"`.
 
 ## Consequences
 
