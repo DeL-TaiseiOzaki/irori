@@ -1,6 +1,6 @@
 # irori continuation handoff
 
-**Astryx design system, stage 2b: the other controls, 0.3.5**
+**Astryx design system, stage 2b: the other controls, 0.3.6**
 ([ADR 076](decisions/076-astryx-design-system.md) "Stage 2b").
 - **What changed.** These are now Astryx's:
   - checkboxes and switches;

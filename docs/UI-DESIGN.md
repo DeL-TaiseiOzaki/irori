@@ -31,7 +31,7 @@ hold, but their values are Astryx's.
   action, `secondary`, `ghost` for quiet ones, and `destructive`. The size is
   `sm` on the chrome and `md` for a page's or a sheet's main actions. A rule for
   irori's own buttons inside a part selects `button:not(:where(.astryx-button))`.
-- **Other controls** (0.3.5).
+- **Other controls** (0.3.6).
   - Checkboxes are `CheckboxInput` and switches are `Switch`.
   - A choice of views is `Segmented`, a radio group.
   - Shortcut hints are `Kbd` (`mod+…`) and counts are a neutral `Badge`.

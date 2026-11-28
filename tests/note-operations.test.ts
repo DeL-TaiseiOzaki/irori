@@ -25,7 +25,8 @@ async function fixture(t: TestContext) {
   const files = new FileService(path.join(base, 'device'));
   await files.init();
   const space = await files.register(root, 'Notes', 'personal');
-  return { base, root, files, id: space.scopeId, space };
+  // Use the registered spelling so I/O mocks also match Windows' canonical paths.
+  return { base, root: space.root, files, id: space.scopeId, space };
 }
 
 test('Create notes in a selected folder or root, keeping the default and existing bytes', async (t) => {

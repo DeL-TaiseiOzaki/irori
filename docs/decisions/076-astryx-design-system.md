@@ -161,7 +161,7 @@ weakening what they prove.
    - Astryx's `Button` defaults to `type="button"`, so every button that
      submitted a form says `type="submit"`.
 
-## Stage 2b: the other controls (0.3.5)
+## Stage 2b: the other controls (0.3.6)
 
 1. **Checkboxes and switches are Astryx's** (`CheckboxInput`, `Switch`). Each
    is named by the words that named it before, so the smokes find it.

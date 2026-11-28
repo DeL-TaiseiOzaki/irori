@@ -65,7 +65,7 @@ Arrow Fill Button was retrieved from the official
 [Arrow Fill Button registry](https://www.obsidianui.dev/r/arrow-fill-button.json)
 on 2026-09-22. Magnet Tabs, retrieved then from its
 [registry](https://www.obsidianui.dev/r/magnet-tabs.json), was replaced by
-Astryx's segmented control in 0.3.5 ([ADR 076](decisions/076-astryx-design-system.md)). Upstream repository:
+Astryx's segmented control in 0.3.6 ([ADR 076](decisions/076-astryx-design-system.md)). Upstream repository:
 [ObsidianUI at 21d9198](https://gitlab.com/Atharvsinh-codez/ObsidianUI/-/tree/21d9198d14fd663f809cbea9fe124efc9576c003).
 The adaptations preserve the visual mechanisms and use irori's tokens,
 Base UI keyboard behavior and native button semantics. See

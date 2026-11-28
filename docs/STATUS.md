@@ -1,6 +1,6 @@
 # Implementation status — notes, native agents and connection onboarding
 
-Astryx design system, stage 2b: the other controls, 2026-11-28 (**0.3.5**,
+Astryx design system, stage 2b: the other controls, 2026-11-28 (**0.3.6**,
 [ADR 076](decisions/076-astryx-design-system.md) "Stage 2b",
 [#394](https://github.com/DeL-TaiseiOzaki/irori/pull/394), open): the owner asked to
 continue with stage 2b after stage 2 merged.
