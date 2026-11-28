@@ -8,26 +8,39 @@ import type { Plugin } from 'vite';
 // module graph, not the chunks' rendered modules, is what names a package whose modules
 // only re-export another's, such as @milkdown/kit.
 export function thirdPartyNotices(fileName = 'third-party-notices.txt'): Plugin {
+  let root = process.cwd();
   return {
     name: 'third-party-notices',
-    generateBundle() {
+    configResolved(config) {
+      root = config.root;
+    },
+    generateBundle(_options, bundle) {
       const directories = new Set<string>();
       // Data a package keeps in a folder of its own, such as pdf.js's fonts and decoders,
       // can carry its own licences there; the folders modules came from, per package.
       const folders = new Map<string, Set<string>>();
-      for (const id of this.getModuleIds()) {
+      const note = (id: string) => {
         // Virtual modules start with \0; a package's directory is the last node_modules entry.
         const directory = /^[^\0].*\/node_modules\/(@[^/]+\/)?[^@/][^/]*(?=\/)/.exec(id)?.[0];
-        if (!directory) continue;
+        if (!directory) return;
         directories.add(directory);
         const folder = path.dirname(id.replace(/\?.*$/, ''));
         if (folder !== directory)
           folders.set(directory, (folders.get(directory) ?? new Set()).add(folder));
-      }
+      };
+      for (const id of this.getModuleIds()) note(id);
+      // A file a stylesheet names, such as a font, is emitted as an asset with no module of
+      // its own; the folder it came from can carry the licence it is under (Astryx's Figtree).
+      for (const output of Object.values(bundle))
+        if (output.type === 'asset')
+          for (const name of output.originalFileNames) note(path.resolve(root, name));
       const licences = (folder: string, prefix = '') =>
         readdirSync(folder, { withFileTypes: true })
           .filter(
-            (entry) => entry.isFile() && /^(licen[cs]e|notice|copying)([._-]|$)/i.test(entry.name),
+            // LICENSE, NOTICE.md, COPYING, or one named for what it covers (figtree.LICENSE.txt).
+            (entry) =>
+              entry.isFile() &&
+              /^([\w-]+\.)?(licen[cs]e|notice|copying)([._-]|$)/i.test(entry.name),
           )
           .map(
             (entry) =>

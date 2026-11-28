@@ -1,5 +1,34 @@
 # UI direction
 
+## Astryx — the design system (2026-11-28)
+
+[ADR 076](decisions/076-astryx-design-system.md) makes
+[Astryx](https://github.com/meta/astryx) irori's design system, in stages; where
+this section and those below disagree, this section stands. The roles of ADR 053
+hold, but their values are Astryx's.
+
+- **Tokens.** `src/app/astryx-tokens.css` is written by
+  `tsx scripts/astryx-tokens.ts` from the installed Astryx (core's tokens with
+  the neutral theme's values, and each two-sided colour as `--light-…` and
+  `--dark-…`); do not edit it. `tokens.css` names those tokens for every role.
+  Use Astryx's tokens directly for what they name: `--radius-*`, `--spacing-*`,
+  `--shadow-*`, `--duration-*`, `--ease-*`, `--color-*`.
+- **Themes.** Hearth: Astryx's dark side on the chrome, its light side on the
+  stage. Light and Dark are Astryx's light and dark throughout.
+- **Type.** Figtree for the interface, Noto Sans JP or the system's Japanese
+  face for Japanese, Geist Mono for code and the terminal. The body is 13 px;
+  the root stays 16 px so Astryx's rem values hold.
+- **Shape.** Controls and rows `--radius-element`, menus, popovers, dialogs and
+  cards `--radius-container`, small marks `--radius-inner`, pills
+  `--radius-full`, the instruction box `--radius-chat`. The stage is Astryx's
+  elevated surface: rounded corners on the chrome, with the hairlines beside it
+  shown only as a handle's focus colour.
+- **Focus.** `--focus` is Astryx's accent resolved where it is drawn: no hue,
+  dark on paper and light on graphite. A chosen option takes the accent with
+  `--act-soft` (Astryx's muted accent) behind it.
+- **Next stages.** Controls, then overlays, become Astryx components; irori's
+  own IDE parts are redrawn after Astryx's anatomy (ADR 076, Stages).
+
 ## 0.3.0 — Desktop IDE discipline and subtractive polish (2026-11-25)
 
 Refines the ADR 053 colour-role system for readers coming from VS Code, Obsidian

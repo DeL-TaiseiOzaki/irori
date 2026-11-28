@@ -28,7 +28,7 @@
 }
 .obsidian-magnet-highlight {
   inset: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   background: var(--magnet-highlight);
 }
 .obsidian-magnet-marker {

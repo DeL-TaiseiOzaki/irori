@@ -204,7 +204,7 @@
   padding: 5px 14px 6px;
   border: 1px solid var(--rule);
   border-top: 0;
-  border-radius: 0 0 8px 8px;
+  border-radius: 0 0 var(--radius-element) var(--radius-element);
   background: var(--stage-2);
   box-shadow: none;
   color: var(--ink-2);

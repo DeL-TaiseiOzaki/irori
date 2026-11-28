@@ -47,7 +47,7 @@
   flex-direction: column;
   gap: 12px;
   padding: 18px 20px;
-  border-radius: 14px;
+  border-radius: var(--radius-container);
   background: var(--card);
   box-shadow: var(--card-shadow);
 }
@@ -91,7 +91,7 @@
   min-height: 120px;
   resize: vertical;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-element);
   font: 12.5px/1.65 var(--font-mono);
   tab-size: 2;
 }

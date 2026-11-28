@@ -1,5 +1,38 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Astryx design system, stage 1, 2026-11-28 (**0.3.3**,
+[ADR 076](decisions/076-astryx-design-system.md),
+[#388](https://github.com/DeL-TaiseiOzaki/irori/pull/388), open): the owner
+asked to bring in the UI design of Astryx, Meta's open-source design system,
+throughout irori without changing its functions, and chose Figtree, keeping
+Hearth, Astryx's shapes and its monochrome focus ring.
+- **Tokens.** `scripts/astryx-tokens.ts` writes `src/app/astryx-tokens.css` from
+  the installed `@astryxdesign/core` (development dependency) and
+  `@astryxdesign/theme-neutral` 0.7.17. Every role in `tokens.css` names an
+  Astryx token; `--focus` is Astryx's accent, resolved where it is drawn.
+- **Type.** Figtree comes from the theme's `fonts.css`; Geist Mono stays for
+  code. The body carries 13 px, so the root's rem stays 16 px.
+- **Shape.** 255 radii now use Astryx's radius tokens. The composer and the
+  person's messages take its chat geometry, and `.stage` is rounded like
+  Astryx's elevated surface.
+- **Window controls.** `windowChrome` takes Astryx's body and secondary text.
+- **Notices.** `scripts/third-party-notices.ts` now also reads licence files
+  beside bundled assets, so Figtree's OFL ships in
+  `dist/third-party-notices.txt`.
+- **Verification.**
+  - Tests: `tests/astryx-tokens.test.ts` (the generated file equals the
+    installed Astryx, and every token the roles name exists) and
+    `tests/window-frame.test.ts`.
+  - Pull request run `46119190188` passed `verify` (UI smokes). Its screen
+    renders were reviewed in hearth, light and dark.
+  - That run's packaging failed because core was a runtime dependency that
+    nothing bundles yet. Core is now a development dependency, and packaging
+    is checked on the pull request's latest run.
+- **Not covered.**
+  - Astryx components (stages 2–4).
+  - The download website, which keeps the earlier palette.
+  - Japanese copy with real CJK fonts, which CI renders as boxes.
+
 The contents folder as a folder in Contents, 2026-11-28 (**0.3.2**,
 [ADR 071](decisions/071-a-vaults-own-files-in-contents.md) D3, amendment of
 2026-11-28): the owner found the `contents` heading below a Contents-only

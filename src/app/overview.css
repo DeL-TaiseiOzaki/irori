@@ -66,7 +66,7 @@
   width: min(280px, 32vw);
   height: 30px;
   padding: 0 7px 0 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   background: var(--field);
   box-shadow: inset 0 0 0 1px var(--hair);
   color: var(--tx-3);
@@ -81,7 +81,7 @@
 }
 .overview-search kbd {
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-inner);
   box-shadow: inset 0 0 0 1px var(--hair-2);
   font: 10.5px var(--font-mono);
 }
@@ -180,7 +180,7 @@
 .map-host {
   position: absolute;
   z-index: 0;
-  border-radius: 14px;
+  border-radius: var(--radius-container);
   background: var(--raised);
   box-shadow: inset 0 0 0 1px var(--hair-2);
   pointer-events: none;
@@ -231,7 +231,7 @@
   gap: 6px;
   max-width: 180px;
   padding: 3px 9px 3px 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: var(--raised);
   box-shadow: inset 0 0 0 1px var(--hair-2);
   color: var(--tx-2);
@@ -246,7 +246,7 @@
   z-index: 2;
   min-width: 120px;
   padding: 0;
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background: none;
   box-shadow: none;
   color: var(--tx);
@@ -295,7 +295,7 @@
 .legend-host {
   width: 18px;
   height: 12px;
-  border-radius: 4px;
+  border-radius: var(--radius-inner);
   background: var(--raised);
   box-shadow: inset 0 0 0 1px var(--hair-2);
 }
@@ -343,7 +343,7 @@
 }
 .ai-card-line.queued {
   padding: 7px 10px;
-  border-radius: 9px;
+  border-radius: var(--radius-element);
   background: var(--field);
 }
 .ai-card-line.error {
@@ -394,7 +394,7 @@
   flex: none;
   display: grid;
   place-items: center;
-  border-radius: 7px;
+  border-radius: var(--radius-element);
   background: var(--solid);
   color: var(--on-solid);
 }
@@ -409,7 +409,7 @@
 }
 .overview-ai-list > .ai-card {
   padding: 11px 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   background: var(--raised);
 }
 .overview-ai-list > .ai-card.waiting {
@@ -422,7 +422,7 @@
   gap: 6px;
   margin: 0 12px 12px;
   padding: 10px 10px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-element);
   border: 1px solid var(--hair-2);
   background: var(--composer);
   box-shadow: var(--composer-shadow);
@@ -455,7 +455,7 @@
   gap: 5px;
   height: 24px;
   padding: 0 8px 0 4px;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   color: var(--tx-2);
   font-size: 11.5px;
   box-shadow: inset 0 0 0 1px var(--hair);
@@ -508,7 +508,7 @@
   width: 28px;
   height: 28px;
   padding: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
 }
 .overview-composer .primary-button:disabled {
   background: none;
@@ -585,7 +585,7 @@
   gap: 10px;
   width: 100%;
   padding: 3px;
-  border-radius: 10px;
+  border-radius: var(--radius-element);
   background: none;
   box-shadow: none;
   color: var(--tx);
@@ -630,7 +630,7 @@
   min-width: 0;
   height: 30px;
   padding: 0 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-element);
   background: none;
   box-shadow: none;
   color: var(--tx);
@@ -658,7 +658,7 @@ button.column-row:hover {
   align-items: center;
   gap: 2px;
   padding: 1px 6px;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   background: var(--raised-2);
   color: var(--tx-2);
   font-size: 11px;
@@ -676,7 +676,7 @@ button.column-row:hover {
 }
 .column-skills > span {
   padding: 2px 7px;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   background: var(--raised);
   color: var(--tx-2);
   font: 11px var(--font-mono);
@@ -687,7 +687,7 @@ button.column-row:hover {
   justify-content: center;
   gap: 7px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: var(--radius-element);
   background: none;
   box-shadow: inset 0 0 0 1px var(--hair-2);
   border: 0;
@@ -727,7 +727,7 @@ button.column-row:hover {
 .your-ai-setup .your-ai-setup-error {
   max-width: 100%;
   padding: 8px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-element);
   background: var(--del-wash);
   color: var(--del-ink);
   overflow-wrap: anywhere;
@@ -750,7 +750,7 @@ button.column-row:hover {
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  border-radius: 18px;
+  border-radius: var(--radius-container);
   background: none;
   box-shadow: none;
   color: var(--tx);
@@ -764,7 +764,7 @@ button.column-row:hover {
   height: 52px;
   display: grid;
   place-items: center;
-  border-radius: 14px;
+  border-radius: var(--radius-container);
   background: var(--solid);
   color: var(--on-solid);
   box-shadow: 0 0 0 1px var(--hair-2);
@@ -829,7 +829,7 @@ button.column-row:hover {
   --magnet-highlight: transparent;
   gap: 3px !important;
   padding: 3px;
-  border-radius: 10px;
+  border-radius: var(--radius-element);
   background: var(--field);
   box-shadow: inset 0 0 0 1px var(--hair);
 }
@@ -837,7 +837,7 @@ button.column-row:hover {
 .overview-island-tabs .obsidian-magnet-tab {
   height: 28px;
   padding: 0 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-element);
   background: none;
   box-shadow: none;
   color: var(--tx-3);
@@ -857,7 +857,7 @@ button.column-row:hover {
 .overview-island-tabs .obsidian-magnet-marker {
   inset: 0;
   height: auto;
-  border-radius: 8px;
+  border-radius: var(--radius-element);
   background: var(--raised-2);
   box-shadow: inset 0 0 0 1px var(--hair);
 }

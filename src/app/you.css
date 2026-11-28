@@ -121,7 +121,7 @@
   gap: 6px;
   height: 26px;
   padding: 0 9px 0 7px;
-  border-radius: 8px;
+  border-radius: var(--radius-element);
   background: var(--raised);
   color: var(--tx-2);
   font-size: 12px;
@@ -166,7 +166,7 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-element);
   background: none;
   box-shadow: none;
   color: var(--tx-3);
@@ -193,7 +193,7 @@
   width: 100%;
   height: 28px;
   padding: 0 8px 0 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-element);
   background: none;
   box-shadow: none;
   color: var(--tx-2);
@@ -316,7 +316,7 @@
 }
 .you-stage-state.error {
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-element);
   background: var(--del-wash);
   color: var(--del-ink);
   overflow-wrap: anywhere;
@@ -367,7 +367,7 @@
   width: 100%;
   min-height: 52px;
   padding: 6px 10px;
-  border-radius: 11px;
+  border-radius: var(--radius-element);
   background: none;
   box-shadow: none;
   color: var(--tx);
@@ -406,7 +406,7 @@
 }
 .you-brains-note.error {
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-element);
   background: var(--field);
   box-shadow: inset 0 0 0 1px var(--hair-2);
 }

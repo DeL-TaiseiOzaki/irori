@@ -8,7 +8,7 @@
   padding: 0 14px;
   width: fit-content;
   max-width: 100%;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   background: var(--solid);
   color: var(--on-solid);
   border: 1px solid transparent;

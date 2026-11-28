@@ -83,7 +83,7 @@ body {
   background: var(--card);
   color: var(--ink);
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   padding: 6px 12px;
   box-shadow: var(--card-shadow);
   font-weight: 500;
@@ -107,7 +107,7 @@ body {
   background: var(--card);
   color: var(--ink);
   border: 1px solid var(--rule-2);
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   padding: 7px 10px;
   max-width: 100%;
 }
@@ -223,7 +223,7 @@ body {
   left: 16px;
   top: -80px;
   padding: 12px 18px;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   background: var(--surface);
   color: var(--ink);
   z-index: 110;
@@ -236,7 +236,7 @@ body {
 .mount-preview {
   padding: 14px;
   background: var(--surface-sunken);
-  border-radius: 7px;
+  border-radius: var(--radius-element);
   overflow-wrap: anywhere;
   line-height: 1.8;
 }
@@ -306,7 +306,7 @@ body {
   background: var(--surface);
   color: var(--ink);
   border: 1px solid var(--rule-soft);
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   box-shadow: var(--shadow-modal);
   padding: 24px 26px;
   width: 500px;
@@ -386,7 +386,7 @@ body {
 .search-notice {
   margin: 6px 0;
   padding: 8px 12px;
-  border-radius: 9px;
+  border-radius: var(--radius-element);
   background: var(--warn-wash);
   color: var(--warn-ink);
   font-size: 12px;
@@ -424,7 +424,7 @@ body {
   padding: 12px 14px;
   font-size: 12px;
   border: 1px solid var(--rule);
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   background: var(--surface-sunken);
   white-space: pre-wrap;
   overflow-wrap: anywhere;

@@ -1,7 +1,12 @@
 /* The paper stage: the crumb bar, the note, banners and the terminal drawer.
    It is the only lit surface in the window, so the eye lands on the note first
-   (ADR 053); it needs no frame or shadow to stand out. */
+   (ADR 053); it needs no frame or shadow to stand out. Its corners are rounded
+   off the chrome like Astryx's elevated surface (ADR 076), so the hairlines at its
+   sides give way to its edge and show only as the focus colour when reached. */
 
+.stage-pane {
+  background: var(--panel);
+}
 .stage {
   flex: 1;
   min-width: 0;
@@ -9,8 +14,13 @@
   flex-direction: column;
   overflow: hidden;
   position: relative;
+  border-radius: var(--radius-container);
   background: var(--stage);
   color: var(--ink);
+}
+[data-panel]:has(> .stage-pane) + .island-handle,
+.island-handle:has(+ [data-panel] > .stage-pane) {
+  background: transparent;
 }
 .stage:focus-visible {
   outline: 2px solid var(--focus);
@@ -29,7 +39,7 @@
   left: 16px;
   top: -80px;
   padding: 12px 18px;
-  border-radius: 9px;
+  border-radius: var(--radius-element);
   background: var(--card);
   color: var(--ink);
   z-index: 110;
@@ -137,7 +147,7 @@
 }
 button.save-state {
   padding: 0 9px;
-  border-radius: 9px;
+  border-radius: var(--radius-element);
   background: none;
   box-shadow: none;
   color: var(--ink-2);
@@ -162,7 +172,7 @@ button.save-state > i {
   justify-content: center;
   gap: 5px;
   padding: 0 7px;
-  border-radius: 9px;
+  border-radius: var(--radius-element);
   background: none;
   box-shadow: none;
   color: var(--ink-3);
@@ -180,7 +190,7 @@ button.save-state > i {
   gap: 7px;
   height: 32px;
   padding: 0 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-element);
   background: none;
   box-shadow: none;
   color: var(--ink-2);
@@ -204,7 +214,7 @@ button.save-state > i {
   gap: 6px;
   height: 30px;
   padding: 0 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-element);
   background: none;
   color: var(--ink-2);
   box-shadow: inset 0 0 0 1px var(--rule-2);
@@ -227,7 +237,7 @@ button.save-state > i {
 .stage-popover {
   width: 320px;
   padding: 14px 16px;
-  border-radius: 14px;
+  border-radius: var(--radius-container);
   background: var(--card);
   color: var(--ink);
   box-shadow: var(--pop);
@@ -284,7 +294,7 @@ button.save-state > i {
 .error {
   margin: 10px 18px 0;
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-element);
   background: var(--del-wash);
   color: var(--del-ink);
   overflow-wrap: anywhere;
@@ -295,7 +305,7 @@ button.save-state > i {
   gap: 8px;
   margin: 10px 18px 0;
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   background: var(--warn-wash);
   color: var(--warn-ink);
 }
@@ -320,7 +330,7 @@ button.save-state > i {
   overflow: auto;
   margin: 0;
   padding: 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-element);
   background: var(--card);
   color: var(--ink);
   font: 12px/1.6 var(--font-mono);
@@ -367,7 +377,7 @@ button.save-state > i {
   height: 30px;
   margin-right: 4px;
   padding: 0 4px 0 10px;
-  border-radius: 9px;
+  border-radius: var(--radius-element);
   background: var(--card);
   box-shadow: inset 0 0 0 1px var(--rule-2);
 }
@@ -562,7 +572,7 @@ button.save-state > i {
   height: 18px;
   margin-right: 6px;
   padding: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-inner);
   color: var(--ink-3);
   opacity: 0;
   transition:
@@ -659,7 +669,7 @@ button.save-state > i {
   font: 0.8125em/1.7 var(--font-mono);
   color: var(--ink-2);
   background: var(--stage-2);
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   padding: 10px 14px;
   overflow-wrap: anywhere;
 }
@@ -711,7 +721,7 @@ button.save-state > i {
   width: 64px;
   height: 64px;
   object-fit: contain;
-  border-radius: 16px;
+  border-radius: var(--radius-container);
 }
 .welcome h1 {
   margin: 26px 0 0;
@@ -790,7 +800,7 @@ button.save-state > i {
 .terminal-toolbar button {
   height: 26px;
   padding: 0 9px;
-  border-radius: 7px;
+  border-radius: var(--radius-element);
   background: rgba(255, 255, 255, 0.06);
   color: var(--term-tx);
   border: 0;
@@ -804,7 +814,7 @@ button.save-state > i {
   gap: 5px;
   height: 26px;
   padding: 0 9px;
-  border-radius: 7px;
+  border-radius: var(--radius-element);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
   font-size: 12px;
   opacity: 0.85;
@@ -980,7 +990,7 @@ button.comment-quote:hover {
   flex-direction: column;
   gap: 3px;
   padding: 8px 10px;
-  border-radius: 9px;
+  border-radius: var(--radius-element);
   background: none;
   box-shadow: none;
   text-align: left;
@@ -1070,7 +1080,7 @@ button.comment-quote:hover {
   display: inline-block;
   max-width: 100%;
   vertical-align: bottom;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
 }
 /* A note's image opens whole over the page; a click anywhere closes it. */
 .document-editor .milkdown-image-block .image-wrapper img,
@@ -1099,7 +1109,7 @@ button.comment-quote:hover {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   box-shadow: var(--pop);
 }
 .document-editor .wiki-embed.missing {
@@ -1113,7 +1123,7 @@ button.comment-quote:hover {
   margin: 12px 0;
   padding: 10px 14px;
   border-left: 3px solid var(--callout-line);
-  border-radius: 0 6px 6px 0;
+  border-radius: 0 var(--radius-element) var(--radius-element) 0;
   background: var(--stage-2);
 }
 .document-editor
@@ -1167,7 +1177,7 @@ button.comment-quote:hover {
 .document-editor .callout-marker {
   margin-right: 8px;
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-inner);
   color: var(--callout-mark, var(--ink-2));
   background: var(--card);
   font: 600 0.76em/1.5 var(--font-ui);
@@ -1218,7 +1228,7 @@ button.comment-quote:hover {
 .document-editor .milkdown .milkdown-code-block {
   --crepe-color-surface: var(--stage-2);
   padding: 12px 16px;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
 }
 .document-editor .milkdown .milkdown-code-block .tools {
   position: absolute;

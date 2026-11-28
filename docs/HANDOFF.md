@@ -1,5 +1,22 @@
 # irori continuation handoff
 
+**Astryx design system, stage 1, 0.3.3**
+([ADR 076](decisions/076-astryx-design-system.md)).
+- **What changed.** Astryx's neutral theme now gives every colour role, the
+  type (Figtree, with Geist Mono for code), the radii, the rounded elevated
+  stage and the monochrome focus ring. Hearth stays. Function is unchanged.
+- **State.** Open in [#388](https://github.com/DeL-TaiseiOzaki/irori/pull/388),
+  not merged.
+- **Next: stage 2** (ADR 076 decision 7).
+  - Import `@astryxdesign/core/astryx.css`.
+  - Move core and `@stylexjs/stylex` to runtime dependencies.
+  - Replace buttons, icon buttons, switches, checkboxes, text fields,
+    segmented controls, badges, keys, spinners and empty states with Astryx
+    components.
+- **Then.** Stage 3 moves the overlays and stage 4 redraws irori's own parts
+  and the website.
+- **Check.** Look at the packaged app with Japanese fonts present.
+
 **The contents folder as a folder in Contents, 0.3.2**
 ([ADR 071](decisions/071-a-vaults-own-files-in-contents.md) D3, amendment of
 2026-11-28): in a vault whose own files are Contents, the contents folder is a

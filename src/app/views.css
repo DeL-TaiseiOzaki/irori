@@ -22,7 +22,7 @@
 .stage-text-button.small {
   height: 28px;
   padding: 0 9px;
-  border-radius: 8px;
+  border-radius: var(--radius-element);
   font-size: 12.5px;
 }
 .stage-text-button.ask-ai {
@@ -33,7 +33,7 @@
   height: 28px;
   padding: 0 7px 0 4px;
   margin-left: -4px;
-  border-radius: 8px;
+  border-radius: var(--radius-element);
   background: none;
   box-shadow: none;
   font-weight: 400;
@@ -157,13 +157,13 @@
 .primary-button.home-button {
   height: 32px;
   padding: 0 13px;
-  border-radius: 8px;
+  border-radius: var(--radius-element);
   font-size: 13px;
 }
 .primary-button.small {
   height: 28px;
   padding: 0 11px;
-  border-radius: 7px;
+  border-radius: var(--radius-element);
   font-size: 12.5px;
 }
 /* The body follows the stage's width, which the panels beside it change: two
@@ -238,7 +238,7 @@
   flex: none;
   min-width: 20px;
   padding: 0 6px;
-  border-radius: 9px;
+  border-radius: var(--radius-element);
   background: var(--stage-3);
   color: var(--ink);
   font-size: 11.5px;
@@ -268,7 +268,7 @@
   min-width: 0;
   min-height: 34px;
   padding: 0 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   background: none;
   box-shadow: none;
   font-size: 13.5px;
@@ -337,7 +337,7 @@ button.home-row:hover {
   max-width: 100%;
   height: 22px;
   padding: 0 7px;
-  border-radius: 5px;
+  border-radius: var(--radius-inner);
   background: var(--stage-2);
   color: var(--ink-2);
   font-family: var(--font-mono);
@@ -384,7 +384,7 @@ button.home-row:hover {
   gap: 4px;
   height: 22px;
   padding: 0 8px;
-  border-radius: 7px;
+  border-radius: var(--radius-element);
   background: var(--stage-2);
   color: var(--run-ink);
   font-size: 11.5px;
@@ -411,7 +411,7 @@ button.home-row:hover {
 .home-state {
   flex: none;
   padding: 1px 7px;
-  border-radius: 5px;
+  border-radius: var(--radius-inner);
   background: var(--stage-2);
   color: var(--ink-2);
   font-size: 11.5px;
@@ -461,7 +461,7 @@ button.home-row:hover {
   height: 28px;
   padding: 0 10px;
   margin-right: 4px;
-  border-radius: 8px;
+  border-radius: var(--radius-element);
   background: var(--warn-wash);
   color: var(--warn-ink);
   font-size: 12px;
@@ -508,7 +508,7 @@ button.home-row:hover {
   justify-content: center;
   padding: 0 10px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-element);
   background: var(--card);
   color: var(--ink);
   box-shadow: var(--card-shadow);
@@ -565,7 +565,7 @@ button.home-row:hover {
   fill: var(--ink-3);
 }
 .ontology-graph .react-flow__controls {
-  border-radius: 10px;
+  border-radius: var(--radius-element);
   overflow: hidden;
   box-shadow: var(--card-shadow);
 }
@@ -645,7 +645,7 @@ button.home-row:hover {
   width: 260px;
   height: 34px;
   margin-right: 6px;
-  border-radius: 10px;
+  border-radius: var(--radius-element);
   font-size: 12.5px;
 }
 .records-layout {
@@ -699,7 +699,7 @@ button.home-row:hover {
 .records-view details {
   margin-bottom: 10px;
   padding: 10px 16px;
-  border-radius: 14px;
+  border-radius: var(--radius-container);
   background: var(--card);
   box-shadow: var(--card-shadow);
 }
@@ -731,7 +731,7 @@ button.home-row:hover {
   max-height: 260px;
   overflow: auto;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-element);
   background: var(--card);
   box-shadow: var(--card-shadow);
   font: 12px/1.6 var(--font-mono);
@@ -740,7 +740,7 @@ button.home-row:hover {
 }
 .records-feedback {
   padding: 8px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-element);
   background: var(--stage-2);
   font-size: 12.5px;
 }
@@ -754,7 +754,7 @@ button.home-row:hover {
   width: min(680px, calc(100vw - 48px));
   max-height: calc(100vh - 120px);
   margin-top: 76px;
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   overflow: hidden;
   color: var(--tx);
   color-scheme: var(--chrome-scheme);
@@ -800,7 +800,7 @@ button.home-row:hover {
 .palette .palette-submit {
   height: 28px;
   padding: 0 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-element);
   font-size: 12px;
 }
 .palette-scopes {
@@ -828,7 +828,7 @@ button.home-row:hover {
   gap: 6px;
   height: 28px;
   padding: 0 10px 0 6px;
-  border-radius: 8px;
+  border-radius: var(--radius-element);
   box-shadow: inset 0 0 0 1px var(--hair-2);
   font-size: 12.5px;
   color: var(--tx-2);
@@ -940,7 +940,7 @@ button.home-row:hover {
   flex-direction: column;
   gap: 4px;
   padding: 9px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-element);
   background: none;
   box-shadow: none;
   text-align: left;
@@ -1016,7 +1016,7 @@ button.home-row:hover {
 .palette .palette-close {
   height: 24px;
   padding: 0 6px;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   background: none;
   box-shadow: inset 0 0 0 1px var(--hair-2);
   color: var(--tx-3);
@@ -1029,7 +1029,7 @@ button.home-row:hover {
 .brain-sheet-dialog {
   width: min(820px, calc(100vw - 48px));
   max-height: calc(100vh - 48px);
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   overflow: hidden;
   box-shadow: var(--pop);
 }
@@ -1137,7 +1137,7 @@ button.home-row:hover {
   margin: 0;
   padding: 3px;
   border: 0;
-  border-radius: 11px;
+  border-radius: var(--radius-element);
   background: var(--stage-2);
 }
 .segments label {
@@ -1146,7 +1146,7 @@ button.home-row:hover {
   align-items: center;
   height: 30px;
   padding: 0 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-element);
   font-size: 12.5px;
   color: var(--ink-2);
   cursor: pointer;
@@ -1192,7 +1192,7 @@ button.home-row:hover {
 .preview-map,
 .preview-note {
   height: 92px;
-  border-radius: 14px;
+  border-radius: var(--radius-container);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1238,7 +1238,7 @@ button.home-row:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   background: var(--card);
   box-shadow: var(--card-shadow);
   color: var(--ink-2);
@@ -1453,7 +1453,7 @@ button.home-row:hover {
 .brain-sheet-footer .solid-button {
   height: 34px;
   padding: 0 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-element);
 }
 .home-title h1 {
   display: flex;

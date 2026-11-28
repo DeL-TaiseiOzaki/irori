@@ -172,6 +172,8 @@ const KnowledgePanel = lazyView(() =>
 );
 import type { PageEditorHandle } from './PageEditor';
 import { FindScope, type FindScopeHandle } from './FindBar';
+import '@astryxdesign/theme-neutral/fonts.css';
+import './astryx-tokens.css';
 import './tokens.css';
 import './style.css';
 import './shell.css';
