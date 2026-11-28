@@ -1,6 +1,6 @@
 {
   "name": "irori",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "private": true,
   "type": "module",
   "description": "A note-centered local agent workspace",
@@ -62,7 +62,6 @@
     "jszip": "3.10.2",
     "lucide-react": "1.46.0",
     "mermaid": "12.1.0",
-    "motion": "13.4.0",
     "node-pty": "1.1.0",
     "papaparse": "5.7.0",
     "pdfjs-dist": "6.3.289",

@@ -30,19 +30,6 @@
   color: var(--tx-2);
   border-bottom: 1px solid var(--hair);
 }
-.session-count {
-  display: inline-grid;
-  place-items: center;
-  min-width: 18px;
-  height: 16px;
-  padding: 0 5px;
-  border-radius: var(--radius-element);
-  background: var(--chip);
-  color: var(--tx-3);
-  font-size: 10.5px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
 .session-lanes {
   flex: 1;
   min-height: 0;

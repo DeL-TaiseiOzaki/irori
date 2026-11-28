@@ -349,15 +349,14 @@ try {
   await page.locator('.ProseMirror').click();
   await page.keyboard.press('ControlOrMeta+End');
   await page.keyboard.insertText('\nUI saved 日本語\n');
-  const modes = page.getByRole('group', { name: 'vault の表示' });
-  const notesView = modes.getByRole('button', { name: 'ファイル', exact: true });
-  const gitView = modes.getByRole('button', { name: /^変更/ });
+  const modes = page.getByRole('radiogroup', { name: 'vault の表示' });
+  const notesView = modes.getByRole('radio', { name: 'ファイル', exact: true });
+  const gitView = modes.getByRole('radio', { name: /^変更/ });
   await notesView.focus();
   await expect(notesView).toHaveAttribute('tabindex', '0');
   await page.keyboard.press('ArrowRight');
   await expect(gitView).toBeFocused();
-  await page.keyboard.press('Enter');
-  await expect(gitView).toHaveAttribute('aria-pressed', 'true');
+  await expect(gitView).toBeChecked();
   let sidebar = page.getByRole('region', { name: 'ソース管理' });
   let panel = page.locator('.git-sidebar, .git-workspace-detail');
   await expect(sidebar).toBeVisible();
@@ -423,14 +422,13 @@ try {
   expect(await readFile(path.join(root, 'extra.md'), 'utf8')).toBe('# Extra after staging');
   await writeFile(path.join(root, 'extra.md'), '# Extra staged note');
   expect(git(remote, 'show', 'main:memo.md')).not.toContain('UI saved 日本語');
-  const changesView = panel.getByRole('button', { name: /^変更 \d+$/ });
-  const historyView = panel.getByRole('button', { name: '履歴', exact: true });
+  const changesView = panel.getByRole('radio', { name: /^変更 \d+$/ });
+  const historyView = panel.getByRole('radio', { name: '履歴', exact: true });
   await changesView.focus();
   await expect(changesView).toHaveAttribute('tabindex', '0');
   await page.keyboard.press('ArrowRight');
   await expect(historyView).toBeFocused();
-  await page.keyboard.press('Enter');
-  await expect(historyView).toHaveAttribute('aria-pressed', 'true');
+  await expect(historyView).toBeChecked();
   await panel.locator('.git-history-item').filter({ hasText: 'UI note update' }).click();
   // Refreshing (or any file event) while the commit diff is in flight must not
   // discard the patch and leave the loading text on screen.
@@ -441,7 +439,7 @@ try {
   const rail = page.getByRole('navigation', { name: 'vault' });
   await rail.getByRole('button', { name: /^チームKB・AI/ }).click();
   await expect(panel.locator('.git-repository-bar')).toContainText('リモート未設定');
-  await panel.getByRole('button', { name: '履歴', exact: true }).click();
+  await panel.getByRole('radio', { name: '履歴', exact: true }).click();
   await expect(panel.locator('.git-history-item')).toHaveCount(1);
   await expect(panel.locator('.git-history-item')).toContainText('チームKB initial');
   await rail.getByRole('button', { name: /^個人KB・AI/ }).click();
@@ -516,8 +514,8 @@ try {
     .getByRole('button', { name: 'memo', exact: true })
     .click();
   await page
-    .getByRole('group', { name: 'vault の表示' })
-    .getByRole('button', { name: /^変更/ })
+    .getByRole('radiogroup', { name: 'vault の表示' })
+    .getByRole('radio', { name: /^変更/ })
     .click();
   sidebar = page.getByRole('region', { name: 'ソース管理' });
   panel = page.locator('.git-sidebar, .git-workspace-detail');
@@ -540,7 +538,7 @@ try {
   );
   await page.screenshot({ path: 'test-results/irori-git-conflict.png' });
   // An unresolved merge keeps the Changes view and the brain in place.
-  await expect(page.getByRole('button', { name: 'ファイル', exact: true })).toBeDisabled();
+  await expect(page.getByRole('radio', { name: 'ファイル', exact: true })).toBeDisabled();
   await expect(panel.getByRole('button', { name: 'ノートに戻る' })).toBeDisabled();
   await expect(
     page.getByRole('navigation', { name: 'vault' }).getByRole('button', { name: /^チームKB・AI/ }),
@@ -640,13 +638,13 @@ try {
   const bounds = await sidebar.boundingBox();
   expect(bounds!.x).toBeGreaterThanOrEqual(0);
   expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(1024);
-  await page.getByRole('button', { name: 'ファイル', exact: true }).click();
+  await page.getByRole('radio', { name: 'ファイル', exact: true }).click();
   await expect(sidebar).toHaveCount(0);
   await expect(page.locator('.document-editor')).toContainText('Combined');
 
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1440, 960));
   await page.getByRole('button', { name: 'vault を追加', exact: true }).click();
-  await page.getByRole('button', { name: 'GitHub から取得', exact: true }).click();
+  await page.getByRole('radio', { name: 'GitHub から取得', exact: true }).click();
   const registration = page.getByRole('form', { name: 'スペース登録' });
   // Nothing to preview yet, so no empty panel sits under the form.
   await expect(registration.locator('.repository-preview')).toBeHidden();
@@ -690,7 +688,7 @@ try {
   // first name; the vault stays created and is published from Source control.
   await page.getByRole('button', { name: 'vault を追加', exact: true }).click();
   const creation = page.getByRole('form', { name: 'スペース登録' });
-  await creation.getByRole('button', { name: '新しく作成', exact: true }).click();
+  await creation.getByRole('radio', { name: '新しく作成', exact: true }).click();
   await creation.getByRole('textbox', { name: '保存先の親フォルダ' }).fill(base);
   await creation.getByRole('textbox', { name: '新しいフォルダ名' }).fill('new-vault');
   await creation.getByRole('textbox', { name: 'スペース名' }).fill('新しい vault');
@@ -718,8 +716,8 @@ try {
   await creation.getByRole('button', { name: '開く', exact: true }).click();
   await expect(page.getByRole('form', { name: 'スペース登録' })).toHaveCount(0);
   await page
-    .getByRole('group', { name: 'vault の表示' })
-    .getByRole('button', { name: /^変更/ })
+    .getByRole('radiogroup', { name: 'vault の表示' })
+    .getByRole('radio', { name: /^変更/ })
     .click();
   panel = page.locator('.git-sidebar, .git-workspace-detail');
   await expect(panel.locator('.git-remote')).toContainText('リモート未設定');
@@ -759,8 +757,8 @@ try {
   await page.getByRole('button', { name: '登録して開く', exact: true }).click();
   await expect(page.getByRole('form', { name: 'スペース登録' })).toHaveCount(0);
   await page
-    .getByRole('group', { name: 'vault の表示' })
-    .getByRole('button', { name: /^変更/ })
+    .getByRole('radiogroup', { name: 'vault の表示' })
+    .getByRole('radio', { name: /^変更/ })
     .click();
   await expect(panel.getByRole('heading', { name: 'Git 未設定' })).toBeVisible();
   await panel.getByRole('button', { name: 'Git を始める', exact: true }).click();

@@ -1,3 +1,4 @@
+import { CheckboxInput } from '@astryxdesign/core/CheckboxInput';
 import { useState } from 'react';
 import type { Document } from '../domain/types';
 import { noteFilename } from '../domain/note-operations';
@@ -127,15 +128,12 @@ export function NoteActionDialog({
                 disabled={busy}
               />
             </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={links}
-                disabled={busy}
-                onChange={(event) => setLinks(event.target.checked)}
-              />{' '}
-              {t('リンクも更新する', 'Also update links')}
-            </label>
+            <CheckboxInput
+              label={t('リンクも更新する', 'Also update links')}
+              value={links}
+              isDisabled={busy}
+              onChange={setLinks}
+            />
             <p className="hint">{linksHint}</p>
           </>
         ) : (

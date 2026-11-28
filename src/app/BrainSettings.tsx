@@ -1,3 +1,4 @@
+import { CheckboxInput } from '@astryxdesign/core/CheckboxInput';
 import { useId, useState } from 'react';
 import {
   brainAppearance,
@@ -226,15 +227,12 @@ function RemoveLocal({
           "It leaves irori and its workspaces. Even if the folder goes to the trash, the vault's search index, deleted notes, drafts, conversations, captured materials and routine records stay in irori's data folder.",
         )}
       </p>
-      <label>
-        <input
-          type="checkbox"
-          checked={trash}
-          disabled={busy}
-          onChange={(event) => onTrash(event.target.checked)}
-        />{' '}
-        {t('フォルダもゴミ箱に移す', 'Also move the folder to the trash')}
-      </label>
+      <CheckboxInput
+        label={t('フォルダもゴミ箱に移す', 'Also move the folder to the trash')}
+        value={trash}
+        isDisabled={busy}
+        onChange={onTrash}
+      />
     </>
   );
 }
@@ -561,26 +559,22 @@ export function BrainSettings({
                     }
                   />
                   {layer === 'Knowledge_Base' && (
-                    <label className="brain-sheet-layer-root">
-                      <input
-                        type="checkbox"
-                        checked={knowledgeAtRoot}
-                        disabled={running || !has(layer)}
-                        onChange={(event) => setKnowledgeAtRoot(event.target.checked)}
-                      />{' '}
-                      {t('vault のルート', "The vault's root")}
-                    </label>
+                    <CheckboxInput
+                      className="brain-sheet-layer-root"
+                      label={t('vault のルート', "The vault's root")}
+                      value={knowledgeAtRoot}
+                      isDisabled={running || !has(layer)}
+                      onChange={setKnowledgeAtRoot}
+                    />
                   )}
                   {layer === 'contents' && (
-                    <label className="brain-sheet-layer-root">
-                      <input
-                        type="checkbox"
-                        checked={ownInContents}
-                        disabled={running || !ownChoice}
-                        onChange={(event) => setOwnChosen(event.target.checked)}
-                      />{' '}
-                      {t('vault 直下のファイルも', "The vault's own files too")}
-                    </label>
+                    <CheckboxInput
+                      className="brain-sheet-layer-root"
+                      label={t('vault 直下のファイルも', "The vault's own files too")}
+                      value={ownInContents}
+                      isDisabled={running || !ownChoice}
+                      onChange={setOwnChosen}
+                    />
                   )}
                   {folderProblems[layer] && <small role="alert">{folderProblems[layer]}</small>}
                 </div>

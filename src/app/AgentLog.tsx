@@ -1,3 +1,4 @@
+import { Spinner } from '@astryxdesign/core/Spinner';
 import {
   lazy,
   memo,
@@ -401,7 +402,7 @@ const TaskList = memo(function TaskList({ tasks, brains }: { tasks: RunTask[]; b
             </span>
             <span className={`task-state ${task.state}`}>
               {task.state === 'working' ? (
-                <Icon name="loader" size={12} className="spin" />
+                <Spinner size="md" shade="inherit" aria-hidden className="spin" />
               ) : task.state === 'reported' ? (
                 <Icon name="check" size={12} />
               ) : (

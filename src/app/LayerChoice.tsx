@@ -1,3 +1,4 @@
+import { CheckboxInput } from '@astryxdesign/core/CheckboxInput';
 import { defaultLayerLabel, namedLayers, type NamedLayer } from '../domain/layers';
 import { t } from '../domain/i18n';
 import { Icon } from './Icon';
@@ -21,28 +22,26 @@ export function LayerChoice({
   return (
     <fieldset className="layer-choice">
       <legend>{t('この vault が持つ層', 'The layers this vault has')}</legend>
-      <label>
-        <input type="checkbox" checked disabled readOnly />
-        <Icon name="schema" size={15} className="layer-icon schema" />
-        {defaultLayerLabel('schema')}
-      </label>
+      <CheckboxInput
+        label={defaultLayerLabel('schema')}
+        labelIcon={<Icon name="schema" size={15} className="layer-icon schema" />}
+        value
+        isReadOnly
+        isDisabled
+      />
       {namedLayers.map((layer) => (
-        <label key={layer}>
-          <input
-            type="checkbox"
-            checked={value.includes(layer)}
-            disabled={disabled}
-            onChange={(event) =>
-              onChange(
-                namedLayers.filter((item) =>
-                  item === layer ? event.target.checked : value.includes(item),
-                ),
-              )
-            }
-          />
-          <Icon name={layerIcons[layer]} size={15} className={`layer-icon ${layer}`} />
-          {defaultLayerLabel(layer)}
-        </label>
+        <CheckboxInput
+          key={layer}
+          label={defaultLayerLabel(layer)}
+          labelIcon={<Icon name={layerIcons[layer]} size={15} className={`layer-icon ${layer}`} />}
+          value={value.includes(layer)}
+          isDisabled={disabled}
+          onChange={(checked) =>
+            onChange(
+              namedLayers.filter((item) => (item === layer ? checked : value.includes(item))),
+            )
+          }
+        />
       ))}
     </fieldset>
   );

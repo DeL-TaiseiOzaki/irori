@@ -1,3 +1,4 @@
+import { Spinner } from '@astryxdesign/core/Spinner';
 import { useEffect, useRef, useState } from 'react';
 import type { AgentId, Space } from '../domain/types';
 import { agentNames } from '../domain/types';
@@ -396,7 +397,7 @@ export function YourAiScreen({
         {running && (
           <footer className="you-update">
             <p className="you-update-state" role="status">
-              <Icon name="loader" size={12} className="you-spin" />
+              <Spinner size="md" shade="inherit" aria-hidden className="you-spin" />
               {t('作業中…', 'Working…')}
             </p>
           </footer>

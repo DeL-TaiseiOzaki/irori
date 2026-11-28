@@ -42,9 +42,6 @@
     width: 300px;
   }
 }
-.you-spin {
-  animation: irori-spin 1.1s linear infinite;
-}
 /* A path keeps its end in view; a long start gives way to an ellipsis. */
 .you-tail {
   direction: rtl;

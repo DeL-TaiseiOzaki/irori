@@ -1,5 +1,5 @@
+import { CheckboxInput } from '@astryxdesign/core/CheckboxInput';
 import { Dialog } from './Dialog';
-import { MagnetTabs } from './obsidian/MagnetTabs';
 import { ArrowFillButton } from './obsidian/ArrowFillButton';
 import { useEffect, useState } from 'react';
 import type { AgentAccess, Space, WorkspaceProfile } from '../domain/types';
@@ -7,6 +7,7 @@ import type { OpenTab } from '../domain/workspace-tabs';
 import { namedLayers, type NamedLayer } from '../domain/layers';
 import { appIcon, appVersion } from './branding';
 import { BrainTile } from './BrainTile';
+import { Segmented } from './controls';
 import { Icon } from './Icon';
 import { useResource } from './useResource';
 import { useAction } from './useAction';
@@ -98,7 +99,7 @@ export function RegisterSpace({
     });
   }
   const ways = (
-    <MagnetTabs
+    <Segmented
       className="git-registration-mode"
       label={t('リポジトリの取得方法', 'How to get the repository')}
       value={way}
@@ -332,19 +333,17 @@ export function RegisterSpace({
             <LayerChoice value={layers} disabled={busy || !!created} onChange={setLayers} />
             {creating ? (
               <>
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={publishing}
-                    disabled={busy || !!created}
-                    onChange={(e) => {
-                      setPublishing(e.target.checked);
-                      if (e.target.checked && !publish.name)
-                        setPublish({ ...publish, name: initialPublish(cloneName).name });
-                    }}
-                  />
-                  {t('GitHub にも作成', 'Also create on GitHub')}
-                </label>
+                <CheckboxInput
+                  className="checkbox-row"
+                  label={t('GitHub にも作成', 'Also create on GitHub')}
+                  value={publishing}
+                  isDisabled={busy || !!created}
+                  onChange={(checked) => {
+                    setPublishing(checked);
+                    if (checked && !publish.name)
+                      setPublish({ ...publish, name: initialPublish(cloneName).name });
+                  }}
+                />
                 {publishing && !created && (
                   <PublishFields value={publish} onChange={setPublish} disabled={busy} />
                 )}

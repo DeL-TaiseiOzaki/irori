@@ -161,6 +161,48 @@ weakening what they prove.
    - Astryx's `Button` defaults to `type="button"`, so every button that
      submitted a form says `type="submit"`.
 
+## Stage 2b: the other controls (0.3.5)
+
+1. **Checkboxes and switches are Astryx's** (`CheckboxInput`, `Switch`). Each
+   is named by the words that named it before, so the smokes find it.
+   - The settings rows keep their visible title, which names the switch
+     through `aria-labelledby`, and a press on it still turns the switch.
+   - The restore list's checkboxes take what was the second half of their
+     name ("On this device", the repository) as their description.
+   - Left as they were: the vault chips at the start, and the person's-lines
+     chip in the instruction box. Both are irori's own parts (stage 4).
+2. **Segmented choices are Astryx's segmented control.**
+   - `Segmented` in `controls.tsx` replaces the ObsidianUI Magnet Tabs (and
+     its `motion` dependency) in seven places: the vault's Files | Changes,
+     Git's Changes | History, irori mode's layout and agents, the routine
+     editor's Form | YAML, and how a repository is added.
+   - It is a radio group: one tab stop, and an arrow key moves both the
+     focus and the choice. Base UI's toggle group moved the focus only. The
+     smokes now check the radio contract.
+   - A count that sat in a badge beside a choice is part of its words
+     ("変更 1").
+3. **Keys, counts, running marks and empty pages are Astryx's.**
+   - Shortcut hints are `Kbd` (`mod+k` shows ⌘ or Ctrl by system).
+   - The vault home's and the session board's counts are a neutral `Badge`.
+   - The running marks of routines, agents, hosts and the irori agent are
+     `Spinner`. These are `aria-hidden`, since the words beside them say the
+     state.
+   - Four empty pages are `EmptyState`: Git not set up, no Git repository,
+     no ontology, and no vault in the workspace.
+4. **Fields keep irori's markup and take Astryx's look.** Astryx's
+   `TextInput` is a whole field, with its own label and status. irori's 69
+   inputs, 9 text areas and 19 selects sit in their own labels and layouts.
+   They now draw Astryx's input in the `irori-defaults` layer, with its
+   tokens:
+   - the emphasized border on the surface;
+   - the accent border and muted ring while written in;
+   - a faint ring under the pointer;
+   - half opacity when disabled;
+   - the `md` element height.
+
+   irori's own special fields keep their rules: the instruction box, search
+   and inline rename.
+
 ## Consequences
 
 - ADR 053 decision 1's "no island radius, gap or shadow" no longer holds for

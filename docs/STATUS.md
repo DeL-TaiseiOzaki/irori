@@ -1,9 +1,44 @@
 # Implementation status — notes, native agents and connection onboarding
 
+Astryx design system, stage 2b: the other controls, 2026-11-28 (**0.3.5**,
+[ADR 076](decisions/076-astryx-design-system.md) "Stage 2b"): the owner asked to
+continue with stage 2b after stage 2 merged.
+- **Checkboxes and switches.** 14 checkboxes in 7 files are Astryx's
+  `CheckboxInput`. Two switches (the settings rows, the connection's edit
+  permission) are `Switch`; the settings row's title names its switch through
+  `aria-labelledby`.
+- **View choices.** `Segmented` in `controls.tsx` (Astryx's
+  `SegmentedControl`) replaces the ObsidianUI `MagnetTabs` in 7 places, and
+  `motion` leaves the dependencies. The smokes check the radio contract
+  instead of a toggle group's: `radiogroup` and `radio`, `toBeChecked`, and
+  an arrow key that also chooses.
+- **Keys, counts, spinners, empty states.**
+  - 9 shortcut hints are `Kbd`.
+  - 3 counts are a neutral `Badge`.
+  - 6 running marks are an `aria-hidden` `Spinner`.
+  - 4 empty pages are `EmptyState`.
+- **Fields.** Native fields take Astryx's input look in the `irori-defaults`
+  layer.
+- **Verification** (Linux, before the pull request)
+  - `npm run build` passes.
+  - `npm test`: 851 tests, 840 passed, 7 skipped, 4 failed. One is the
+    known `ssh -G` permission failure. The other three are Git tests that
+    timed out under load; their files pass when run alone.
+  - UI smokes: 42 of 43 pass. `account-ui-smoke` now checks the restore
+    row's count as the checkbox's accessible description, and passes.
+    `explorer-ui-smoke` stops at the system trash, which that host lacks, as
+    it does on earlier trees.
+  - All 36 screen renders in hearth, light and dark were looked at.
+    `scripts/ui-screens.ts` now reaches Changes, Columns and Mapping as
+    radios.
+- **Not covered.** Overlays (stage 3); irori's own parts (stage 4), including
+  the start screen's vault chips and the person's-lines chip.
+
 Astryx design system, stage 2: buttons, 2026-11-28 (**0.3.4**,
 [ADR 076](decisions/076-astryx-design-system.md) "Stage 2",
-[#391](https://github.com/DeL-TaiseiOzaki/irori/pull/391), open): the owner asked to
-continue with stage 2 after stage 1 merged.
+[#391](https://github.com/DeL-TaiseiOzaki/irori/pull/391), published as
+`v0.3.4-preview.1`): the owner asked to continue with stage 2 after stage 1
+merged.
 - **What changed.** 149 buttons in 33 renderer files are Astryx's, through
   `src/app/controls.tsx` (`Button`, `IconButton`): 101 `Button` and 48
   `IconButton`. Base UI menu and popover triggers render the adapter
@@ -25,7 +60,10 @@ continue with stage 2 after stage 1 merged.
     folder to the system trash, which that host lacks; the 0.3.3 tree fails
     there the same way.
   - The screen renders were reviewed in hearth, light and dark.
-  - Pull request CI runs the full set.
+  - The pull request's CI passed `verify` and packaging on all three systems.
+    The merge was published by run `46127315814`. The three assets downloaded
+    anonymously match `SHA256SUMS.txt`, and the live download page carries
+    0.3.4.
 - **Not covered.** Fields, switches, checkboxes, segmented controls, badges,
   keys, spinners and empty states (stage 2b); overlays (stage 3); irori's own
   parts (stage 4).

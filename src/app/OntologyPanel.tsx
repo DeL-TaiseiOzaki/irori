@@ -1,3 +1,4 @@
+import { EmptyState } from '@astryxdesign/core/EmptyState';
 import { useMemo, useState } from 'react';
 import {
   ReactFlow,
@@ -553,20 +554,21 @@ export function OntologyPanel({
       ) : (
         data && (
           <div className="graph-empty">
-            <Icon name="graph" size={32} />
-            <p>
-              {t(
+            <EmptyState
+              headingLevel={2}
+              icon={<Icon name="graph" size={32} />}
+              title={t(
                 'この KB は種類と関係を宣言していません。',
                 'This KB declares no types and relations.',
               )}
-            </p>
-            <p className="muted">
-              {data.problem ??
+              description={
+                data.problem ??
                 t(
                   `${propertyDeclarationFile} に種類と関係を宣言すると、irori がページに当てはめます。`,
                   `Declare types and relations in ${propertyDeclarationFile}, and irori applies them to the pages.`,
-                )}
-            </p>
+                )
+              }
+            />
           </div>
         )
       )}

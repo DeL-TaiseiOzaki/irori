@@ -177,8 +177,8 @@ for (const run of runs) {
     });
     await step('changes', async () => {
       await page
-        .getByRole('group', { name: L('vault の表示', 'vault view') })
-        .getByRole('button', { name: new RegExp(`^${L('変更', 'Changes')}`) })
+        .getByRole('radiogroup', { name: L('vault の表示', 'vault view') })
+        .getByRole('radio', { name: new RegExp(`^${L('変更', 'Changes')}`) })
         .click();
       await page
         .getByRole('button', { name: /interviews/ })
@@ -186,8 +186,8 @@ for (const run of runs) {
         .click();
       await shot(page, 'Changes', run);
       await page
-        .getByRole('group', { name: L('vault の表示', 'vault view') })
-        .getByRole('button', { name: L('ファイル', 'Files'), exact: true })
+        .getByRole('radiogroup', { name: L('vault の表示', 'vault view') })
+        .getByRole('radio', { name: L('ファイル', 'Files'), exact: true })
         .click();
     });
     await step('ontology', async () => {
@@ -223,9 +223,9 @@ for (const run of runs) {
       await shot(page, 'Atlas', run);
     });
     await step('columns', async () => {
-      await page.getByRole('button', { name: L('並列', 'Columns'), exact: true }).click();
+      await page.getByRole('radio', { name: L('並列', 'Columns'), exact: true }).click();
       await shot(page, 'Columns', run);
-      await page.getByRole('button', { name: L('マッピング', 'Mapping'), exact: true }).click();
+      await page.getByRole('radio', { name: L('マッピング', 'Mapping'), exact: true }).click();
     });
     await step('you', async () => {
       // The map's hearth; each irori mode column's mark opens the same screen.

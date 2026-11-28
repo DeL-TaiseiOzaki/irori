@@ -105,13 +105,43 @@ body {
     outline: 2px solid var(--focus);
     outline-offset: 2px;
   }
-  :where(input, select, textarea) {
-    background: var(--card);
+  /* Fields take Astryx's input look (ADR 076, stage 2b): its emphasized border on its
+     surface, an accent border with its muted ring while written in, a faint ring under
+     the pointer, half opacity when disabled. irori keeps its own labels around them. */
+  :where(
+    input:not([type='checkbox'], [type='radio'], [type='file'], [type='range'], [type='color']),
+    select,
+    textarea
+  ) {
+    min-height: var(--size-element-md);
+    background: var(--stage);
     color: var(--ink);
-    border: 1px solid var(--rule-2);
+    border: var(--border-width) solid var(--rule-2);
     border-radius: var(--radius-element);
-    padding: 7px 10px;
+    padding: var(--spacing-1) var(--spacing-2);
     max-width: 100%;
+    transition:
+      border-color var(--duration-fast) var(--ease-standard),
+      box-shadow var(--duration-fast) var(--ease-standard);
+  }
+  :where(
+      input:not([type='checkbox'], [type='radio'], [type='file'], [type='range'], [type='color']),
+      select,
+      textarea
+    ):hover:not(:focus, :disabled) {
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--rule-2) 30%, transparent);
+  }
+  :where(
+    input:not([type='checkbox'], [type='radio'], [type='file'], [type='range'], [type='color']),
+    select,
+    textarea
+  ):focus {
+    outline: none;
+    border-color: var(--act-ink);
+    box-shadow: inset 0 0 0 2px var(--act-wash);
+  }
+  :where(input, select, textarea):disabled {
+    opacity: 0.5;
   }
   :where(input[type='checkbox'], input[type='radio']) {
     accent-color: var(--ink-solid);
@@ -135,7 +165,24 @@ body {
   :where(.chrome) :where(input, select, textarea) {
     background: var(--field);
     color: var(--tx);
-    border-color: var(--hair-2);
+    border-color: var(--hair-3);
+  }
+  :where(.chrome)
+    :where(
+      input:not([type='checkbox'], [type='radio'], [type='file'], [type='range'], [type='color']),
+      select,
+      textarea
+    ):hover:not(:focus, :disabled) {
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--hair-3) 30%, transparent);
+  }
+  :where(.chrome)
+    :where(
+      input:not([type='checkbox'], [type='radio'], [type='file'], [type='range'], [type='color']),
+      select,
+      textarea
+    ):focus {
+    border-color: var(--act);
+    box-shadow: inset 0 0 0 2px var(--act-soft);
   }
   :where(.chrome) ::placeholder {
     color: var(--tx-3);
@@ -413,8 +460,4 @@ body {
   background: var(--surface-sunken);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-.git-registration-mode {
-  display: flex;
-  gap: 8px;
 }

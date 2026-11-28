@@ -1,19 +1,28 @@
 # irori continuation handoff
 
-**Astryx design system, stage 2: buttons, 0.3.4**
-([ADR 076](decisions/076-astryx-design-system.md) "Stage 2").
-- **What changed.** Every styled button is Astryx's `Button` or `IconButton`
-  through `src/app/controls.tsx`. irori's element defaults sit in an
-  `irori-defaults` layer under Astryx's. Function is unchanged.
-- **State.** Open in [#391](https://github.com/DeL-TaiseiOzaki/irori/pull/391),
-  not merged.
-- **Next: stage 2b.** Turn text fields, switches, checkboxes, segmented
-  controls, badges, keys, spinners and empty states into Astryx components the
-  same way: adapters in `controls.tsx`, accessible names kept, then the old
-  CSS removed.
-- **Then.** Stage 3 moves the overlays and stage 4 redraws irori's own parts
-  and the website.
+**Astryx design system, stage 2b: the other controls, 0.3.5**
+([ADR 076](decisions/076-astryx-design-system.md) "Stage 2b").
+- **What changed.** These are now Astryx's:
+  - checkboxes and switches;
+  - view choices (`Segmented`, a radio group);
+  - shortcut keys, counts, running marks and four empty pages.
+
+  Native fields take Astryx's input look. `MagnetTabs` and `motion` are gone.
+- **State.** Open as a pull request, not merged.
+- **Next: stage 3** (ADR 076 decision 8). Move menus, context menus,
+  popovers, dialogs and the settings sheet from Base UI to Astryx in one
+  stage, then drop Base UI. ⌘K becomes Astryx's command palette.
+- **Then.** Stage 4 redraws irori's own parts and the website: the tree,
+  tabs, rail, the agent column with its chips and composer, the session board,
+  the map and the status bar.
 - **Check.** Look at the packaged app with Japanese fonts present.
+
+**Astryx design system, stage 2: buttons, 0.3.4**
+([ADR 076](decisions/076-astryx-design-system.md) "Stage 2"): every styled
+button is Astryx's `Button` or `IconButton` through `src/app/controls.tsx`;
+irori's element defaults sit in an `irori-defaults` layer under Astryx's.
+Merged in [#391](https://github.com/DeL-TaiseiOzaki/irori/pull/391) and
+published as `v0.3.4-preview.1`.
 
 **Astryx design system, stage 1, 0.3.3**
 ([ADR 076](decisions/076-astryx-design-system.md)): Astryx's neutral theme

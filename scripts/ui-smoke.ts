@@ -98,21 +98,18 @@ try {
   await expect(registration).toBeVisible();
   await expect.poll(() => registration.evaluate((element) => element.matches(':modal'))).toBe(true);
   await expect(registration.getByLabel('KBフォルダ', { exact: true })).toBeFocused();
-  // Obsidian's moving indicators keep Base UI's keyboard and pressed-value contract.
-  const folderMode = registration.getByRole('button', { name: '既存のフォルダ', exact: true });
-  const cloneMode = registration.getByRole('button', { name: 'GitHub から取得', exact: true });
+  // Astryx's segmented control is a radio group: one tab stop, and the arrow keys
+  // move both the focus and the choice.
+  const folderMode = registration.getByRole('radio', { name: '既存のフォルダ', exact: true });
+  const cloneMode = registration.getByRole('radio', { name: 'GitHub から取得', exact: true });
   await expect(registration.getByRole('button', { name: '登録して開く' })).toBeDisabled();
   await folderMode.focus();
   await expect(folderMode).toHaveAttribute('tabindex', '0');
+  await expect(folderMode).toBeChecked();
   await page.keyboard.press('ArrowRight');
   await expect(cloneMode).toBeFocused();
-  await expect(folderMode).toHaveAttribute('aria-pressed', 'true');
-  await page.keyboard.press('Enter');
-  await expect(cloneMode).toHaveAttribute('aria-pressed', 'true');
+  await expect(cloneMode).toBeChecked();
   await expect(registration.getByLabel('GitHub リポジトリ URL')).toBeVisible();
-  await cloneMode.focus();
-  await page.keyboard.press('Enter');
-  await expect(cloneMode).toHaveAttribute('aria-pressed', 'true');
   // The OS setting takes effect while the dialog is already mounted.
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect(registration.locator('.obsidian-arrow-fill-btn__arrow')).toHaveCSS(
@@ -120,20 +117,8 @@ try {
     '0s',
   );
   await page.keyboard.press('ArrowLeft');
-  await page.keyboard.press('Space');
-  await expect(folderMode).toHaveAttribute('aria-pressed', 'true');
+  await expect(folderMode).toBeChecked();
   await expect(registration.getByLabel('KBフォルダ', { exact: true })).toBeVisible();
-  const transforms = await folderMode
-    .locator('.obsidian-magnet-marker')
-    .evaluate(async (marker) => {
-      const samples: string[] = [];
-      for (let frame = 0; frame < 8; frame++) {
-        await new Promise(requestAnimationFrame);
-        samples.push(getComputedStyle(marker).transform);
-      }
-      return samples;
-    });
-  expect(transforms.every((transform) => transform === 'none')).toBe(true);
   await page.screenshot({ path: 'test-results/obsidian-registration.png', fullPage: true });
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   for (let i = 0; i < 12; i++) {

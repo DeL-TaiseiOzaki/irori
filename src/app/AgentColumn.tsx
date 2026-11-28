@@ -1,3 +1,4 @@
+import { Kbd } from '@astryxdesign/core/Kbd';
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Menu } from '@base-ui/react/menu';
 import {
@@ -1077,9 +1078,9 @@ export function AgentColumn({
                   )}
             </p>
             <span className="conversation-empty-keys">
-              <kbd>/</kbd>
+              <Kbd keys="/" />
               {t('コマンド', 'Commands')}
-              <kbd>Enter</kbd>
+              <Kbd keys="enter" />
               {t('送信', 'Send')}
             </span>
           </div>

@@ -1,3 +1,4 @@
+import { Kbd } from '@astryxdesign/core/Kbd';
 import { useEffect, useRef, useState } from 'react';
 import { layerLabel } from '../domain/layers';
 import type { KnowledgeSearch, SearchHit } from '../domain/search';
@@ -379,16 +380,16 @@ export function SearchPanel({
         )}
         <footer className="palette-footer">
           <span>
-            <kbd>↑</kbd>
-            <kbd>↓</kbd>
+            <Kbd keys="up" />
+            <Kbd keys="down" />
             {t('選択', 'Select')}
           </span>
           <span>
-            <kbd>↵</kbd>
+            <Kbd keys="enter" />
             {t('検索・開く', 'Search · open')}
           </span>
           <span>
-            <kbd>esc</kbd>
+            <Kbd keys="escape" />
             {t('閉じる', 'Close')}
           </span>
           <span className="palette-footer-space" />

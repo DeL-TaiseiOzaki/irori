@@ -1,3 +1,4 @@
+import { CheckboxInput } from '@astryxdesign/core/CheckboxInput';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '../domain/i18n';
@@ -25,8 +26,7 @@ import {
 import { Dialog } from './Dialog';
 import { errorText } from './ErrorMessage';
 import { Icon } from './Icon';
-import { Button, IconButton } from './controls';
-import { MagnetTabs } from './obsidian/MagnetTabs';
+import { Button, IconButton, Segmented } from './controls';
 import { secretInput, validSecretName } from './RoutineKeys';
 import { useAction } from './useAction';
 import { useResource } from './useResource';
@@ -315,21 +315,18 @@ function AgentFields({
       {handed === 'some' && (
         <div className="routine-draft-vaults" role="group" aria-label={t('渡す vault', 'Vaults')}>
           {choices.map((name) => (
-            <label key={name} className="routine-chip">
-              <input
-                type="checkbox"
-                checked={named.includes(name)}
-                onChange={(event) =>
-                  onChange({
-                    ...step,
-                    vaults: event.target.checked
-                      ? [...named, name]
-                      : named.filter((item) => item !== name),
-                  })
-                }
-              />
-              {name}
-            </label>
+            <CheckboxInput
+              key={name}
+              className="routine-chip"
+              label={name}
+              value={named.includes(name)}
+              onChange={(checked) =>
+                onChange({
+                  ...step,
+                  vaults: checked ? [...named, name] : named.filter((item) => item !== name),
+                })
+              }
+            />
           ))}
         </div>
       )}
@@ -553,7 +550,7 @@ export function RoutineEditor({
             <h2>{name || label}</h2>
           )}
           {view && (
-            <MagnetTabs
+            <Segmented
               className="routine-editor-views"
               label={t('編集の表示', 'Editor view')}
               value={view}

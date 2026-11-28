@@ -204,9 +204,10 @@ try {
   await expect(sheet.getByRole('checkbox', { name: /受信箱/ })).toBeChecked();
   // B's AGENTS.md is the same; only the shared Schema is missing.
   await expect(sheet.getByRole('checkbox', { name: /irori agent のファイル/ })).toBeChecked();
-  await expect(sheet.locator('label').filter({ hasText: 'irori agent のファイル' })).toContainText(
-    '1 件',
-  );
+  // What is missing is the checkbox's description (Astryx's CheckboxInput), not part of its name.
+  await expect(
+    sheet.getByRole('checkbox', { name: /irori agent のファイル/ }),
+  ).toHaveAccessibleDescription(/1 件/);
   await expect(sheet.getByRole('checkbox', { name: /SLACK_TOKEN/ })).toBeChecked();
   const restoreButton = sheet.getByRole('button', { name: '復元', exact: true });
   await expect(restoreButton).toBeDisabled();

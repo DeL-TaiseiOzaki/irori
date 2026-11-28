@@ -396,7 +396,7 @@ try {
   // Where vaults are added, an SSH host is a source beside a folder, a clone and a new one.
   await rail(page).getByRole('button', { name: 'vault を追加' }).click();
   const register = page.getByRole('dialog', { name: 'スペース登録' });
-  await register.getByRole('button', { name: 'SSH ホスト', exact: true }).click();
+  await register.getByRole('radio', { name: 'SSH ホスト', exact: true }).click();
   await register.getByRole('button', { name: /^Lab server/ }).click();
   const again = page.getByRole('dialog', { name: 'Lab server のフォルダを vault にする' });
   await expect(again.getByRole('listitem').filter({ hasText: 'notes' })).toContainText('vault');

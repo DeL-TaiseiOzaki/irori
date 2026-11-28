@@ -52,24 +52,10 @@
   font-size: 12px;
   font-weight: 600;
 }
-.modal .restore-list label {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  margin: 0;
+.modal .restore-list > :not(legend) {
+  /* Each choice is Astryx's checkbox; a hairline between them. */
   padding: 7px 2px;
-  border-bottom: 1px solid var(--rule-soft);
-  font-size: 13px;
-}
-.restore-list label[data-here] {
-  opacity: 0.6;
-}
-.restore-list small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  opacity: 0.75;
+  border-bottom: 1px solid var(--rule);
 }
 .restore-parent {
   display: grid;
