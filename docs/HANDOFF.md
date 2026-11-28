@@ -8,7 +8,8 @@
   - shortcut keys, counts, running marks and four empty pages.
 
   Native fields take Astryx's input look. `MagnetTabs` and `motion` are gone.
-- **State.** Open as a pull request, not merged.
+- **State.** Open in [#394](https://github.com/DeL-TaiseiOzaki/irori/pull/394),
+  not merged.
 - **Next: stage 3** (ADR 076 decision 8). Move menus, context menus,
   popovers, dialogs and the settings sheet from Base UI to Astryx in one
   stage, then drop Base UI. ⌘K becomes Astryx's command palette.
