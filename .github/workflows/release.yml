@@ -52,15 +52,17 @@ jobs:
       # Creating the release and uploading its assets is the only write this needs.
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          persist-credentials: false
           # The ancestry check below walks main's history. A depth-1 checkout holds only
           # main's tip, so any tested commit behind it, which is every commit whose
           # release notes are committed afterwards, fails as "not a valid commit".
           fetch-depth: 0
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: '24.21.0'
+          package-manager-cache: false
 
       - name: Resolve the named run
         id: source
