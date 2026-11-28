@@ -12,9 +12,10 @@ import {
 
 test('astryx-tokens.css is what the installed Astryx gives', async () => {
   const source = await readSource();
-  const installed = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-  assert.equal(source.coreVersion, installed.dependencies['@astryxdesign/core']);
-  assert.equal(source.themeVersion, installed.dependencies['@astryxdesign/theme-neutral']);
+  const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+  const pinned = { ...manifest.dependencies, ...manifest.devDependencies };
+  assert.equal(source.coreVersion, pinned['@astryxdesign/core']);
+  assert.equal(source.themeVersion, pinned['@astryxdesign/theme-neutral']);
   assert.equal(
     await readFile(astryxTokensFile, 'utf8'),
     await renderAstryxTokens(source),

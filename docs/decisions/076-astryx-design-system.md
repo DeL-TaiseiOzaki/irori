@@ -119,8 +119,10 @@ weakening what they prove.
   outcome still takes no colour.
 - The focus role has no hue, so a chosen option or a drop target is told by
   the accent, its muted fill and the ring.
-- `@astryxdesign/core`, `@astryxdesign/theme-neutral` and `@stylexjs/stylex`
-  are runtime dependencies. Stage 1 ships only the neutral theme's `fonts.css`
-  with Figtree's woff2 files; Astryx's component CSS and JavaScript come with
-  stage 2.
+- Stage 1 ships only the neutral theme's `fonts.css` with Figtree's woff2
+  files, so `@astryxdesign/theme-neutral` is its one runtime dependency;
+  `@astryxdesign/core` is a development dependency that the token script reads.
+  Stage 2 makes core and its peer `@stylexjs/stylex` runtime dependencies when
+  Astryx's component CSS and JavaScript are first bundled (the package smoke
+  requires every runtime dependency to be in the bundle's notices).
 - The download website keeps the earlier palette until stage 4.
