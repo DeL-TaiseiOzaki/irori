@@ -1,5 +1,12 @@
 # irori continuation handoff
 
+**The contents folder as a folder in Contents, 0.3.2**
+([ADR 071](decisions/071-a-vaults-own-files-in-contents.md) D3, amendment of
+2026-11-28): in a vault whose own files are Contents, the contents folder is a
+folder row (link icon, muted) among them instead of a separate heading. Next:
+merge and publish, then check a real Contents-only vault with a connection and
+the work folder in the packaged app.
+
 **Close a session from the session board, 0.3.1**
 ([ADR 069](decisions/069-session-board.md), amendment of 2026-11-25): a card's
 × stops its run, closes the conversation in every column and takes the card

@@ -417,7 +417,7 @@ export function Tree({
         )}
         {data && !data.error && !entries.length && (
           <small className="tree-empty" style={indent}>
-            {layer === 'contents' && !depth
+            {layer === 'contents' && space.contents.includes(directory)
               ? t(
                   '接続フォルダはありません（クラウド接続から追加）',
                   'No connected folders — add one above',
@@ -432,6 +432,8 @@ export function Tree({
             ? connections.find((item) => `${item.contentsRoot}/${item.name}` === entry.path)
             : undefined;
           const takesDrop = entry.directory && editable(entry);
+          // A contents folder among the vault's own files holds what is connected, outside Git.
+          const boundary = layer === 'contents' && space.contents.includes(entry.path);
           const clipped = explorer?.clipped;
           const isCut =
             clipped?.cut && clipped.scopeId === space.scopeId && clipped.path === entry.path;
@@ -448,13 +450,15 @@ export function Tree({
               )}
               <Icon
                 name={
-                  entry.repository
-                    ? 'branch'
-                    : entry.connection && !entry.local
-                      ? 'cloud'
-                      : entry.directory
-                        ? 'folder'
-                        : 'file'
+                  boundary
+                    ? 'link'
+                    : entry.repository
+                      ? 'branch'
+                      : entry.connection && !entry.local
+                        ? 'cloud'
+                        : entry.directory
+                          ? 'folder'
+                          : 'file'
                 }
                 size={15}
                 className={`tree-icon ${entry.connection ? 'drive' : ''}`}
@@ -476,9 +480,17 @@ export function Tree({
               ) : (
                 <button
                   ref={isSelected ? selectedRow : undefined}
-                  className={`tree-row ${entry.blocked ? 'muted' : ''} ${isSelected ? 'selected' : ''} ${takesDrop && drop.over === entry.path ? 'drop-target' : ''} ${isCut ? 'cut' : ''}`}
+                  className={`tree-row ${entry.blocked || boundary ? 'muted' : ''} ${isSelected ? 'selected' : ''} ${takesDrop && drop.over === entry.path ? 'drop-target' : ''} ${isCut ? 'cut' : ''}`}
                   style={indent}
                   data-entry={entry.path}
+                  title={
+                    boundary && !entry.blocked
+                      ? t(
+                          '接続したフォルダと作業フォルダの置き場所です。Git の対象外です。',
+                          'Where connected folders and the work folder are kept, outside Git.',
+                        )
+                      : undefined
+                  }
                   aria-current={isSelected ? 'page' : undefined}
                   aria-expanded={entry.directory && !entry.blocked ? isOpen : undefined}
                   draggable={movable(entry)}
@@ -675,10 +687,10 @@ function NoLayers() {
 const headingHeight = 30;
 
 /**
- * A vault's Contents: its own files when they are Contents (ADR 071), then what
- * its contents folders hold. Connected folders sit directly under the section; a
- * contents folder names itself when there is a second one or the vault's own
- * files stand above it.
+ * A vault's Contents. When its own files are Contents (ADR 071), they make one
+ * tree in which each contents folder is a folder row among them (ADR 071 D3, amended).
+ * Otherwise connected folders sit directly under the section, and a contents
+ * folder names itself when there is a second one.
  */
 function ContentsTrees({
   space,
@@ -697,41 +709,43 @@ function ContentsTrees({
   explorer?: Explorer;
   onOpen: (space: Space, entry: Entry) => void;
 }) {
-  const own = useMemo(
-    () =>
-      roots && ownLayer(space) === 'contents'
-        ? {
-            ...roots,
-            entries: roots.entries.filter(
-              (entry) => entry.layer === 'contents' && !space.contents.includes(entry.path),
-            ),
-          }
-        : undefined,
-    [roots, space],
-  );
+  const own = useMemo(() => {
+    if (!roots || ownLayer(space) !== 'contents') return undefined;
+    const entries = roots.entries.filter((entry) => entry.layer === 'contents');
+    // A contents folder declared inside a folder of the vault's own shows there.
+    const listed = (folder: string) =>
+      folder.includes('/') && entries.some((entry) => entry.path === folder.split('/')[0]);
+    return {
+      ...roots,
+      entries: entries.filter(
+        (entry) => !space.contents.includes(entry.path) || !listed(entry.path),
+      ),
+    };
+  }, [roots, space]);
   if (!roots) return <small className="tree-empty">{t('読み込み中…', 'Loading…')}</small>;
+  if (own)
+    return (
+      <div className="contents-root own">
+        <Tree
+          space={space}
+          layer="contents"
+          roots={own}
+          revision={revision}
+          selected={selected}
+          connections={connections}
+          onOpen={onOpen}
+          {...(explorer && { explorer, writable: true })}
+        />
+      </div>
+    );
   const folders = roots.entries.filter(
     (entry) => entry.layer === 'contents' && space.contents.includes(entry.path),
   );
   return (
     <>
-      {own && (
-        <div className="contents-root own">
-          <Tree
-            space={space}
-            layer="contents"
-            roots={own}
-            revision={revision}
-            selected={selected}
-            connections={connections}
-            onOpen={onOpen}
-            {...(explorer && { explorer, writable: true })}
-          />
-        </div>
-      )}
       {folders.map((root) => (
         <div key={root.path} className="contents-root">
-          {(folders.length > 1 || own) && <span className="contents-root-name">{root.path}</span>}
+          {folders.length > 1 && <span className="contents-root-name">{root.path}</span>}
           {root.blocked ? (
             <small className="tree-empty">{root.blocked}</small>
           ) : (

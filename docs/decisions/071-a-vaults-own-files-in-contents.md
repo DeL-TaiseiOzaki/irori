@@ -1,6 +1,7 @@
 # 071 — A vault's own files can be its Contents
 
-Date: 2026-11-24. Status: owner decision; implemented for 0.2.95.
+Date: 2026-11-24. Status: owner decision; implemented for 0.2.95. D3 amended
+2026-11-28 (0.3.2).
 Revises [ADR 070](070-a-vault-chooses-its-layers.md) decision 4 (without
 Knowledge, the vault's own files are Schema) and its first two consequences.
 Extends [ADR 019](019-local-folder-connections.md) (contents shows connections
@@ -39,6 +40,17 @@ repository of code is a vault as it is.
    holds is connected, not the vault's own, and ADR 019's rule for it is
    unchanged. The Contents section shows the vault's own files first and then
    the contents folder under its name.
+
+   *Amended 2026-11-28 (0.3.2), owner request.* The contents folder's name as a
+   heading below the vault's own files read as a layer of its own, most often
+   holding only the work folder. The Contents section is now one tree: each
+   contents folder is a folder row among the vault's own files, sorted with
+   them, with a link icon, muted text and a tooltip saying it keeps connected
+   folders and the work folder outside Git. It opens like any folder; it
+   cannot be renamed, moved or deleted from the tree and takes no new entries
+   at its top, as before. A contents folder declared inside one of the vault's
+   own folders shows inside that folder. A vault whose own files are not
+   Contents is unchanged.
 4. **Own files behave as an editable connection's do, in the vault's Git.**
    They open, save in place with the same conflict check, take new files,
    folders and notes, are renamed, moved, copied and sent to the system trash.
