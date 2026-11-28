@@ -25,6 +25,7 @@ import {
 import { Dialog } from './Dialog';
 import { errorText } from './ErrorMessage';
 import { Icon } from './Icon';
+import { Button, IconButton } from './controls';
 import { MagnetTabs } from './obsidian/MagnetTabs';
 import { secretInput, validSecretName } from './RoutineKeys';
 import { useAction } from './useAction';
@@ -137,14 +138,12 @@ function StepSecrets({
             <option key={name} value={name} />
           ))}
       </datalist>
-      <button
+      <Button
         type="button"
-        className="panel-button"
+        label={t('追加', 'Add')}
         disabled={!validSecretName(adding) || names.includes(adding) || names.length >= 20}
         onClick={add}
-      >
-        {t('追加', 'Add')}
-      </button>
+      />
     </div>
   );
 }
@@ -381,32 +380,26 @@ function StepCard({
               : 'vault agent'}
         </strong>
         <span className="routine-space" />
-        <button
+        <IconButton
           type="button"
-          className="icon-button"
-          aria-label={t(`${label}を上へ`, `Move ${label} up`)}
+          label={t(`${label}を上へ`, `Move ${label} up`)}
+          icon={<Icon name="up" size={13} />}
           disabled={index === 0}
           onClick={() => onMove(-1)}
-        >
-          <Icon name="up" size={13} />
-        </button>
-        <button
+        />
+        <IconButton
           type="button"
-          className="icon-button"
-          aria-label={t(`${label}を下へ`, `Move ${label} down`)}
+          label={t(`${label}を下へ`, `Move ${label} down`)}
+          icon={<Icon name="down" size={13} />}
           disabled={index === count - 1}
           onClick={() => onMove(1)}
-        >
-          <Icon name="down" size={13} />
-        </button>
-        <button
+        />
+        <IconButton
           type="button"
-          className="icon-button"
-          aria-label={t(`${label}を削除`, `Delete ${label}`)}
+          label={t(`${label}を削除`, `Delete ${label}`)}
+          icon={<Icon name="trash" size={13} />}
           onClick={onRemove}
-        >
-          <Icon name="trash" size={13} />
-        </button>
+        />
       </div>
       {step.kind === 'run' ? (
         <RunFields
@@ -592,17 +585,14 @@ export function RoutineEditor({
         ) : (
           <p className="routine-editor-path">
             <span className="routine-path mono">{editing?.path}</span>
-            <button
+            <IconButton
               type="button"
-              className="icon-button"
-              aria-label={t('フォルダを開く', 'Open the folder')}
-              title={t('フォルダを開く', 'Open the folder')}
+              label={t('フォルダを開く', 'Open the folder')}
+              icon={<Icon name="folderOpen" size={14} />}
               onClick={() =>
                 host.revealRoutine(editing!.ref).catch((reason) => setError(errorText(reason)))
               }
-            >
-              <Icon name="folderOpen" size={14} />
-            </button>
+            />
           </p>
         )}
         {source.error && (
@@ -644,24 +634,20 @@ export function RoutineEditor({
               role="group"
               aria-label={t('ステップを追加', 'Add a step')}
             >
-              <button
+              <Button
                 type="button"
-                className="panel-button"
+                label={t('エージェント', 'Agent')}
+                icon={<Icon name="plus" size={13} />}
                 disabled={steps.length >= routineSteps}
                 onClick={() => setSteps([...steps, agentDraft()])}
-              >
-                <Icon name="plus" size={13} />
-                {t('エージェント', 'Agent')}
-              </button>
-              <button
+              />
+              <Button
                 type="button"
-                className="panel-button"
+                label={t('プログラム', 'Program')}
+                icon={<Icon name="plus" size={13} />}
                 disabled={steps.length >= routineSteps}
                 onClick={() => setSteps([...steps, runDraft()])}
-              >
-                <Icon name="plus" size={13} />
-                {t('プログラム', 'Program')}
-              </button>
+              />
             </div>
           </>
         )}
@@ -711,13 +697,12 @@ export function RoutineEditor({
             {/* After a save that still cannot run, the file is written: closing keeps it. */}
             {version ? t('閉じる', 'Close') : t('キャンセル', 'Cancel')}
           </button>
-          <button
+          <Button
             type="submit"
-            className="primary"
+            variant="primary"
+            label={editing ? t('保存', 'Save') : t('作成', 'Create')}
             disabled={busy || !view || (editing ? !read : !name || !owner)}
-          >
-            {editing ? t('保存', 'Save') : t('作成', 'Create')}
-          </button>
+          />
         </div>
       </form>
     </Dialog>,

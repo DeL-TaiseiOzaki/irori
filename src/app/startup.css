@@ -68,7 +68,7 @@
   font-size: 12.5px;
   color: var(--tx-2);
 }
-.start-footer .update-notice > button,
+.start-footer .update-notice > button:not(:where(.astryx-button)),
 .start-footer .cloud-recovery-trigger,
 .start-footer .language-switch,
 .start-footer .start-settings {
@@ -80,7 +80,7 @@
   color: var(--tx-2);
   font-size: 12.5px;
 }
-.start-footer .update-notice > button:hover:not(:disabled),
+.start-footer .update-notice > button:not(:where(.astryx-button)):hover:not(:disabled),
 .start-footer .cloud-recovery-trigger:hover,
 .start-footer .language-switch:hover,
 .start-footer .start-settings:hover {
@@ -442,7 +442,7 @@
   flex-wrap: wrap;
   gap: 6px;
 }
-.start .start-add button {
+.start .start-add button:not(:where(.astryx-button)) {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -454,7 +454,7 @@
   color: var(--tx-2);
   text-align: left;
 }
-.start .start-add button:hover:not(:disabled) {
+.start .start-add button:not(:where(.astryx-button)):hover:not(:disabled) {
   background: var(--raised);
   color: var(--tx);
 }
@@ -462,12 +462,12 @@
   font-size: 13px;
   font-weight: 500;
 }
-.start .start-first .start-add button:first-child {
+.start .start-first .start-add button:not(:where(.astryx-button)):first-child {
   background: var(--solid);
   color: var(--on-solid);
   box-shadow: none;
 }
-.start .start-first .start-add button:first-child strong {
+.start .start-first .start-add button:not(:where(.astryx-button)):first-child strong {
   font-weight: 600;
 }
 

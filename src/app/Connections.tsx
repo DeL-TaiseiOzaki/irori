@@ -9,6 +9,7 @@ import { useResource } from './useResource';
 import { t } from '../domain/i18n';
 import { BrainTile } from './BrainTile';
 import { Icon } from './Icon';
+import { Button, IconButton } from './controls';
 import './connections.css';
 const host = window.irori;
 // States are looked up inside render so they resolve in the current language.
@@ -91,9 +92,15 @@ function MoreMenu({
 }) {
   return (
     <Menu.Root modal={false}>
-      <Menu.Trigger className="stage-button connect-more" aria-label={label} title={label}>
-        <Icon name="more" size={15} />
-      </Menu.Trigger>
+      <Menu.Trigger
+        render={
+          <IconButton
+            className="connect-more"
+            label={label}
+            icon={<Icon name="more" size={15} />}
+          />
+        }
+      />
       {/* Inside the sheet: a modal dialog leaves everything outside it inert. */}
       <Menu.Portal container={container}>
         <Menu.Positioner side="bottom" align="end" sideOffset={6} positionMethod="fixed">
@@ -233,15 +240,13 @@ export function Connections({
               {t('の Contents にフォルダを接続', '· Connect folders to Contents')}
             </span>
           </h2>
-          <button
-            className="stage-button connect-close"
-            aria-label={t('閉じる', 'Close')}
-            title={t('閉じる', 'Close')}
+          <IconButton
+            className="connect-close"
+            label={t('閉じる', 'Close')}
+            icon={<Icon name="close" size={17} />}
             disabled={busy}
             onClick={onClose}
-          >
-            <Icon name="close" size={17} />
-          </button>
+          />
         </header>
         <div className="connect-body">
           <div className="connect-steps">
@@ -262,28 +267,24 @@ export function Connections({
                     ['github', 'branch', 'GitHub'],
                   ] as const
                 ).map(([value, icon, label]) => (
-                  <button
+                  <Button
                     key={value}
-                    className="stage-text-button framed small"
+                    label={label}
+                    icon={<Icon name={icon} size={14} />}
                     aria-pressed={source === value}
                     disabled={busy}
                     onClick={() => chooseSource(value)}
-                  >
-                    <Icon name={icon} size={14} />
-                    {label}
-                  </button>
+                  />
                 ))}
               </div>
               {source === 'local' ? (
                 <div className="local-pick">
-                  <button
-                    className="stage-text-button framed small"
+                  <Button
+                    label={t('フォルダを選ぶ', 'Choose folder')}
+                    icon={<Icon name="folderOpen" size={14} />}
                     disabled={busy}
                     onClick={() => void perform(chooseLocal)}
-                  >
-                    <Icon name="folderOpen" size={14} />
-                    {t('フォルダを選ぶ', 'Choose folder')}
-                  </button>
+                  />
                   {localPath && <span className="mono local-path">{localPath}</span>}
                 </div>
               ) : (
@@ -322,22 +323,18 @@ export function Connections({
                     </p>
                   )}
                   <div className="local-pick">
-                    <button
-                      className="stage-text-button framed small"
+                    <Button
+                      label={t('保存先を選ぶ', 'Choose where to clone')}
+                      icon={<Icon name="download" size={14} />}
                       disabled={busy || !validURL}
                       onClick={() => void perform(() => chooseRepositoryFolder(false))}
-                    >
-                      <Icon name="download" size={14} />
-                      {t('保存先を選ぶ', 'Choose where to clone')}
-                    </button>
-                    <button
-                      className="stage-text-button framed small"
+                    />
+                    <Button
+                      label={t('手元のクローンを選ぶ', 'Choose a clone')}
+                      icon={<Icon name="folderOpen" size={14} />}
                       disabled={busy || !validURL}
                       onClick={() => void perform(() => chooseRepositoryFolder(true))}
-                    >
-                      <Icon name="folderOpen" size={14} />
-                      {t('手元のクローンを選ぶ', 'Choose a clone')}
-                    </button>
+                    />
                     {localPath && (
                       <span className="mono local-path">
                         {existing ? localPath : `${localPath}/${repositoryFolder(url.trim())}`}
@@ -443,15 +440,18 @@ export function Connections({
                     </span>
                   </p>
                   <div className="connect-submit">
-                    <button
-                      className="solid-button"
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="md"
+                      label={
+                        source === 'github' && !existing
+                          ? t('取得して接続', 'Clone and connect')
+                          : t('登録して接続', 'Register and connect')
+                      }
+                      icon={<Icon name={source === 'github' ? 'branch' : 'folder'} size={15} />}
                       disabled={busy || !!invalidName || (source === 'github' && !validBranch)}
-                    >
-                      <Icon name={source === 'github' ? 'branch' : 'folder'} size={15} />
-                      {source === 'github' && !existing
-                        ? t('取得して接続', 'Clone and connect')
-                        : t('登録して接続', 'Register and connect')}
-                    </button>
+                    />
                   </div>
                   {cloning === '' && !existing && <CloningNote />}
                 </form>
@@ -521,8 +521,9 @@ export function Connections({
                 )}
                 <div className="connection-actions">
                   {connection.provider === 'github' && connection.state === 'unconfigured' ? (
-                    <button
-                      className="stage-text-button framed"
+                    <Button
+                      label={t('取得', 'Clone')}
+                      size="md"
                       disabled={busy}
                       onClick={() =>
                         void perform(async () => {
@@ -534,25 +535,24 @@ export function Connections({
                           await host.connectCloud(space.scopeId, connection.mountId);
                         })
                       }
-                    >
-                      {t('取得', 'Clone')}
-                    </button>
+                    />
                   ) : connection.state === 'mounted' ? (
                     <>
-                      <button
-                        className="stage-text-button framed"
+                      <Button
+                        label={t('フォルダを開く', 'Open folder')}
+                        size="md"
                         disabled={busy}
                         onClick={() =>
                           void perform(() =>
                             host.openCloudFolder(space.scopeId, connection.mountId),
                           )
                         }
-                      >
-                        {t('フォルダを開く', 'Open folder')}
-                      </button>
+                      />
                       {connection.provider === 'github' && (
-                        <button
-                          className="stage-text-button framed"
+                        <Button
+                          label={t('最新にする', 'Update')}
+                          size="md"
+                          icon={<Icon name="refresh" size={13} />}
                           disabled={disabled}
                           onClick={() =>
                             void perform(async () => {
@@ -575,25 +575,26 @@ export function Connections({
                               });
                             })
                           }
-                        >
-                          <Icon name="refresh" size={13} />
-                          {t('最新にする', 'Update')}
-                        </button>
+                        />
                       )}
                     </>
                   ) : (
-                    <button
-                      className="stage-text-button framed"
+                    <Button
+                      label={t('再接続', 'Reconnect')}
+                      size="md"
                       disabled={busy || connection.state === 'unconfigured'}
                       onClick={() =>
                         void perform(() => host.connectCloud(space.scopeId, connection.mountId))
                       }
-                    >
-                      {t('再接続', 'Reconnect')}
-                    </button>
+                    />
                   )}
-                  <button
-                    className="stage-text-button framed"
+                  <Button
+                    size="md"
+                    label={
+                      connection.access === 'read-write'
+                        ? t('読み取り専用にする', 'Make read-only')
+                        : t('編集を許可', 'Allow editing')
+                    }
                     disabled={held(connection) || connection.state === 'connecting'}
                     title={accessNote(
                       connection.access === 'read-write' ? 'read-only' : 'read-write',
@@ -607,11 +608,7 @@ export function Connections({
                         ),
                       )
                     }
-                  >
-                    {connection.access === 'read-write'
-                      ? t('読み取り専用にする', 'Make read-only')
-                      : t('編集を許可', 'Allow editing')}
-                  </button>
+                  />
                   <MoreMenu label={t('接続先の操作', 'Connection actions')} host={sheet}>
                     {(connection.state === 'mounted' ||
                       connection.state === 'waiting' ||
@@ -685,17 +682,18 @@ export function Connections({
                       required
                     />
                     <div className="connection-actions">
-                      <button
+                      <Button
                         type="button"
-                        className="stage-text-button framed small"
+                        label={t('キャンセル', 'Cancel')}
                         disabled={busy}
                         onClick={() => setEditing(undefined)}
-                      >
-                        {t('キャンセル', 'Cancel')}
-                      </button>
-                      <button className="solid-button" disabled={busy || !!mountNameError(newName)}>
-                        {t('保存', 'Save')}
-                      </button>
+                      />
+                      <Button
+                        type="submit"
+                        variant="primary"
+                        label={t('保存', 'Save')}
+                        disabled={busy || !!mountNameError(newName)}
+                      />
                     </div>
                     {mountNameError(newName) && (
                       <small role="alert">{mountNameError(newName)}</small>
@@ -740,29 +738,31 @@ export function Connections({
                     {stray.target && <span className="connection-path mono">→ {stray.target}</span>}
                     <div className="connection-actions">
                       {stray.kind === 'link' && (
-                        <button
-                          className="stage-text-button framed"
+                        <Button
+                          size="md"
+                          label={
+                            stray.missing
+                              ? t('フォルダを選んで接続', 'Choose folder and connect')
+                              : t('接続として登録', 'Register as connection')
+                          }
                           disabled={busy}
                           onClick={() => void perform(() => adopt(stray))}
-                        >
-                          {stray.missing
-                            ? t('フォルダを選んで接続', 'Choose folder and connect')
-                            : t('接続として登録', 'Register as connection')}
-                        </button>
+                        />
                       )}
-                      <button
-                        className="stage-text-button framed"
+                      <Button
+                        size="md"
+                        label={
+                          stray.kind === 'link'
+                            ? t('リンクを削除', 'Remove link')
+                            : t('ゴミ箱に移動', 'Move to trash')
+                        }
                         disabled={disabled}
                         onClick={() =>
                           void perform(() =>
                             host.removeStray(space.scopeId, stray.contentsRoot, stray.name),
                           )
                         }
-                      >
-                        {stray.kind === 'link'
-                          ? t('リンクを削除', 'Remove link')
-                          : t('ゴミ箱に移動', 'Move to trash')}
-                      </button>
+                      />
                     </div>
                   </div>
                 ))}

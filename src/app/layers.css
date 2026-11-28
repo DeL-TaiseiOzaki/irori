@@ -1,0 +1,5 @@
+/* The cascade layers, in order (ADR 076). irori's element defaults sit under
+   Astryx's components and its theme; irori's own component rules are unlayered and
+   win over all of them. This file is imported first, so it fixes the order before
+   Astryx's stylesheets name their layers. */
+@layer irori-defaults, reset, astryx-base, astryx-theme;

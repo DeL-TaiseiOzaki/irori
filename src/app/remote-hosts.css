@@ -90,7 +90,7 @@
   direction: rtl;
   text-align: left;
 }
-.settings-body button.remote-add-vault {
+.settings-body button:not(:where(.astryx-button)).remote-add-vault {
   align-self: flex-start;
 }
 

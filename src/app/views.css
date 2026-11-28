@@ -19,16 +19,6 @@
   margin-left: 18px;
   margin-right: 18px;
 }
-.stage-text-button.small {
-  height: 28px;
-  padding: 0 9px;
-  border-radius: var(--radius-element);
-  font-size: 12.5px;
-}
-.stage-text-button.ask-ai {
-  color: var(--ink);
-  font-weight: 600;
-}
 .crumb.brain:is(button) {
   height: 28px;
   padding: 0 7px 0 4px;
@@ -153,18 +143,6 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-}
-.primary-button.home-button {
-  height: 32px;
-  padding: 0 13px;
-  border-radius: var(--radius-element);
-  font-size: 13px;
-}
-.primary-button.small {
-  height: 28px;
-  padding: 0 11px;
-  border-radius: var(--radius-element);
-  font-size: 12.5px;
 }
 /* The body follows the stage's width, which the panels beside it change: two
    columns where there is room, one below it, the main column first. */
@@ -307,7 +285,7 @@ button.home-row:hover {
 .home-row-name.mono {
   font-size: 12px;
 }
-.home-card.schema button.home-row .home-row-icon {
+.home-card.schema button:not(:where(.astryx-button)).home-row .home-row-icon {
   color: var(--schema-ink);
 }
 .home-more,
@@ -472,10 +450,6 @@ button.home-row:hover {
   background: var(--add-wash);
   color: var(--add-ink);
 }
-.stage-button[aria-pressed='true'] {
-  background: var(--stage-2);
-  color: var(--ink);
-}
 .graph-view .stage-view-body {
   overflow: hidden;
 }
@@ -600,7 +574,7 @@ button.home-row:hover {
   color: var(--ink-2);
   cursor: pointer;
 }
-.graph-table .ontology-list td button {
+.graph-table .ontology-list td button:not(:where(.astryx-button)) {
   padding: 0;
   background: none;
   box-shadow: none;
@@ -635,9 +609,6 @@ button.home-row:hover {
   padding: 40px 24px;
   text-align: center;
   color: var(--ink-2);
-}
-.graph-empty .solid-button {
-  height: 34px;
 }
 
 /* Materials and outputs. */
@@ -693,7 +664,7 @@ button.home-row:hover {
 }
 .records-side input,
 .records-side select,
-.records-side button {
+.records-side button:not(:where(.astryx-button)) {
   width: 100%;
 }
 .records-view details {
@@ -717,8 +688,8 @@ button.home-row:hover {
   margin-bottom: 6px;
   overflow-wrap: anywhere;
 }
-.records-view li button,
-.records-view p button {
+.records-view li button:not(:where(.astryx-button)),
+.records-view p button:not(:where(.astryx-button)) {
   padding: 3px 9px;
   margin: 2px 4px 2px 0;
   font-size: 12px;
@@ -934,7 +905,7 @@ button.home-row:hover {
   flex-direction: column;
   gap: 2px;
 }
-.palette .search-results button {
+.palette .search-results button:not(:where(.astryx-button)) {
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -946,8 +917,8 @@ button.home-row:hover {
   text-align: left;
   font-weight: 400;
 }
-.palette .search-results button:hover:not(:disabled),
-.palette .search-results button[aria-current='true'] {
+.palette .search-results button:not(:where(.astryx-button)):hover:not(:disabled),
+.palette .search-results button:not(:where(.astryx-button))[aria-current='true'] {
   background: var(--raised-2);
 }
 .search-result-location {
@@ -1449,11 +1420,6 @@ button.home-row:hover {
 }
 .brain-sheet-footer .danger {
   color: var(--danger);
-}
-.brain-sheet-footer .solid-button {
-  height: 34px;
-  padding: 0 14px;
-  border-radius: var(--radius-element);
 }
 .home-title h1 {
   display: flex;

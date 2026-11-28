@@ -13,6 +13,7 @@ import {
 import { findAll, FindTurns } from '../domain/find';
 import { t } from '../domain/i18n';
 import { Icon } from './Icon';
+import { IconButton } from './controls';
 
 /** How many occurrences a search found, and which to show first. */
 export interface FindCount {
@@ -270,32 +271,26 @@ export function FindScope({
                 {count}
               </span>
             </div>
-            <button
-              className="icon-button"
-              aria-label={t('前の一致', 'Previous match')}
+            <IconButton
+              label={t('前の一致', 'Previous match')}
               title={t('前の一致 (Shift+Enter)', 'Previous match (Shift+Enter)')}
+              icon={<Icon name="up" size={14} />}
               disabled={!found?.count}
               onClick={() => step(-1)}
-            >
-              <Icon name="up" size={14} />
-            </button>
-            <button
-              className="icon-button"
-              aria-label={t('次の一致', 'Next match')}
+            />
+            <IconButton
+              label={t('次の一致', 'Next match')}
               title={t('次の一致 (Enter)', 'Next match (Enter)')}
+              icon={<Icon name="down" size={14} />}
               disabled={!found?.count}
               onClick={() => step(1)}
-            >
-              <Icon name="down" size={14} />
-            </button>
-            <button
-              className="icon-button"
-              aria-label={t('検索を閉じる', 'Close find')}
+            />
+            <IconButton
+              label={t('検索を閉じる', 'Close find')}
               title={t('閉じる (Esc)', 'Close (Esc)')}
+              icon={<Icon name="close" size={14} />}
               onClick={close}
-            >
-              <Icon name="close" size={14} />
-            </button>
+            />
           </>
         )}
       </div>

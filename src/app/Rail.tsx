@@ -15,6 +15,7 @@ import { appIcon } from './branding';
 import { BrainTile } from './BrainTile';
 import { Dialog } from './Dialog';
 import { Icon } from './Icon';
+import { Button } from './controls';
 import { shortcut } from './shortcuts';
 import { useLanguage } from './useLanguage';
 import { aiStateWords } from './display';
@@ -329,9 +330,11 @@ export const Rail = memo(function Rail({
               <button type="button" onClick={() => setNaming(undefined)}>
                 {t('キャンセル', 'Cancel')}
               </button>
-              <button className="primary">
-                {naming.groupId ? t('変更', 'Rename') : t('作成', 'Create')}
-              </button>
+              <Button
+                type="submit"
+                variant="primary"
+                label={naming.groupId ? t('変更', 'Rename') : t('作成', 'Create')}
+              />
             </div>
           </form>
         </Dialog>

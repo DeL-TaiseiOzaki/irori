@@ -22,6 +22,7 @@ import {
 } from '../domain/agent-log';
 import { t } from '../domain/i18n';
 import { Icon } from './Icon';
+import { Button } from './controls';
 import { BrainTile } from './BrainTile';
 import { useLanguage } from './useLanguage';
 import { PathBase } from './path-links';
@@ -294,17 +295,18 @@ export function AgentRequest({
         <pre>{event.details}</pre>
       </details>
       <div className="request-actions">
-        <button className="panel-button" disabled={sending} onClick={() => void reply(false)}>
-          {questions ? t('回答しない', 'Decline') : t('拒否', 'Deny')}
-        </button>
+        <Button
+          label={questions ? t('回答しない', 'Decline') : t('拒否', 'Deny')}
+          disabled={sending}
+          onClick={() => void reply(false)}
+        />
         {(!quick || Object.values(drafts).some((draft) => draft.other)) && (
-          <button
-            className="primary-button"
+          <Button
+            variant="primary"
+            label={questions ? t('回答する', 'Answer') : t('今回のみ許可', 'Allow this time')}
             disabled={sending || (!!questions && !questionsAnswered(questions, answers!))}
             onClick={() => void reply(true, answers)}
-          >
-            {questions ? t('回答する', 'Answer') : t('今回のみ許可', 'Allow this time')}
-          </button>
+          />
         )}
       </div>
     </div>

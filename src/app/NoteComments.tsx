@@ -5,6 +5,7 @@ import type { NoteComment } from '../domain/comments';
 import type { EditorSelection } from '../editor/Editor';
 import { displayLocale, t } from '../domain/i18n';
 import { Icon } from './Icon';
+import { Button, IconButton } from './controls';
 import { useResource } from './useResource';
 import { useAction } from './useAction';
 
@@ -122,10 +123,26 @@ export function NoteComments({
         setOpen(next);
       }}
     >
-      <Popover.Trigger className="stage-button comments-trigger" aria-label={label} title={label}>
-        <Icon name="comment" size={16} />
-        {!!count && <span className="backlinks-count">{countLabel(count)}</span>}
-      </Popover.Trigger>
+      <Popover.Trigger
+        render={
+          count ? (
+            <Button
+              className="comments-trigger"
+              variant="ghost"
+              label={label}
+              icon={<Icon name="comment" size={16} />}
+            >
+              <span className="backlinks-count">{countLabel(count)}</span>
+            </Button>
+          ) : (
+            <IconButton
+              className="comments-trigger"
+              label={label}
+              icon={<Icon name="comment" size={16} />}
+            />
+          )
+        }
+      />
       <Popover.Portal>
         <Popover.Positioner
           side="bottom"
@@ -136,9 +153,11 @@ export function NoteComments({
           <Popover.Popup className="stage-popover comments-popover">
             <div className="backlinks-heading">
               <Popover.Title render={<h3 />}>{t('コメント', 'Comments')}</Popover.Title>
-              <Popover.Close className="stage-button" aria-label={t('閉じる', 'Close')}>
-                <Icon name="close" size={15} />
-              </Popover.Close>
+              <Popover.Close
+                render={
+                  <IconButton label={t('閉じる', 'Close')} icon={<Icon name="close" size={15} />} />
+                }
+              />
             </div>
             <form
               className="comment-composer"
@@ -150,15 +169,12 @@ export function NoteComments({
               {quote && (
                 <div className="comment-quote selected">
                   <span>{clip(quote.quote, 240)}</span>
-                  <button
+                  <IconButton
                     type="button"
-                    className="stage-button"
-                    aria-label={t('引用を外す', 'Remove the quote')}
-                    title={t('引用を外す', 'Remove the quote')}
+                    label={t('引用を外す', 'Remove the quote')}
+                    icon={<Icon name="close" size={13} />}
                     onClick={() => setQuote(undefined)}
-                  >
-                    <Icon name="close" size={13} />
-                  </button>
+                  />
                 </div>
               )}
               <textarea
@@ -223,18 +239,15 @@ export function NoteComments({
                           .filter(Boolean)
                           .join(' · ')}
                       </small>
-                      <button
+                      <IconButton
                         type="button"
-                        className="stage-button"
                         disabled={busy}
-                        aria-label={t('解決', 'Resolve')}
-                        title={t('解決', 'Resolve')}
+                        label={t('解決', 'Resolve')}
+                        icon={<Icon name="check" size={14} />}
                         onClick={() =>
                           void change(() => host.removeNoteComment(scopeId, path, comment.id))
                         }
-                      >
-                        <Icon name="check" size={14} />
-                      </button>
+                      />
                     </div>
                   </li>
                 ))}

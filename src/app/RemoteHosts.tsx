@@ -13,6 +13,7 @@ import { baseName } from '../domain/paths';
 import { t } from '../domain/i18n';
 import { Dialog } from './Dialog';
 import { Icon } from './Icon';
+import { Button } from './controls';
 import { ErrorMessage, errorText } from './ErrorMessage';
 import { LayerChoice } from './LayerChoice';
 import { hostEvents } from './host-events';
@@ -235,9 +236,14 @@ export function HostForm({
             {t('キャンセル', 'Cancel')}
           </button>
         )}
-        <button type="submit" className="primary" disabled={busy}>
-          {busy ? t('保存しています…', 'Saving…') : remote ? t('保存', 'Save') : t('追加', 'Add')}
-        </button>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={busy}
+          label={
+            busy ? t('保存しています…', 'Saving…') : remote ? t('保存', 'Save') : t('追加', 'Add')
+          }
+        />
       </div>
     </form>
   );
@@ -509,9 +515,12 @@ function SshQuestion({
             {t('キャンセル', 'Cancel')}
           </button>
           {question.kind !== 'notice' && (
-            <button type="submit" className="primary" disabled={stopped}>
-              {question.kind === 'confirm' ? t('続ける', 'Continue') : t('送信', 'Send')}
-            </button>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={stopped}
+              label={question.kind === 'confirm' ? t('続ける', 'Continue') : t('送信', 'Send')}
+            />
           )}
         </div>
       </form>
@@ -974,9 +983,12 @@ export function RemoteFolderDialog({
           <button type="button" disabled={busy} onClick={onCancel}>
             {t('キャンセル', 'Cancel')}
           </button>
-          <button type="submit" className="primary" disabled={busy || !shown}>
-            {t('vault にする', 'Make it a vault')}
-          </button>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={busy || !shown}
+            label={t('vault にする', 'Make it a vault')}
+          />
         </div>
       </form>
     </Dialog>,
@@ -1027,15 +1039,14 @@ export function RemoteVaultState({ space }: { space: Space }) {
       {connection.error && connection.error !== remote.detail && (
         <ErrorMessage text={connection.error} />
       )}
-      <button
+      <Button
         type="button"
-        className="stage-text-button framed"
+        size="md"
+        label={t('接続', 'Connect')}
+        icon={<Icon name={connecting ? 'loader' : 'server'} size={14} />}
         disabled={connecting}
         onClick={() => void connection.connect()}
-      >
-        <Icon name={connecting ? 'loader' : 'server'} size={14} />
-        {t('接続', 'Connect')}
-      </button>
+      />
     </div>
   );
 }

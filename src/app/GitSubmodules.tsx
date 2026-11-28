@@ -5,6 +5,7 @@ import { Dialog } from './Dialog';
 import { ErrorMessage } from './ErrorMessage';
 import { useAction } from './useAction';
 import { Icon } from './Icon';
+import { Button } from './controls';
 import { ArrowFillButton } from './obsidian/ArrowFillButton';
 
 /** Chooses which of the vault's repositories the Changes view shows (ADR 022). */
@@ -59,10 +60,13 @@ export function UnfetchedSubmodule({
       <h2>{t('未取得', 'Not fetched')}</h2>
       <p>{submodule.repository ?? submodule.path}</p>
       {error && <ErrorMessage className="git-notice error" text={error} />}
-      <button className="solid-button" disabled={busy} onClick={onFetch}>
-        <Icon name="down" size={14} />
-        {busy ? t('取得しています…', 'Fetching…') : t('取得', 'Fetch')}
-      </button>
+      <Button
+        variant="primary"
+        label={busy ? t('取得しています…', 'Fetching…') : t('取得', 'Fetch')}
+        icon={<Icon name="down" size={14} />}
+        disabled={busy}
+        onClick={onFetch}
+      />
     </div>
   );
 }

@@ -59,11 +59,6 @@
   font-weight: 650;
   color: var(--ink);
 }
-.connect-sheet .connect-close {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-}
 
 /* Body: steps and the registered folders */
 .connect-sheet .connect-body {
@@ -310,12 +305,6 @@
   display: flex;
   justify-content: flex-end;
 }
-.connect-sheet .connect-submit .solid-button {
-  height: 34px;
-  padding: 0 13px;
-  border-radius: var(--radius-element);
-  font-size: 13px;
-}
 
 /* Registered folders */
 .connect-sheet .connection-card {
@@ -409,19 +398,6 @@
   gap: 6px;
   padding-top: 2px;
 }
-.connect-sheet .connection-actions .stage-text-button {
-  height: 30px;
-  padding: 0 13px;
-  font-weight: 500;
-}
-.connect-sheet .connection-actions .stage-text-button.small {
-  height: 28px;
-  padding: 0 10px;
-}
-.connect-sheet .connection-actions .solid-button {
-  height: 28px;
-  padding: 0 11px;
-}
 .connect-sheet .connection-actions .connect-more {
   margin-left: auto;
 }
@@ -454,11 +430,11 @@
   display: flex;
   gap: 6px;
 }
-.connect-sheet .connect-source button {
+.connect-sheet .connect-source button:not(:where(.astryx-button)) {
   gap: 6px;
   color: var(--ink-2);
 }
-.connect-sheet .connect-source button[aria-pressed='true'] {
+.connect-sheet .connect-source button:not(:where(.astryx-button))[aria-pressed='true'] {
   background: var(--stage-2);
   color: var(--ink);
 }
@@ -468,7 +444,7 @@
   align-items: center;
   gap: 10px;
 }
-.connect-sheet .local-pick button {
+.connect-sheet .local-pick button:not(:where(.astryx-button)) {
   gap: 6px;
 }
 .connect-sheet .local-path {

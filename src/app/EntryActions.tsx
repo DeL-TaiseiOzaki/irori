@@ -9,6 +9,7 @@ import { t } from '../domain/i18n';
 import { parentPath } from '../domain/paths';
 import { inContentsFolder } from '../domain/scopes';
 import { useAction } from './useAction';
+import { Button } from './controls';
 import type { Brought } from './dropped';
 
 const host = window.irori;
@@ -284,9 +285,12 @@ export function NewEntryDialog({
           <button type="button" disabled={busy} onClick={onClose}>
             {t('キャンセル', 'Cancel')}
           </button>
-          <button className="primary" disabled={busy || !!problem}>
-            {t('作成', 'Create')}
-          </button>
+          <Button
+            type="submit"
+            variant="primary"
+            label={t('作成', 'Create')}
+            disabled={busy || !!problem}
+          />
         </div>
       </form>
     </Dialog>
@@ -443,13 +447,18 @@ export function EntryDialog({
           <button type="button" disabled={busy} onClick={onClose}>
             {t('キャンセル', 'Cancel')}
           </button>
-          <button className="primary" disabled={busy || !!problem || unchanged}>
-            {action === 'delete'
-              ? knowledgeNote
-                ? t('削除済みに移す', 'Move to deleted')
-                : t('ゴミ箱に移す', 'Move to trash')
-              : title}
-          </button>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={busy || !!problem || unchanged}
+            label={
+              action === 'delete'
+                ? knowledgeNote
+                  ? t('削除済みに移す', 'Move to deleted')
+                  : t('ゴミ箱に移す', 'Move to trash')
+                : title
+            }
+          />
         </div>
       </form>
     </Dialog>
