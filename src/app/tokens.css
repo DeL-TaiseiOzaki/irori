@@ -1,12 +1,14 @@
-/* irori design tokens (ADR 014, colour roles from ADR 053). Every colour in the
-   renderer resolves through one of these roles, and each role means one thing:
+/* irori design tokens (ADR 014, colour roles from ADR 053, values from Astryx since
+   ADR 076). Every colour in the renderer resolves through one of these roles, and each
+   role means one thing:
 
    - brand (--brand): irori's ember. The mark and the website only; never a
      control, a state or the AI.
-   - action (--solid, --ink-solid): the primary button of a place, solid ink on
-     paper or paper on graphite. No hue.
+   - action (--solid, --ink-solid): the primary button of a place: Astryx's accent,
+     which in its neutral theme is ink on paper or paper on graphite. No hue.
    - focus (--focus, --act*): where the person is — the keyboard focus, the
-     column being edited, a chosen option, a drop target.
+     column being edited, a chosen option, a drop target. Astryx's focus ring is
+     its accent too, so focus is told by the ring, not by a hue.
    - running (--run*): something works on its own. A neutral colour that moves.
    - attention (--attn*): something waits for the person — an approval, a
      conflict, a warning.
@@ -17,17 +19,14 @@
    A normal outcome (saved, connected, succeeded) takes no colour, and links
    are ink with an underline.
 
+   The values are Astryx's neutral theme, written out by scripts/astryx-tokens.ts in
+   astryx-tokens.css. A two-sided Astryx colour is named here by the side it takes:
+   --dark-… on the chrome of hearth and dark, --light-… on paper. Only the brand is
+   irori's own.
+
    Themes: hearth (graphite chrome, paper stage) is the canvas default and the
    system choice in a light desktop; light is paper throughout; dark is graphite
    throughout. The renderer writes the resolved theme into data-theme. */
-
-@font-face {
-  font-family: 'Geist';
-  src: url('./fonts/Geist-Variable.woff2') format('woff2');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
 
 @font-face {
   font-family: 'Geist Mono';
@@ -43,238 +42,211 @@
   --chrome-scheme: dark;
   --stage-scheme: light;
 
-  /* chrome */
-  --bg: #121417;
-  --rail-tx: #8b929e;
-  --panel: #171a1e;
-  --raised: #1e2228;
-  --raised-2: #262b33;
-  --field: #0f1114;
-  --hair: rgba(255, 255, 255, 0.07);
-  --hair-2: rgba(255, 255, 255, 0.13);
-  --hair-3: rgba(255, 255, 255, 0.22);
-  --tx: #eceef2;
-  --tx-2: #9ea5b0;
-  --tx-3: #78808c;
-  --solid: #eceef2;
-  --on-solid: #131519;
+  /* chrome: Astryx's dark body, its surface for what is raised */
+  --bg: var(--dark-color-background-body);
+  --rail-tx: var(--dark-color-text-secondary);
+  --panel: var(--dark-color-background-body);
+  --raised: var(--dark-color-background-surface);
+  --raised-2: var(--dark-color-background-gray);
+  --field: var(--dark-color-background-surface);
+  --hair: var(--dark-color-border);
+  --hair-2: color-mix(in srgb, var(--dark-color-border-emphasized) 72%, transparent);
+  --hair-3: var(--dark-color-border-emphasized);
+  --tx: var(--dark-color-text-primary);
+  --tx-2: var(--dark-color-text-secondary);
+  --tx-3: color-mix(in srgb, var(--dark-color-text-secondary) 72%, var(--dark-color-text-disabled));
+  --solid: var(--dark-color-accent);
+  --on-solid: var(--dark-color-on-accent);
 
   /* brand: the mark only */
   --brand: #e06d26;
 
   /* focus: where the person is */
-  --focus: #3b72f6;
-  --act: #6b9aff;
-  --act-soft: rgba(107, 154, 255, 0.13);
-  --act-line: rgba(107, 154, 255, 0.46);
+  --act: var(--dark-color-accent);
+  --act-soft: var(--dark-color-accent-muted);
+  --act-line: color-mix(in srgb, var(--dark-color-accent) 46%, transparent);
 
   /* running: neutral, told by motion */
-  --run: #d4d8df;
+  --run: var(--dark-color-text-secondary);
 
   /* attention: waits for the person */
-  --attn: #e5a93b;
-  --attn-tx: #f0be63;
-  --attn-soft: rgba(229, 169, 59, 0.12);
-  --attn-line: rgba(229, 169, 59, 0.48);
+  --attn: var(--color-warning);
+  --attn-tx: var(--dark-color-text-warning);
+  --attn-soft: var(--dark-color-warning-muted);
+  --attn-line: var(--dark-color-border-yellow);
 
   /* danger: failed or cannot be undone */
-  --danger-tx: #f79283;
-  --danger-soft: rgba(242, 108, 90, 0.12);
-  --danger-line: rgba(242, 108, 90, 0.44);
+  --danger-tx: var(--dark-color-text-error);
+  --danger-soft: var(--dark-color-error-muted);
+  --danger-line: var(--dark-color-border-red);
 
   /* diff on the chrome: added and removed, inside a change list only */
-  --add-tx: #7ed19d;
-  --del-tx: #f79283;
+  --add-tx: var(--dark-color-text-success);
+  --del-tx: var(--dark-color-text-error);
 
   /* layers, on the chrome */
-  --schema: #b5a8ff;
-  --know: #eceef2;
-  --cont: #68cfc0;
-  --cont-soft: rgba(104, 207, 192, 0.12);
+  --schema: var(--dark-color-text-purple);
+  --know: var(--dark-color-text-primary);
+  --cont: var(--dark-color-text-teal);
+  --cont-soft: var(--dark-color-background-teal);
 
-  /* the stage: calibrated neutral architectural paper */
-  --stage: #fbfbfa;
-  --stage-2: #f3f3f1;
-  --stage-3: #e7e7e4;
-  --card: #ffffff;
-  --rule: rgba(24, 26, 31, 0.085);
-  --rule-2: rgba(24, 26, 31, 0.15);
-  --ink: #181a1f;
-  --ink-2: #525863;
-  --ink-3: #6e7582;
-  --schema-ink: #5542c2;
-  --know-ink: #181a1f;
-  --cont-ink: #0d7668;
-  --act-ink: #2957c8;
-  --act-wash: rgba(41, 87, 200, 0.085);
-  --run-ink: #525863;
-  --attn-ink: #875800;
-  --attn-wash: #fef3dc;
-  --ink-solid: #181a1f;
-  --on-ink-solid: #fbfbfa;
-  --add-ink: #1b683f;
-  --add-wash: #e3f2e8;
-  --del-ink: #9e3528;
-  --del-wash: #fbe7e4;
-  --term: #0c0e11;
-  --term-tx: #d6dbd9;
+  /* the stage: Astryx's light surface */
+  --stage: var(--light-color-background-surface);
+  --stage-2: var(--light-color-background-body);
+  --stage-3: var(--light-color-background-gray);
+  --card: var(--light-color-background-card);
+  --rule: var(--light-color-border);
+  --rule-2: var(--light-color-border-emphasized);
+  --ink: var(--light-color-text-primary);
+  --ink-2: var(--light-color-text-secondary);
+  --ink-3: var(--light-color-icon-secondary);
+  --schema-ink: var(--light-color-text-purple);
+  --know-ink: var(--light-color-text-primary);
+  --cont-ink: var(--light-color-text-teal);
+  --act-ink: var(--light-color-accent);
+  --act-wash: var(--light-color-accent-muted);
+  --run-ink: var(--light-color-text-secondary);
+  --attn-ink: var(--light-color-text-warning);
+  --attn-wash: var(--light-color-warning-muted);
+  --ink-solid: var(--light-color-accent);
+  --on-ink-solid: var(--light-color-on-accent);
+  --add-ink: var(--light-color-text-success);
+  --add-wash: color-mix(in srgb, var(--light-color-success-muted) 45%, transparent);
+  --del-ink: var(--light-color-text-error);
+  --del-wash: color-mix(in srgb, var(--light-color-error-muted) 45%, transparent);
+  --term: var(--dark-color-syntax-background);
+  --term-tx: var(--dark-color-syntax-variable);
 
-  --shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.05), 0 1px 0 rgba(255, 255, 255, 0.03) inset,
-    0 12px 28px rgba(0, 0, 0, 0.32);
-  --stage-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 18px 44px rgba(0, 0, 0, 0.45);
-  --pop: 0 0 0 1px rgba(255, 255, 255, 0.09), 0 24px 64px rgba(0, 0, 0, 0.54);
+  /* Astryx's elevations; each takes the side of the surface it falls on. */
+  --shadow: var(--shadow-med);
+  --stage-shadow: var(--shadow-low);
+  --pop: var(--shadow-high);
   /* The instruction box: a surface lifted off the chrome, and the quiet fill of
      what sits on it (a chip, a hovered control). */
-  --composer: #1b1f25;
-  --composer-shadow: 0 6px 20px -10px rgba(0, 0, 0, 0.55);
-  --chip: rgba(255, 255, 255, 0.065);
-  --chip-2: rgba(255, 255, 255, 0.11);
-  --card-shadow: 0 0 0 1px rgba(24, 26, 31, 0.075), 0 1px 2px rgba(24, 26, 31, 0.035);
-  --label-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
-  --scrim: rgba(8, 9, 12, 0.56);
+  --composer: var(--dark-color-background-surface);
+  --composer-shadow: var(--shadow-low);
+  --chip: var(--dark-color-neutral);
+  --chip-2: var(--dark-color-accent-muted);
+  --card-shadow: 0 0 0 1px var(--light-color-border);
+  --label-shadow: var(--shadow-med);
+  --scrim: var(--dark-color-overlay);
 
-  /* vault colours: identity only, a calm set with no orange (the brand) */
-  --t-stone: #2b2e33;
-  --t-stone-fg: #e7e4dd;
-  --t-ai: #232d42;
-  --t-ai-fg: #c7d5f6;
-  --t-koke: #26332b;
-  --t-koke-fg: #cde2c5;
-  --t-seiji: #1f3431;
-  --t-seiji-fg: #bde6dc;
-  --t-fuji: #2d2842;
-  --t-fuji-fg: #dad0f8;
-  --t-sakura: #3b2a32;
-  --t-sakura-fg: #f4d1dd;
-  --t-suna: #36302a;
-  --t-suna-fg: #ecdcc4;
-  --t-shiro: #e9e6df;
-  --t-shiro-fg: #1a1d21;
+  /* vault colours: identity only, Astryx's hues without orange (the brand) */
+  --t-stone: var(--dark-color-background-gray);
+  --t-stone-fg: var(--dark-color-text-gray);
+  --t-ai: var(--dark-color-background-blue);
+  --t-ai-fg: var(--dark-color-text-blue);
+  --t-koke: var(--dark-color-background-green);
+  --t-koke-fg: var(--dark-color-text-green);
+  --t-seiji: var(--dark-color-background-teal);
+  --t-seiji-fg: var(--dark-color-text-teal);
+  --t-fuji: var(--dark-color-background-purple);
+  --t-fuji-fg: var(--dark-color-text-purple);
+  --t-sakura: var(--dark-color-background-pink);
+  --t-sakura-fg: var(--dark-color-text-pink);
+  --t-suna: var(--dark-color-background-yellow);
+  --t-suna-fg: var(--dark-color-text-yellow);
+  --t-shiro: var(--light-color-background-body);
+  --t-shiro-fg: var(--light-color-text-primary);
 }
 
 :root[data-theme='light'] {
   color-scheme: light;
   --chrome-scheme: light;
   --stage-scheme: light;
-  --bg: #ededeb;
-  --rail-tx: #585e68;
-  --panel: #f6f6f4;
-  --raised: #ececea;
-  --raised-2: #e2e2df;
-  --field: #ffffff;
-  --hair: rgba(24, 26, 31, 0.08);
-  --hair-2: rgba(24, 26, 31, 0.14);
-  --hair-3: rgba(24, 26, 31, 0.24);
-  --tx: #181a1f;
-  --tx-2: #525863;
-  --tx-3: #6e7582;
-  --solid: #181a1f;
-  --on-solid: #ffffff;
+  --bg: var(--light-color-background-body);
+  --rail-tx: var(--light-color-text-secondary);
+  --panel: var(--light-color-background-body);
+  --raised: color-mix(
+    in srgb,
+    var(--light-color-background-gray) 55%,
+    var(--light-color-background-body)
+  );
+  --raised-2: var(--light-color-background-gray);
+  --field: var(--light-color-background-surface);
+  --hair: var(--light-color-border);
+  --hair-2: color-mix(in srgb, var(--light-color-border-emphasized) 72%, transparent);
+  --hair-3: var(--light-color-border-emphasized);
+  --tx: var(--light-color-text-primary);
+  --tx-2: var(--light-color-text-secondary);
+  --tx-3: var(--light-color-icon-secondary);
+  --solid: var(--light-color-accent);
+  --on-solid: var(--light-color-on-accent);
   --brand: #cf601b;
-  --focus: #2563eb;
-  --act: #2957c8;
-  --act-soft: rgba(41, 87, 200, 0.09);
-  --act-line: rgba(41, 87, 200, 0.4);
-  --run: #525863;
-  --attn: #cc870e;
-  --attn-tx: #875800;
-  --attn-soft: rgba(204, 135, 14, 0.11);
-  --attn-line: rgba(204, 135, 14, 0.46);
-  --danger-tx: #9e3528;
-  --danger-soft: rgba(158, 53, 40, 0.08);
-  --danger-line: rgba(158, 53, 40, 0.38);
-  --add-tx: #1b683f;
-  --del-tx: #9e3528;
-  --schema: #5542c2;
-  --know: #181a1f;
-  --cont: #0d7668;
-  --cont-soft: rgba(13, 118, 104, 0.09);
-  --stage: #ffffff;
-  --stage-2: #f4f4f2;
-  --stage-3: #e8e8e5;
-  --card: #ffffff;
-  --rule: rgba(24, 26, 31, 0.085);
-  --rule-2: rgba(24, 26, 31, 0.15);
-  --ink: #181a1f;
-  --ink-2: #525863;
-  --ink-3: #6e7582;
-  --schema-ink: #5542c2;
-  --know-ink: #181a1f;
-  --cont-ink: #0d7668;
-  --act-ink: #2957c8;
-  --act-wash: rgba(41, 87, 200, 0.08);
-  --run-ink: #525863;
-  --attn-ink: #875800;
-  --attn-wash: #fef3dc;
-  --ink-solid: #181a1f;
-  --on-ink-solid: #ffffff;
-  --add-ink: #1b683f;
-  --add-wash: #e3f2e8;
-  --del-ink: #9e3528;
-  --del-wash: #fbe7e4;
-  --term: #14171b;
-  --term-tx: #d6dbd9;
-  --shadow: 0 0 0 1px rgba(24, 26, 31, 0.06), 0 8px 22px rgba(24, 26, 31, 0.06);
-  --stage-shadow: 0 0 0 1px rgba(24, 26, 31, 0.08), 0 12px 32px rgba(24, 26, 31, 0.1);
-  --pop: 0 0 0 1px rgba(24, 26, 31, 0.09), 0 24px 64px rgba(24, 26, 31, 0.18);
-  --composer: #ffffff;
-  --composer-shadow: 0 6px 18px -10px rgba(24, 26, 31, 0.18);
-  --chip: rgba(24, 26, 31, 0.055);
-  --chip-2: rgba(24, 26, 31, 0.09);
-  --card-shadow: 0 0 0 1px rgba(24, 26, 31, 0.08), 0 1px 2px rgba(24, 26, 31, 0.035);
-  --label-shadow: 0 8px 24px rgba(24, 26, 31, 0.16);
-  --scrim: rgba(24, 26, 31, 0.32);
-  --t-stone: #e4e4e0;
-  --t-stone-fg: #26292e;
-  --t-ai: #dbe3f5;
-  --t-ai-fg: #24355c;
-  --t-koke: #dce8d8;
-  --t-koke-fg: #2d4732;
-  --t-seiji: #d5ebe5;
-  --t-seiji-fg: #1d4a42;
-  --t-fuji: #e6def7;
-  --t-fuji-fg: #42356b;
-  --t-sakura: #f5dfe7;
-  --t-sakura-fg: #682d44;
-  --t-suna: #ede5d8;
-  --t-suna-fg: #56472e;
-  --t-shiro: #ffffff;
-  --t-shiro-fg: #181a1f;
+  --act: var(--light-color-accent);
+  --act-soft: var(--light-color-accent-muted);
+  --act-line: color-mix(in srgb, var(--light-color-accent) 40%, transparent);
+  --run: var(--light-color-text-secondary);
+  --attn-tx: var(--light-color-text-warning);
+  --attn-soft: var(--light-color-warning-muted);
+  --attn-line: var(--light-color-border-yellow);
+  --danger-tx: var(--light-color-text-error);
+  --danger-soft: color-mix(in srgb, var(--light-color-error-muted) 45%, transparent);
+  --danger-line: var(--light-color-border-red);
+  --add-tx: var(--light-color-text-success);
+  --del-tx: var(--light-color-text-error);
+  --schema: var(--light-color-text-purple);
+  --know: var(--light-color-text-primary);
+  --cont: var(--light-color-text-teal);
+  --cont-soft: var(--light-color-background-teal);
+  --composer: var(--light-color-background-surface);
+  --chip: var(--light-color-neutral);
+  --chip-2: var(--light-color-overlay-pressed);
+  --scrim: var(--light-color-overlay);
+  --t-stone: var(--light-color-background-gray);
+  --t-stone-fg: var(--light-color-text-gray);
+  --t-ai: var(--light-color-background-blue);
+  --t-ai-fg: var(--light-color-text-blue);
+  --t-koke: var(--light-color-background-green);
+  --t-koke-fg: var(--light-color-text-green);
+  --t-seiji: var(--light-color-background-teal);
+  --t-seiji-fg: var(--light-color-text-teal);
+  --t-fuji: var(--light-color-background-purple);
+  --t-fuji-fg: var(--light-color-text-purple);
+  --t-sakura: var(--light-color-background-pink);
+  --t-sakura-fg: var(--light-color-text-pink);
+  --t-suna: var(--light-color-background-yellow);
+  --t-suna-fg: var(--light-color-text-yellow);
+  --t-shiro: var(--light-color-background-surface);
+  --t-shiro-fg: var(--light-color-text-primary);
 }
 
-/* Dark keeps the hearth's chrome and darkens the stage. */
+/* Dark keeps the hearth's chrome and darkens the stage: Astryx's dark surface. */
 :root[data-theme='dark'] {
   --stage-scheme: dark;
-  --stage: #191c21;
-  --stage-2: #20242b;
-  --stage-3: #292e37;
-  --card: #1e2229;
-  --rule: rgba(255, 255, 255, 0.075);
-  --rule-2: rgba(255, 255, 255, 0.14);
-  --ink: #e8eaef;
-  --ink-2: #a5acb8;
-  --ink-3: #7d8592;
-  --schema-ink: #b5a8ff;
-  --know-ink: #e8eaef;
-  --cont-ink: #68cfc0;
-  --focus: #4f84f7;
-  --act-ink: #84aaff;
-  --act-wash: rgba(132, 170, 255, 0.12);
-  --run-ink: #a5acb8;
-  --attn-ink: #f0be63;
-  --attn-wash: #2c2516;
-  --ink-solid: #e8eaef;
-  --on-ink-solid: #191c21;
-  --add-ink: #7ed19d;
-  --add-wash: rgba(74, 184, 114, 0.14);
-  --del-ink: #f79283;
-  --del-wash: rgba(235, 96, 78, 0.15);
-  --card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
+  --stage: var(--dark-color-background-surface);
+  --stage-2: var(--dark-color-background-body);
+  --stage-3: var(--dark-color-background-gray);
+  --card: var(--dark-color-background-card);
+  --rule: var(--dark-color-border);
+  --rule-2: var(--dark-color-border-emphasized);
+  --ink: var(--dark-color-text-primary);
+  --ink-2: var(--dark-color-text-secondary);
+  --ink-3: color-mix(
+    in srgb,
+    var(--dark-color-text-secondary) 72%,
+    var(--dark-color-text-disabled)
+  );
+  --schema-ink: var(--dark-color-text-purple);
+  --know-ink: var(--dark-color-text-primary);
+  --cont-ink: var(--dark-color-text-teal);
+  --act-ink: var(--dark-color-accent);
+  --act-wash: var(--dark-color-accent-muted);
+  --run-ink: var(--dark-color-text-secondary);
+  --attn-ink: var(--dark-color-text-warning);
+  --attn-wash: var(--dark-color-warning-muted);
+  --ink-solid: var(--dark-color-accent);
+  --on-ink-solid: var(--dark-color-on-accent);
+  --add-ink: var(--dark-color-text-success);
+  --add-wash: var(--dark-color-success-muted);
+  --del-ink: var(--dark-color-text-error);
+  --del-wash: var(--dark-color-error-muted);
+  --card-shadow: 0 0 0 1px var(--dark-color-border);
 }
 
 /* Names from before v5, kept for components that still read them. Each one
-   resolves to a v5 role, so the whole renderer follows one palette. */
+   resolves to a v5 role, so the whole renderer follows one palette. Then the
+   roles the window shares whatever the theme. */
 :root {
   --paper: var(--stage);
   --surface: var(--card);
@@ -328,28 +300,42 @@
   --shadow-modal: var(--pop);
   --shadow-panel: var(--shadow);
 
-  /* type */
-  --font-ui:
-    'Geist', 'Noto Sans JP', 'Noto Sans CJK JP', 'Hiragino Sans', 'Yu Gothic UI', Meiryo, system-ui,
-    sans-serif;
-  --font-jp:
-    'Noto Sans JP', 'Noto Sans CJK JP', 'Hiragino Sans', 'Yu Gothic UI', Meiryo, 'Geist', sans-serif;
-  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* focus: Astryx's ring is its accent, so it takes the side of the surface it is
+     drawn on (dark on paper, light on graphite), resolved where it is used. */
+  --focus: var(--color-accent);
 
-  /* motion */
-  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --quick: 140ms;
-  --medium: 200ms;
-  --slow: 320ms;
+  /* type: Astryx neutral's Figtree, which has Latin letters only, so Japanese falls
+     to Noto Sans JP or the system's Japanese face. Code and the terminal keep the
+     bundled Geist Mono, the same on every system. */
+  --font-ui:
+    'Figtree', 'Noto Sans JP', 'Noto Sans CJK JP', 'Hiragino Sans', 'Yu Gothic UI', Meiryo,
+    system-ui, sans-serif;
+  --font-jp:
+    'Noto Sans JP', 'Noto Sans CJK JP', 'Hiragino Sans', 'Yu Gothic UI', Meiryo, 'Figtree',
+    sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-family-body: var(--font-ui);
+  --font-family-heading: var(--font-ui);
+  --font-family-code: var(--font-mono);
+
+  /* motion: Astryx's durations and easing */
+  --ease: var(--ease-standard);
+  --quick: var(--duration-fast);
+  --medium: var(--duration-medium-min);
+  --slow: var(--duration-medium);
 
   font-family: var(--font-ui);
-  font-size: 13px;
   line-height: 1.5;
-  letter-spacing: 0.01em;
   color: var(--tx);
   background: var(--bg);
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
+}
+
+/* The window's text is 13px, set on the body so the root keeps the browser's 16px:
+   Astryx gives its spacing, radii and type in rem against that. */
+body {
+  font-size: 13px;
 }
 
 /* Surfaces that sit on the paper stage carry its scheme, so native controls

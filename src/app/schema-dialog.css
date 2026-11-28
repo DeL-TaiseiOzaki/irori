@@ -52,7 +52,7 @@
   width: 100%;
   min-height: 36px;
   padding: 6px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-element);
   background: none;
   box-shadow: none;
   color: var(--tx);

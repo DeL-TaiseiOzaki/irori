@@ -49,7 +49,7 @@
   display: grid;
   place-items: center;
   padding: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-element);
   background: none;
   box-shadow: none;
   color: var(--tx-3);
@@ -93,7 +93,7 @@
   flex: 0 1 auto;
   display: flex;
   align-items: center;
-  border-radius: 7px;
+  border-radius: var(--radius-element);
   -webkit-app-region: no-drag;
   transition:
     background-color 140ms ease,
@@ -145,7 +145,7 @@
   place-items: center;
   padding: 0;
   margin-right: 4px;
-  border-radius: 5px;
+  border-radius: var(--radius-inner);
   background: none;
   box-shadow: none;
   color: var(--tx-3);
@@ -162,7 +162,7 @@
   width: 26px;
   height: 26px;
   margin: 0 0 0 2px;
-  border-radius: 7px;
+  border-radius: var(--radius-element);
 }
 .workspace-tabs button.workspace-tab-close:hover:not(:disabled),
 .workspace-tabs button.workspace-tab-add:hover:not(:disabled),
@@ -184,7 +184,7 @@
   height: 26px;
   max-width: 320px;
   padding: 0 12px;
-  border-radius: 7px;
+  border-radius: var(--radius-element);
   background: var(--raised);
   box-shadow: var(--pop);
   color: var(--tx);
@@ -395,7 +395,7 @@
 .rail-home {
   width: 36px;
   height: 36px;
-  border-radius: 8px;
+  border-radius: var(--radius-element);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -404,7 +404,7 @@
 .rail-home img {
   width: 24px;
   height: 24px;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   display: block;
 }
 .rail .rail-button:hover:not(:disabled),
@@ -442,7 +442,7 @@
 .rail .rail-brain {
   position: relative;
   display: flex;
-  border-radius: 10px;
+  border-radius: var(--radius-element);
 }
 .rail .rail-brain:hover:not(:disabled) {
   filter: brightness(1.08);
@@ -464,7 +464,7 @@
 .rail-ring {
   position: absolute;
   inset: -3px;
-  border-radius: 13px;
+  border-radius: var(--radius-container);
   overflow: hidden;
   pointer-events: none;
 }
@@ -481,7 +481,7 @@
   content: '';
   position: absolute;
   inset: 2px;
-  border-radius: 11px;
+  border-radius: var(--radius-element);
   background: var(--bg);
 }
 /* A vault whose agent waits for the person: the attention dot, the one thing in
@@ -510,7 +510,7 @@
   top: 7px;
   height: 28px;
   padding: 0 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   background: var(--solid);
   color: var(--on-solid);
   font-size: 12px;
@@ -570,7 +570,7 @@
   position: relative;
   width: 36px;
   height: 36px;
-  border-radius: 9px;
+  border-radius: var(--radius-element);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -595,7 +595,7 @@
   grid-auto-rows: 13px;
   gap: 3px;
   padding: 1px;
-  border-radius: 9px;
+  border-radius: var(--radius-element);
   background: var(--raised);
 }
 .rail-group-open {
@@ -610,7 +610,7 @@
   content: '';
   position: absolute;
   inset: 0 5px;
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   background: var(--raised);
   opacity: 0.6;
   pointer-events: none;
@@ -625,7 +625,7 @@
   margin-top: 4px;
   width: 36px;
   height: 36px;
-  border-radius: 8px;
+  border-radius: var(--radius-element);
   border: 1px dashed var(--hair-2);
   display: flex;
   align-items: center;
@@ -669,7 +669,7 @@
   gap: 6px;
   height: 22px;
   padding: 0 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   color: var(--tx-2);
 }
 .status-bar button.status-item {
@@ -748,7 +748,7 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   color: var(--tx-3);
   background: none;
   box-shadow: none;
@@ -777,7 +777,7 @@
   gap: 7px;
   height: 30px;
   padding: 0 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   font-size: 12.5px;
   white-space: nowrap;
 }
@@ -802,7 +802,7 @@
 .menu {
   min-width: 204px;
   padding: 4px;
-  border-radius: 10px;
+  border-radius: var(--radius-element);
   /* The window shows faintly through a menu, which sits over it for a moment. */
   background: color-mix(in srgb, var(--panel) 92%, transparent);
   backdrop-filter: blur(20px) saturate(1.2);
@@ -828,7 +828,7 @@
   gap: 8px;
   min-height: 29px;
   padding: 0 9px;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   cursor: default;
   outline: none;
   white-space: nowrap;
@@ -930,7 +930,7 @@
   grid-template-columns: 244px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   background: var(--panel);
   color: var(--tx);
   box-shadow:
@@ -967,7 +967,7 @@
   gap: 7px;
   height: 30px;
   padding: 0 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   background: var(--field);
   box-shadow: inset 0 0 0 1px var(--hair-2);
   color: var(--tx-3);
@@ -1017,7 +1017,7 @@
   align-items: center;
   min-height: 38px;
   padding: 5px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   background: none;
   box-shadow: none;
   color: var(--tx-2);
@@ -1136,7 +1136,7 @@
 .settings-group {
   display: flex;
   flex-direction: column;
-  border-radius: 8px;
+  border-radius: var(--radius-element);
   background: var(--raised);
   box-shadow: inset 0 0 0 1px var(--hair);
 }
@@ -1235,7 +1235,7 @@
   gap: 8px;
   min-height: 36px;
   padding: 7px 10px 7px 12px;
-  border-radius: 7px;
+  border-radius: var(--radius-element);
   box-shadow: inset 0 0 0 1px var(--hair-2);
   font-size: 12.5px;
   color: var(--tx-2);
@@ -1367,7 +1367,7 @@
 .settings-switch > span {
   position: absolute;
   inset: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-element);
   background: var(--raised-2);
   box-shadow: inset 0 0 0 1px var(--hair-3);
   transition:
@@ -1436,7 +1436,7 @@
 .settings-preview {
   margin: 0;
   padding: 18px 0;
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   background: var(--stage);
   box-shadow: inset 0 0 0 1px var(--hair);
   color: var(--ink);
@@ -1474,7 +1474,7 @@
   gap: 7px;
   min-height: 30px;
   padding: 0 11px;
-  border-radius: 9px;
+  border-radius: var(--radius-element);
   background: var(--raised-2);
   color: var(--tx);
   box-shadow: inset 0 0 0 1px var(--hair-2);
@@ -1521,7 +1521,7 @@
 .settings-body .settings-folder .stage-text-button.framed {
   height: auto;
   min-height: 30px;
-  border-radius: 9px;
+  border-radius: var(--radius-element);
   background: var(--raised-2);
   color: var(--tx);
   box-shadow: inset 0 0 0 1px var(--hair-2);
@@ -1539,7 +1539,7 @@
   gap: 8px;
   margin-bottom: 10px;
   padding: 10px 12px;
-  border-radius: 9px;
+  border-radius: var(--radius-element);
   background: var(--danger-soft);
   box-shadow: inset 0 0 0 1px var(--danger-line);
   font-size: 12.5px;
@@ -1586,7 +1586,7 @@
 }
 .settings-sheet button.settings-close {
   padding: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-element);
   background: none;
   box-shadow: none;
   color: var(--tx-3);
@@ -1700,7 +1700,7 @@
   gap: 5px;
   min-height: 26px;
   padding: 0 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-element);
   box-shadow: inset 0 0 0 1px var(--hair-2);
   color: var(--tx-2);
   font-size: 12px;

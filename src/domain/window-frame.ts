@@ -60,10 +60,11 @@ export function stripUnder<T>(
  * What the host paints around the renderer for a theme: the window's first paint and
  * the system's window controls, which sit on the title bar. Hearth, dark and a system
  * choice keep graphite chrome; light is paper throughout. The values are the chrome's
- * `--bg` and `--tx-2` in src/app/tokens.css.
+ * `--bg` and `--tx-2` in src/app/tokens.css, which are Astryx's body and secondary text
+ * (src/app/astryx-tokens.css).
  */
 export function windowChrome(theme: Theme): { background: string; symbol: string } {
   return theme === 'light'
-    ? { background: '#ededeb', symbol: '#525863' }
-    : { background: '#121417', symbol: '#9ea5b0' };
+    ? { background: '#f1f1f1', symbol: '#474747' }
+    : { background: '#1b1b1b', symbol: '#9e9e9e' };
 }

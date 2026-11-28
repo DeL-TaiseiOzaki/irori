@@ -1,0 +1,168 @@
+// Writes src/app/astryx-tokens.css: the design tokens of Astryx (@astryxdesign/core) with the
+// values of its neutral theme (@astryxdesign/theme-neutral), the system irori's look follows
+// (ADR 076). irori's own roles in tokens.css name these tokens instead of holding colours of
+// their own, so moving to a newer Astryx is `tsx scripts/astryx-tokens.ts` and a look at the
+// result. `--check` only compares, and tests/astryx-tokens.test.ts runs the same comparison.
+//
+// The tokens are copied, not imported with the theme's own stylesheet: that sheet also styles
+// headings and paragraphs inside its scope, which would override the note's own type. A colour
+// Astryx gives as light-dark(light, dark) is also written as its two sides,
+// --light-<token> and --dark-<token>, for the hearth theme, whose chrome is dark while its
+// paper stage is light.
+import { readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { format, resolveConfig } from 'prettier';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const output = path.join(root, 'src', 'app', 'astryx-tokens.css');
+
+type Declarations = Map<string, string>;
+
+/** Splits `text` at `separator` wherever it is outside parentheses and quotes. */
+function splitTop(text: string, separator: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let quote = '';
+  let start = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (quote) {
+      if (char === quote) quote = '';
+    } else if (char === '"' || char === "'") quote = char;
+    else if (char === '(') depth += 1;
+    else if (char === ')') depth -= 1;
+    else if (char === separator && depth === 0) {
+      parts.push(text.slice(start, index));
+      start = index + 1;
+    }
+  }
+  parts.push(text.slice(start));
+  return parts;
+}
+
+function declarations(body: string, into: Declarations = new Map()): Declarations {
+  for (const part of splitTop(body, ';')) {
+    const colon = part.indexOf(':');
+    if (colon < 0) continue;
+    const name = part.slice(0, colon).trim();
+    if (name.startsWith('--'))
+      into.set(
+        name,
+        part
+          .slice(colon + 1)
+          .trim()
+          .replace(/\s+/g, ' '),
+      );
+  }
+  return into;
+}
+
+/** The text between the brace that opens at `open` and the one that closes it. */
+function block(css: string, open: number): string {
+  let depth = 0;
+  for (let index = open; index < css.length; index += 1) {
+    if (css[index] === '{') depth += 1;
+    else if (css[index] === '}' && --depth === 0) return css.slice(open + 1, index);
+  }
+  throw new Error('An Astryx stylesheet has an unclosed block');
+}
+
+/**
+ * The tokens core declares for every page (`:root, .x… { … }` in astryx.css), without the
+ * private ones (`--_…`, `--x-…`) its components keep for themselves.
+ */
+export function coreTokens(coreCss: string): Declarations {
+  const tokens: Declarations = new Map();
+  for (const match of coreCss.matchAll(/:root, \.[a-z0-9]+\{([^}]*)\}/g))
+    declarations(match[1], tokens);
+  for (const name of [...tokens.keys()])
+    if (name.startsWith('--_') || name.startsWith('--x-') || name.startsWith('--astryx-'))
+      tokens.delete(name);
+  return tokens;
+}
+
+/** The tokens a built theme sets on the element it is applied to (its first `:scope` rule). */
+export function themeTokens(themeCss: string, theme: string): Declarations {
+  const scope = themeCss.indexOf(
+    `@scope ([data-astryx-theme="${theme}"])`,
+    themeCss.indexOf('@layer astryx-theme {'),
+  );
+  if (scope < 0) throw new Error(`The ${theme} theme's stylesheet has no theme scope`);
+  const rule = themeCss.indexOf(':scope {', scope);
+  if (rule < 0) throw new Error(`The ${theme} theme's scope sets no tokens`);
+  return declarations(block(themeCss, themeCss.indexOf('{', rule)));
+}
+
+/** `light-dark(a, b)` as [a, b], or nothing for any other value. */
+export function sides(value: string): [string, string] | undefined {
+  const match = /^light-dark\((.*)\)$/.exec(value);
+  if (!match) return undefined;
+  const parts = splitTop(match[1], ',');
+  return parts.length === 2 ? [parts[0].trim(), parts[1].trim()] : undefined;
+}
+
+export interface Source {
+  coreCss: string;
+  themeCss: string;
+  coreVersion: string;
+  themeVersion: string;
+}
+
+export async function renderAstryxTokens(source: Source): Promise<string> {
+  const tokens = coreTokens(source.coreCss);
+  for (const [name, value] of themeTokens(source.themeCss, 'neutral')) tokens.set(name, value);
+  const lines = [...tokens].map(([name, value]) => `${name}: ${value};`);
+  const split = [...tokens].flatMap(([name, value]) => {
+    const pair = sides(value);
+    if (!pair) return [];
+    const token = name.slice(2);
+    return [`--light-${token}: ${pair[0]};`, `--dark-${token}: ${pair[1]};`];
+  });
+  const css = `/* Generated by scripts/astryx-tokens.ts from @astryxdesign/core ${source.coreVersion}
+   and @astryxdesign/theme-neutral ${source.themeVersion}. Do not edit: run
+   \`tsx scripts/astryx-tokens.ts\` after moving to another Astryx. */
+
+@layer reset, astryx-base, astryx-theme;
+
+@layer astryx-theme {
+  :root {
+    ${lines.join('\n')}
+
+    /* Each two-sided colour's sides, for a surface whose scheme differs from the window's. */
+    ${split.join('\n')}
+  }
+}
+`;
+  const config = (await resolveConfig(output)) ?? {};
+  return format(css, { ...config, parser: 'css' });
+}
+
+export async function readSource(): Promise<Source> {
+  // Neither package exports its package.json, so they are read from where npm installs them.
+  const packages = path.join(root, 'node_modules', '@astryxdesign');
+  const version = async (name: string) =>
+    JSON.parse(await readFile(path.join(packages, name, 'package.json'), 'utf8')).version as string;
+  return {
+    coreCss: await readFile(path.join(packages, 'core', 'dist', 'astryx.css'), 'utf8'),
+    themeCss: await readFile(path.join(packages, 'theme-neutral', 'dist', 'theme.css'), 'utf8'),
+    coreVersion: await version('core'),
+    themeVersion: await version('theme-neutral'),
+  };
+}
+
+export { output as astryxTokensFile };
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const rendered = await renderAstryxTokens(await readSource());
+  if (process.argv.includes('--check')) {
+    const current = await readFile(output, 'utf8').catch(() => '');
+    if (current !== rendered) {
+      console.error(`${path.relative(root, output)} is not what the installed Astryx gives`);
+      process.exit(1);
+    }
+  } else {
+    await writeFile(output, rendered);
+    console.log(`Wrote ${path.relative(root, output)}`);
+  }
+}

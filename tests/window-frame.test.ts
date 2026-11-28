@@ -10,16 +10,24 @@ import {
 } from '../src/domain/window-frame';
 
 const tokens = await readFile(new URL('../src/app/tokens.css', import.meta.url), 'utf8');
+const astryx = await readFile(new URL('../src/app/astryx-tokens.css', import.meta.url), 'utf8');
 const shell = await readFile(new URL('../src/app/shell.css', import.meta.url), 'utf8');
 
-/** The value of a custom property in the first rule whose selector list contains `selector`. */
+/**
+ * The value of a custom property in the first rule whose selector list contains `selector`,
+ * following a `var()` that names one of Astryx's tokens to the value it holds.
+ */
 function token(selector: string, name: string) {
   const start = tokens.indexOf(selector);
   assert.ok(start >= 0, `${selector} is in tokens.css`);
   const block = tokens.slice(start, tokens.indexOf('}', start));
   const value = new RegExp(`${name}:\\s*([^;]+);`).exec(block)?.[1].trim();
   assert.ok(value, `${selector} sets ${name}`);
-  return value;
+  const named = /^var\((--[a-z0-9-]+)\)$/.exec(value)?.[1];
+  if (!named) return value;
+  const held = new RegExp(`\\n\\s*${named}:\\s*([^;]+);`).exec(astryx)?.[1].trim();
+  assert.ok(held, `astryx-tokens.css sets ${named}`);
+  return held;
 }
 
 test('the window controls take the chrome colours of the theme on show', () => {
